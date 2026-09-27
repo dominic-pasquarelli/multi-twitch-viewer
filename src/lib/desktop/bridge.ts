@@ -4,7 +4,7 @@
  */
 export interface UpdateStatus {
   /** dev = run from source (no update checks). */
-  state: 'dev' | 'checking' | 'up-to-date' | 'available' | 'error';
+  state: 'dev' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'error';
   current: string | null;
   latest?: string;
   latestMessage?: string;

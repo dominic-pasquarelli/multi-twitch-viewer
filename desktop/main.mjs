@@ -119,12 +119,20 @@ function startUpdateChecks() {
   setInterval(() => void runUpdateCheck(), UPDATE_CHECK_EVERY);
 }
 
-/** Runs the installer script (it rebuilds, reinstalls and restarts the app), then quits. */
+/**
+ * Starts the installer script in its own window. It rebuilds the app, then
+ * closes this one, installs the new version and reopens it.
+ */
 function installUpdate() {
-  if (process.platform !== 'win32') return;
-  startUpdater();
-  quitting = true;
-  setTimeout(() => app.quit(), 500);
+  if (process.platform !== 'win32' || updateStatus.state === 'installing') return;
+  try {
+    startUpdater({ dir: app.getPath('userData') });
+    updateStatus = { ...updateStatus, state: 'installing' };
+  } catch (err) {
+    updateStatus = { ...updateStatus, state: 'error', error: `Couldn't start the updater: ${err}` };
+  }
+  win?.webContents.send('mtv:update-status', updateStatus);
+  tray?.setUpdateAvailable(false);
 }
 
 function createWindow() {

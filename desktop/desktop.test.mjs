@@ -123,21 +123,35 @@ describe('updates', async () => {
     writeFileSync(join(dir, 'package.json'), JSON.stringify({ buildCommit: 'nope' }));
     expect(readBuildCommit(dir)).toBeNull();
   });
-  it('runs the latest installer script in its own window', () => {
+  it('runs the latest installer script in its own window, via Explorer', () => {
     /** @type {any[]} */
     const calls = [];
+    /** @type {Record<string, string>} */
+    const written = {};
     const fakeSpawn = /** @type {any} */ (
       (/** @type {any[]} */ ...args) => {
         calls.push(args);
-        return { unref() {} };
+        return { unref() {}, on() {} };
       }
     );
-    startUpdater(fakeSpawn);
+    const file = startUpdater({
+      dir: '/data',
+      spawnImpl: fakeSpawn,
+      writeFile: /** @type {any} */ (
+        (/** @type {string} */ p, /** @type {string} */ c) => (written[p] = c)
+      ),
+    });
+    expect(file).toBe(join('/data', 'update-multi-twitch-viewer.cmd'));
+    const script = written[file];
+    expect(script).toContain('\r\n'); // Windows line endings
+    expect(script).toContain(INSTALL_SCRIPT_URL);
+    expect(script).toContain('-FromApp');
+    expect(script).toContain('if errorlevel 1 pause');
+    // The PowerShell command is wrapped in double quotes, so it must not contain any.
+    expect(updaterCommand()).not.toContain('"');
     const [cmd, args, opts] = calls[0];
-    expect(cmd).toBe('powershell.exe');
-    expect(args.at(-1)).toBe(updaterCommand());
-    expect(updaterCommand()).toContain(INSTALL_SCRIPT_URL);
-    expect(updaterCommand()).toContain('-FromApp');
-    expect(opts).toMatchObject({ detached: true, windowsHide: false });
+    expect(cmd).toBe('explorer.exe');
+    expect(args).toEqual([file]);
+    expect(opts).toMatchObject({ detached: true });
   });
 });

@@ -4,7 +4,7 @@
 // with the newest commit on GitHub, and "Update now" re-runs the installer
 // script, which rebuilds and reinstalls the app on this PC.
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const REPO = 'dominic-pasquarelli/multi-twitch-viewer';
@@ -13,7 +13,7 @@ export const INSTALL_SCRIPT_URL = `https://raw.githubusercontent.com/${REPO}/${B
 
 /**
  * @typedef {{
- *   state: 'dev' | 'checking' | 'up-to-date' | 'available' | 'error';
+ *   state: 'dev' | 'checking' | 'up-to-date' | 'available' | 'installing' | 'error';
  *   current: string | null;
  *   latest?: string;
  *   latestMessage?: string;
@@ -86,16 +86,34 @@ export const updaterCommand = () =>
   '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; ' +
   `& ([scriptblock]::Create((New-Object Net.WebClient).DownloadString('${INSTALL_SCRIPT_URL}'))) -FromApp`;
 
+/** A .cmd file that runs the updater in a visible console window. */
+export const updaterCmdScript = () =>
+  [
+    '@echo off',
+    'title Multi Twitch Viewer - updating',
+    'echo Updating Multi Twitch Viewer. The app closes and reopens by itself when the new version is ready.',
+    `powershell -NoProfile -ExecutionPolicy Bypass -Command "${updaterCommand()}"`,
+    'if errorlevel 1 pause',
+    '',
+  ].join('\r\n');
+
 /**
- * Starts the installer script in its own console window (so progress is
- * visible), independent of the app, which then quits and gets replaced.
- * @param {typeof spawn} [spawnImpl]
+ * Starts the updater in its own window, fully independent of the app: the
+ * app writes a small .cmd file and asks Explorer to open it (a process the
+ * app starts itself can be shut down when the app closes). The app keeps
+ * running; the script closes it just before installing and reopens it after.
+ * @param {{ dir: string; spawnImpl?: typeof spawn; writeFile?: typeof writeFileSync }} opts
+ * @returns {string} the .cmd file's path
  */
-export function startUpdater(spawnImpl = spawn) {
-  const child = spawnImpl(
-    'powershell.exe',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', updaterCommand()],
-    { detached: true, stdio: 'ignore', windowsHide: false },
-  );
-  child.unref();
+export function startUpdater({ dir, spawnImpl = spawn, writeFile = writeFileSync }) {
+  const file = join(dir, 'update-multi-twitch-viewer.cmd');
+  writeFile(file, updaterCmdScript());
+  const launch = (/** @type {string} */ cmd, /** @type {string[]} */ args) => {
+    const child = spawnImpl(cmd, args, { detached: true, stdio: 'ignore' });
+    child.unref();
+    return child;
+  };
+  // Fallback if Explorer can't be started for some reason.
+  launch('explorer.exe', [file]).on('error', () => launch('cmd.exe', ['/c', 'start', '""', file]));
+  return file;
 }
