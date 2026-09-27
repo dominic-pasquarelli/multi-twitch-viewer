@@ -39,8 +39,9 @@ function SetupForm({ onDone }: { onDone(): void }) {
           turned on).
         </li>
         <li>
-          Register an application: any unique <strong>Name</strong> (e.g. “yourname-multi-viewer”),
-          category <strong>Website Integration</strong>, client type <strong>Public</strong>.
+          Register an application: a unique <strong>Name</strong> without the word “Twitch” (Twitch
+          rejects it), e.g. “yourname-multiviewer”, category <strong>Website Integration</strong>,
+          client type <strong>Public</strong>.
         </li>
         <li>
           Set the <strong>OAuth Redirect URL</strong> to exactly:
