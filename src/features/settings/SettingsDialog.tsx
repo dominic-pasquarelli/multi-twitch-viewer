@@ -1,4 +1,5 @@
 import { redirectUri } from '@/config/appConfig';
+import { desktop } from '@/lib/desktop/bridge';
 import { useClientId, useServices } from '@/app/servicesContext';
 import { useAuth } from '@/state/authStore';
 import { useState } from 'react';
@@ -64,6 +65,17 @@ function SettingsForm() {
               <LoginButton />
             )}
           </div>
+          {desktop && (
+            <div className={formStyles.row} style={{ marginBottom: 12 }}>
+              <span className={formStyles.help} style={{ flex: 1 }}>
+                For Turbo or sub benefits (no ads) inside the players, sign in to twitch.tv once in
+                the app too.
+              </span>
+              <Button size="small" onClick={() => void desktop?.openTwitchSignIn()}>
+                Sign in to Twitch players
+              </Button>
+            </div>
+          )}
           <Field
             label="Client ID"
             help={
@@ -166,6 +178,11 @@ function SettingsForm() {
       </Field>
 
       <div className={formStyles.row} style={{ justifyContent: 'flex-end', marginTop: 16 }}>
+        {desktop?.version && (
+          <span className={formStyles.help} style={{ flex: 1 }}>
+            Multi Twitch Viewer {desktop.version} · updates install automatically
+          </span>
+        )}
         <Button size="small" variant="ghost" onClick={() => s.reset()}>
           Reset settings to defaults
         </Button>

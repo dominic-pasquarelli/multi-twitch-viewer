@@ -50,26 +50,33 @@ old entry falls back to defaults instead of crashing the app. All keys are prefi
 embed, or the mock ones (`VITE_TWITCH_MOCK=true`, used by `npm run dev:mock` and the e2e tests).
 Features only use `useServices()`, so they don't know or care which one is active.
 
-## Windows launcher (`launcher/`)
+## Desktop app (`desktop/`, Electron)
 
-A small Go program (`MultiTwitchViewer.exe`) that makes the app a double-click desktop tool:
+Plain JavaScript modules, typechecked through `tsconfig.desktop.json` (`// @ts-check`), with no
+build step:
 
-- It embeds the built web app (`launcher/web`, filled by `npm run build:windows`) and serves it on
-  `127.0.0.1:5757`, the same origin as `npm start`, so logins and presets are shared.
-- It opens the app with `chrome.exe`/`msedge.exe --app=…`, a window without tabs that still uses
-  your normal browser profile, so the twitch.tv cookies (Turbo) work. If neither browser is found,
-  it opens the default browser.
-- **Single instance**: if port 5757 already answers `/__mtv/health`, it just opens another window.
-- **Auto-quit**: the web app POSTs `/__mtv/heartbeat` every 20 s (`src/lib/launcher/heartbeat.ts`,
-  which does nothing outside the launcher). The launcher exits 3 minutes after the last heartbeat,
-  which allows for browsers throttling background windows.
-- **Update notice**: `/__mtv/version` reports the version and commit stamped in at build time.
-  `src/lib/launcher/updates.ts` compares that commit with GitHub's `latest` tag and
-  `features/updates/UpdateBanner` offers the download. Local builds (commit `dev`) skip this.
-- On first run it creates a desktop shortcut. Errors are shown in a Windows message box.
-- `winres/` holds the icon, version info and manifest (compiled in with `go-winres`).
-- Platform-specific code is in `platform_windows.go`; `platform_other.go` lets it build and be
-  tested on Linux or macOS.
+| Module            | What it does                                                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `main.mjs`        | App lifecycle: single instance, window, close-to-tray, permissions, links, Twitch sign-in window.                                                                        |
+| `server.mjs`      | Serves `dist/` on `localhost:5757` (IPv4 + IPv6). The Twitch OAuth redirect and embed `parent` need exactly that origin.                                                 |
+| `windowState.mjs` | Saves and restores size, position, maximized and fullscreen; falls back to the primary monitor if the saved one is gone.                                                 |
+| `navigation.mjs`  | Only the app and `*.twitch.tv` pages may load in the window; everything else opens in the system browser. Also the permission allow-list and the Chrome-like user agent. |
+| `tray.mjs`        | Tray icon and menu (show, restart to install update, quit).                                                                                                              |
+| `updates.mjs`     | `electron-updater` against GitHub releases: checks at start and every 6 h, installs on quit.                                                                             |
+| `preload.cjs`     | The only bridge to the page: `window.mtvDesktop` (see `src/lib/desktop/bridge.ts`).                                                                                      |
+
+Behaviour notes:
+
+- **Hidden to the tray**, the page gets `mtvDesktop.onBackgroundChange(true)` and unmounts the
+  players and chat (no hidden audio or bandwidth). The live-list polling keeps running
+  (`backgroundThrottling: false`, `refetchIntervalInBackground`), so go-live notifications still
+  fire. Clicking one calls `showWindow()`.
+- The window is sandboxed (`contextIsolation`, `sandbox`, no Node integration). The page can only
+  use the bridge functions.
+- Packaging: `electron-builder.yml` (NSIS one-click installer). Only `electron-updater` is a
+  runtime dependency; the web app's libraries are already bundled into `dist/`.
+- Tests: `desktop/desktop.test.mjs` (unit) and `e2e/desktop.spec.ts`, which drives the real app
+  with Playwright: tray hide/show, blocked navigation, and window position across restarts.
 
 ## Key design decisions
 

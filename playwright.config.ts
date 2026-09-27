@@ -30,6 +30,11 @@ export default defineConfig({
       use: { ...chromium, baseURL: `http://localhost:${PORT}` },
     },
     {
+      // The Electron app loads the mock build from dist/ (built by the webServer below).
+      name: 'desktop',
+      testMatch: 'desktop.spec.ts',
+    },
+    {
       name: 'twitch',
       testMatch: 'twitch-integration.spec.ts',
       use: { ...chromium, baseURL: `http://localhost:${REAL_PORT}` },
@@ -37,7 +42,8 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `npx vite build --mode mock --outDir dist-e2e/mock && npx vite preview --mode mock --outDir dist-e2e/mock --port ${PORT}`,
+      // Also builds dist/ in mock mode for the desktop (Electron) tests.
+      command: `npx vite build --mode mock && npx vite build --mode mock --outDir dist-e2e/mock && npx vite preview --mode mock --outDir dist-e2e/mock --port ${PORT}`,
       url: `http://localhost:${PORT}`,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

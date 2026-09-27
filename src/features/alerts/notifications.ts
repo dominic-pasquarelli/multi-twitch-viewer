@@ -1,3 +1,5 @@
+import { desktop } from '@/lib/desktop/bridge';
+
 /** Thin wrapper over the browser Notification API (shows as a Windows toast). */
 
 export type NotifyPermission = NotificationPermission | 'unsupported';
@@ -22,6 +24,7 @@ export function notify(
     tag: opts.tag,
   });
   n.onclick = () => {
+    desktop?.showWindow(); // un-hide the desktop app from the tray
     window.focus();
     opts.onClick();
     n.close();

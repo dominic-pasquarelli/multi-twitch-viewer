@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { startLauncherHeartbeat } from '@/lib/launcher/heartbeat';
+import { desktop } from '@/lib/desktop/bridge';
 import { useClientId } from '@/app/servicesContext';
 import { useSettings } from '@/state/settingsStore';
 import { useUi } from '@/state/uiStore';
@@ -17,7 +17,6 @@ import { useHotkeys } from '@/features/shortcuts/useHotkeys';
 import { useFullscreenSync } from '@/features/topbar/fullscreen';
 import { TopBar } from '@/features/topbar/TopBar';
 import { installAudioUnlock } from '@/features/viewer/playerRegistry';
-import { UpdateBanner } from '@/features/updates/UpdateBanner';
 import { useHashSync } from '@/features/viewer/useHashSync';
 import { Viewer } from '@/features/viewer/Viewer';
 import styles from './App.module.css';
@@ -30,19 +29,16 @@ export function App() {
   useFullscreenSync();
   useGoLiveAlerts();
   useEffect(() => installAudioUnlock(), []);
-  useEffect(() => {
-    let stop = () => {};
-    let cancelled = false;
-    void startLauncherHeartbeat().then((s) => (cancelled ? s() : (stop = s)));
-    return () => {
-      cancelled = true;
-      stop();
-    };
-  }, []);
+  useEffect(
+    () => desktop?.onBackgroundChange((hidden) => useUi.getState().setBackgrounded(hidden)),
+    [],
+  );
 
   const sidebarCollapsed = useSettings((s) => s.sidebarCollapsed);
   const chatOpen = useViewStore((s) => s.view.chat.open);
   const fullscreen = useUi((s) => s.fullscreen);
+  // Hidden in the tray: unmount the players so nothing plays or downloads.
+  const backgrounded = useUi((s) => s.backgrounded);
 
   return (
     <div className={`${styles.app} ${fullscreen ? styles.fullscreen : ''}`}>
@@ -53,10 +49,8 @@ export function App() {
       <div className={`${styles.side} ${sidebarCollapsed ? styles.collapsed : ''}`}>
         <Sidebar />
       </div>
-      <main className={styles.main}>
-        <Viewer />
-      </main>
-      {chatOpen && (
+      <main className={styles.main}>{!backgrounded && <Viewer />}</main>
+      {chatOpen && !backgrounded && (
         <div className={styles.chat}>
           <ChatPanel />
         </div>
@@ -65,7 +59,6 @@ export function App() {
       <SetupDialog />
       <SavePresetDialog />
       <ShortcutsDialog />
-      <UpdateBanner />
       <Toasts />
     </div>
   );

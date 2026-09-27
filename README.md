@@ -31,23 +31,33 @@ channels are live, and watch several streams at once with layouts that actually 
 - **Also**: tabbed chat (`C`) that follows the stream you're hearing, fullscreen (`F`), undo
   (`Ctrl+Z`), and optional "match quality to tile size" to save bandwidth.
 
-## Windows: one-click app (easiest)
+## Windows desktop app (easiest)
 
-1. Go to the repository's **Releases** page, open **Latest Windows app**, and download
-   **`MultiTwitchViewer.exe`**.
-2. Put it wherever you like (for example `Documents`) and double-click it.
-   - Windows may say _"Windows protected your PC"_ because the file isn't code-signed. Click
-     **More info → Run anyway**. You only need to do this once.
-3. The app opens in its own window. A **Multi Twitch Viewer** shortcut is added to your desktop,
-   so next time just double-click that.
+1. Go to the repository's **Releases** page, open the newest release, and download
+   **`MultiTwitchViewer-Setup-<version>.exe`**.
+2. Double-click it. It installs in a few seconds, with no questions, and opens the app.
+   - Windows may say _"Windows protected your PC"_ because the installer isn't code-signed.
+     Click **More info → Run anyway**. You only need to do this once.
+3. From then on, use the **Multi Twitch Viewer** shortcut on your desktop or in the Start menu.
 
-No Node.js, no commands and no installer. The exe contains the whole app and runs it on
-`http://localhost:5757`. It uses your installed Chrome or Edge (Edge comes with Windows), so your
-twitch.tv login and Turbo carry over. It quits on its own a few minutes after you close the
-window. Opening it again while it's running just opens another window.
+**First run:**
 
-When a newer version is released, the app shows a **Download** prompt. Replace your old exe with
-the new one; presets and settings are kept, because they're stored in the browser, not in the exe.
+1. Do the [one-time Twitch setup](#one-time-twitch-setup-about-3-minutes) and log in when the app
+   asks.
+2. For Turbo in the players, open **Settings → Sign in to Twitch players** once. The desktop app
+   has its own built-in browser, so it doesn't use your normal browser's Twitch login.
+
+**How it behaves:**
+
+- **Closing the window keeps it in the system tray** (bottom-right, near the clock). Streams stop,
+  but go-live alerts for your favorites keep coming. Click the tray icon to reopen, or right-click
+  → **Quit**.
+- **Updates install themselves.** New versions download in the background and are installed the
+  next time the app starts (or use **Restart to install update** in the tray menu).
+- It reopens at the same size, position and monitor, maximized or fullscreen included, and
+  restores your last streams.
+- Its presets and settings are separate from the browser version (`npm start`). To move presets
+  between them, use **Presets → Export / Import**.
 
 ## Run from source (any OS)
 
@@ -90,7 +100,9 @@ that the app shows **Log in again**, which is one click because Twitch remembers
 
 ## Turbo / no ads
 
-The video players are Twitch's official embedded players. They use the Twitch login from the
+**Desktop app:** use **Settings → Sign in to Twitch players** once; that's all.
+
+**Browser version (`npm start`):** the video players are Twitch's official embedded players. They use the Twitch login from the
 browser you run the app in, so your Turbo (or sub) benefits apply when:
 
 1. You're logged in at [twitch.tv](https://www.twitch.tv) in the **same browser**, and
@@ -154,13 +166,14 @@ npm run dev:mock     # dev server with fake Twitch data
 npm run check        # typecheck + lint + unit tests
 npm run test:e2e     # browser tests (first time: npx playwright install chromium)
 npm run format       # prettier
-npm run build:windows  # release/MultiTwitchViewer.exe (needs Go 1.24+; works from any OS)
-npm run test:launcher  # Go tests for the Windows launcher
+npm run desktop      # run the desktop (Electron) app from source
+npm run desktop:mock # …with fake Twitch data
+npm run desktop:dist # build the Windows installer into release/ (best run on Windows)
 ```
 
-The Windows app is a small Go program in `launcher/` that embeds the built web app. The
-**Windows app** GitHub workflow rebuilds it on every push to `main` and attaches it to the
-**Latest Windows app** release.
+The desktop app lives in `desktop/`. The **Desktop app** GitHub workflow builds the installer on
+every push to `main` and publishes it as a numbered release, which installed apps pick up as an
+update.
 
 Code is organised as independent, reusable modules. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module map and how to extend or fix one

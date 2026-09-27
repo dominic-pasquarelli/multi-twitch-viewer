@@ -22,6 +22,8 @@ export function useFollowedLive() {
     queryFn: () => api!.getFollowedStreams(userId!),
     enabled: !!api && !!userId,
     refetchInterval: refreshSeconds * 1000,
+    // Keep polling in the background so go-live alerts still arrive.
+    refetchIntervalInBackground: true,
     placeholderData: keepPreviousData,
   });
 }
