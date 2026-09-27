@@ -1,38 +1,19 @@
-import {
-  memo,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from 'react';
-import {
-  ExternalLink,
-  GripVertical,
-  MessageSquare,
-  Maximize2,
-  Play,
-  RotateCw,
-  Volume2,
-  VolumeX,
-  X,
-} from 'lucide-react';
+import { memo, useEffect, useLayoutEffect, useRef } from 'react';
+import { Play } from 'lucide-react';
 import { useServices } from '@/app/servicesContext';
 import type { Rect } from '@/lib/layout';
 import { PlayerController } from '@/lib/player/PlayerController';
 import { pickQualityForHeight } from '@/lib/player/quality';
 import type { PlayerStatus } from '@/lib/player/types';
-import { formatCount } from '@/lib/utils/format';
 import { useUi } from '@/state/uiStore';
 import { IconButton } from '@/ui/Button';
+import { AutoResume } from './autoResume';
+import { markInteraction, pausedByUser } from './playerInteraction';
 import { playerRegistry } from './playerRegistry';
-import { nudgeVolume, VOLUME_STEP } from './volume';
 import styles from './PlayerTile.module.css';
 
 export interface PlayerTileProps {
   login: string;
-  displayName: string;
-  viewers?: number;
   rect: Rect;
   /** The stream you're focused on (full volume, highlighted). */
   audible: boolean;
@@ -42,37 +23,36 @@ export interface PlayerTileProps {
   volumeScale: number;
   /** The channel's remembered volume (null = leave the player's own). */
   volume: number | null;
-  isMain: boolean;
-  showMainButton: boolean;
   fitQuality: boolean;
   belowMinimum: boolean;
   status: PlayerStatus | undefined;
+  /** Its controls are shown in the top bar. */
+  selected: boolean;
   dropTarget: boolean;
-  dragging: boolean;
-  onToggleAudio(login: string): void;
   onVolume(login: string, volume: number): void;
-  onRemove(login: string): void;
-  onMakeMain(login: string): void;
-  onOpenChat(login: string): void;
   onExternalMute(login: string, muted: boolean): void;
   onStatus(login: string, status: PlayerStatus | null): void;
-  onDragStart(login: string, e: ReactPointerEvent): void;
+  onSelect(login: string): void;
 }
 
-/**
- * One stream. The player is created once per mount and then only steered
- * (mute/volume/quality) — never re-created — so streams don't restart.
- */
 /** Volume actually sent to the player: the channel's volume times the duck scale. */
 const effectiveVolume = (volume: number | null, scale: number): number | null =>
   volume === null ? (scale === 1 ? null : 0.5 * scale) : volume * scale;
 
+/**
+ * One stream: only the player, nothing drawn on top of it (Twitch players can
+ * pause or refuse to play when covered). Highlights sit in the gap around it;
+ * the stream's controls live in the top bar (StreamControls).
+ *
+ * The player is created once per mount and then only steered
+ * (mute/volume/quality), never re-created, so streams don't restart.
+ */
 export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
   const { login, rect, audible, muted, volume, volumeScale, status } = props;
   const { playerFactory } = useServices();
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<PlayerController | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  const reloadKey = useUi((s) => s.reloadRequests[login] ?? 0);
   const latest = useRef(props);
   useLayoutEffect(() => {
     latest.current = props;
@@ -83,13 +63,24 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
     const host = hostRef.current;
     if (!host) return;
     const p = latest.current;
+    const autoResume = new AutoResume();
+    let resumeTimer: ReturnType<typeof setTimeout> | undefined;
     // Start muted so autoplay is allowed; the controller unmutes once ready.
     const adapter = playerFactory.create(host, { channel: login, muted: true });
     const controller = new PlayerController(
       adapter,
       { muted: p.muted, volume: effectiveVolume(p.volume, p.volumeScale), quality: null },
       {
-        onStatus: (s) => latest.current.onStatus(login, s),
+        onStatus: (s) => {
+          latest.current.onStatus(login, s);
+          // Keep streams playing unless you paused them yourself.
+          clearTimeout(resumeTimer);
+          if (s === 'paused' && autoResume.shouldResume(pausedByUser(login))) {
+            resumeTimer = setTimeout(() => {
+              if (controller.status === 'paused' && !pausedByUser(login)) adapter.play();
+            }, 600);
+          }
+        },
         onExternalMute: (m) => {
           // Muting a quiet background stream in duck mode doesn't change focus.
           if (!m || latest.current.audible) latest.current.onExternalMute(login, m);
@@ -104,6 +95,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
     const poll = setInterval(() => controller.sync(), 1000);
     return () => {
       clearInterval(poll);
+      clearTimeout(resumeTimer);
       controller.dispose();
       adapter.destroy();
       if (playerRegistry.get(login)?.controller === controller) playerRegistry.delete(login);
@@ -128,16 +120,6 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
     if (v !== null) controllerRef.current?.update({ volume: v });
   }, [login, volume, volumeScale]);
 
-  // Brief "volume 65%" readout after wheel/keyboard changes.
-  const flash = useUi((s) => (s.volumeFlash?.login === login ? s.volumeFlash.n : 0));
-  const [showHud, setShowHud] = useState(false);
-  useEffect(() => {
-    if (!flash) return;
-    setShowHud(true);
-    const t = setTimeout(() => setShowHud(false), 900);
-    return () => clearTimeout(t);
-  }, [flash]);
-
   // Optional: match the stream quality to the tile size (saves bandwidth/CPU).
   const { fitQuality } = props;
   useEffect(() => {
@@ -161,9 +143,9 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
 
   const classes = [
     styles.tile,
+    props.selected && styles.selected,
     audible && styles.audible,
     props.dropTarget && styles.dropTarget,
-    props.dragging && styles.dragging,
   ]
     .filter(Boolean)
     .join(' ');
@@ -174,11 +156,12 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       data-testid="player-tile"
       data-channel={login}
       data-audible={audible}
+      data-selected={props.selected}
+      data-status={status ?? 'loading'}
       style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
-      // The video itself is an iframe (it keeps its own wheel events), so this
-      // works over the name and control bars that appear on hover.
-      onWheel={(e) => {
-        if (e.deltaY !== 0) nudgeVolume(login, e.deltaY < 0 ? VOLUME_STEP : -VOLUME_STEP);
+      onMouseEnter={(e) => {
+        // Not while a button is held: that's a drag from the top-bar controls.
+        if (e.buttons === 0) props.onSelect(login);
       }}
       onMouseLeave={() => {
         // Clicking inside a player gives it keyboard focus; hand focus back to
@@ -187,7 +170,15 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         if (active instanceof HTMLIFrameElement && hostRef.current?.contains(active)) active.blur();
       }}
     >
-      <div ref={hostRef} key={reloadKey} className={styles.host} data-player-host />
+      <div
+        ref={hostRef}
+        key={reloadKey}
+        className={styles.host}
+        data-player-host
+        // Players that are part of the page (mock mode) report clicks here;
+        // real Twitch players are iframes, detected via focus in the Viewer.
+        onPointerDown={() => markInteraction(login)}
+      />
 
       {status === 'blocked' && (
         <div className={styles.overlay}>
@@ -207,82 +198,6 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
           </p>
         </div>
       )}
-
-      {showHud && (
-        <div className={styles.hud} data-testid="volume-hud">
-          {muted ? 'Muted · ' : ''}Volume {Math.round((volume ?? 0.5) * 100)}%
-          {volumeScale !== 1 && !muted ? ` (background ${Math.round(volumeScale * 100)}%)` : ''}
-        </div>
-      )}
-
-      <div className={`${styles.bar} ${styles.left}`}>
-        <span
-          className={styles.grip}
-          onPointerDown={(e) => props.onDragStart(login, e)}
-          title="Drag onto another stream to swap places"
-        >
-          <GripVertical size={16} />
-        </span>
-        <span className={styles.name}>
-          {props.displayName}
-          {props.viewers !== undefined && (
-            <span className={styles.meta}>{formatCount(props.viewers)}</span>
-          )}
-          {status === 'offline' && <span className={styles.meta}>offline</span>}
-        </span>
-      </div>
-
-      <div className={`${styles.bar} ${styles.right}`}>
-        <IconButton
-          size="sm"
-          label={audible ? 'Stop listening (M mutes all)' : 'Listen to this stream'}
-          active={audible}
-          icon={muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          onClick={() => props.onToggleAudio(login)}
-        />
-        <input
-          className={styles.volume}
-          type="range"
-          min={0}
-          max={100}
-          value={Math.round((volume ?? 0.5) * 100)}
-          aria-label={`${props.displayName} volume`}
-          title="Volume — or scroll over this bar; ↑/↓ change the stream you're hearing"
-          onChange={(e) => props.onVolume(login, Number(e.target.value) / 100)}
-        />
-        {props.showMainButton && !props.isMain && (
-          <IconButton
-            size="sm"
-            label="Make this the main stream"
-            icon={<Maximize2 size={15} />}
-            onClick={() => props.onMakeMain(login)}
-          />
-        )}
-        <IconButton
-          size="sm"
-          label="Show chat"
-          icon={<MessageSquare size={15} />}
-          onClick={() => props.onOpenChat(login)}
-        />
-        <IconButton
-          size="sm"
-          label="Reload player"
-          icon={<RotateCw size={15} />}
-          onClick={() => setReloadKey((k) => k + 1)}
-        />
-        <IconButton
-          size="sm"
-          label="Open on Twitch"
-          icon={<ExternalLink size={15} />}
-          onClick={() => window.open(`https://www.twitch.tv/${login}`, '_blank', 'noopener')}
-        />
-        <IconButton
-          size="sm"
-          label="Remove"
-          icon={<X size={16} />}
-          onClick={() => props.onRemove(login)}
-        />
-      </div>
     </div>
   );
 });

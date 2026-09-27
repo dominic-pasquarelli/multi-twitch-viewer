@@ -18,4 +18,5 @@ export function nudgeVolume(login: string, delta: number): void {
   const next = Math.min(1, Math.max(0, Math.round((currentVolume(login) + delta) * 100) / 100));
   useChannelPrefs.getState().setVolume(login, next);
   useUi.getState().flashVolume(login);
+  useUi.getState().setSelected(login); // show it in the top-bar controls
 }

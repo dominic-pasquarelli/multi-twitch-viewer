@@ -7,12 +7,22 @@ import { createMockPlayerFactory } from '@/lib/player/mockPlayer';
 import { useAuth } from '@/state/authStore';
 import { ServicesContext, useClientId, type Services } from './servicesContext';
 
-if (IS_MOCK) (window as unknown as { mtvMock: unknown }).mtvMock = { setLive: setMockLive };
-
 const mockPlayers = createMockPlayerFactory({
   isLive: (login) => MOCK_CHANNELS.find((c) => c.login === login)?.live ?? true,
   hueFor: mockHue,
 });
+
+// Test/demo hooks in mock mode: simulate going live, or a player pausing itself.
+if (IS_MOCK) {
+  (window as unknown as { mtvMock: unknown }).mtvMock = {
+    setLive: setMockLive,
+    pause: (login: string) =>
+      mockPlayers.instances
+        .filter((p) => p.channel === login)
+        .at(-1)
+        ?.pause(),
+  };
+}
 
 /**
  * Chooses the real Twitch implementations or the mock ones. Features only see

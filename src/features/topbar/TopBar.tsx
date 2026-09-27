@@ -18,6 +18,7 @@ import { Avatar } from '@/ui/Avatar';
 import { IconButton } from '@/ui/Button';
 import { LoginButton } from '../auth/LoginPrompt';
 import { PresetsMenu } from '../presets/PresetsMenu';
+import { StreamControls } from '../viewer/StreamControls';
 import { AddChannelBox } from './AddChannelBox';
 import { toggleFullscreen } from './fullscreen';
 import styles from './TopBar.module.css';
@@ -111,6 +112,8 @@ export function TopBar() {
           disabled={!view.channels.length}
         />
       </div>
+
+      <StreamControls />
 
       <div className={styles.spacer} />
 
