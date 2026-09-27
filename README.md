@@ -33,27 +33,50 @@ channels are live, and watch several streams at once with layouts that actually 
 
 ## Windows desktop app (easiest)
 
-1. Go to the repository's **Releases** page, open the newest release, and download
-   **`MultiTwitchViewer-Setup-<version>.exe`**.
-2. Double-click it. It installs in a few seconds, with no questions, and opens the app.
-   - Windows may say _"Windows protected your PC"_ because the installer isn't code-signed.
-     Click **More info → Run anyway**. You only need to do this once.
-3. From then on, use the **Multi Twitch Viewer** shortcut on your desktop or in the Start menu.
+### Install (once)
 
-**First run:**
+Pick one:
+
+- **Double-click:** download
+  [`Install Multi Twitch Viewer.cmd`](https://github.com/dominic-pasquarelli/multi-twitch-viewer/raw/main/Install%20Multi%20Twitch%20Viewer.cmd)
+  (if the browser shows the text instead, right-click the link → _Save link as…_) and double-click
+  it. If Windows says _"Windows protected your PC"_, click **More info → Run anyway**.
+- **Or paste one line:** press Start, type **PowerShell**, open it, paste this and press Enter:
+
+  ```powershell
+  irm https://raw.githubusercontent.com/dominic-pasquarelli/multi-twitch-viewer/main/scripts/windows/install.ps1 | iex
+  ```
+
+A window shows the progress. It downloads the newest code from GitHub, builds the app on your PC
+and installs it. The first time takes about 5 minutes; after that, about 1–2. When it's done, the app
+opens and **Multi Twitch Viewer** shortcuts are on your desktop and in the Start menu.
+
+Nothing else is needed: no Node.js, Git or admin rights. The installer keeps its own private copy
+of the build tools in `%LOCALAPPDATA%\MultiTwitchViewer-Builder` (safe to delete; a log of the
+last run is saved there as `last-run.log`).
+
+### Updates
+
+The app checks GitHub for new code (at start and every 6 hours). When there is some, you get a
+notification and an **Update now** button (also in **Settings → App updates** and the tray menu).
+One click closes the app, rebuilds it from the latest code, reinstalls and reopens it. Your
+presets, settings and Twitch login are kept.
+
+So the whole pipeline is: **merge to `main` on GitHub → click Update now.** No GitHub Actions are
+involved.
+
+### First run
 
 1. Do the [one-time Twitch setup](#one-time-twitch-setup-about-3-minutes) and log in when the app
    asks.
 2. For Turbo in the players, open **Settings → Sign in to Twitch players** once. The desktop app
    has its own built-in browser, so it doesn't use your normal browser's Twitch login.
 
-**How it behaves:**
+### How it behaves
 
 - **Closing the window keeps it in the system tray** (bottom-right, near the clock). Streams stop,
   but go-live alerts for your favorites keep coming. Click the tray icon to reopen, or right-click
   → **Quit**.
-- **Updates install themselves.** New versions download in the background and are installed the
-  next time the app starts (or use **Restart to install update** in the tray menu).
 - It reopens at the same size, position and monitor, maximized or fullscreen included, and
   restores your last streams.
 - Its presets and settings are separate from the browser version (`npm start`). To move presets
@@ -171,9 +194,10 @@ npm run desktop:mock # …with fake Twitch data
 npm run desktop:dist # build the Windows installer into release/ (best run on Windows)
 ```
 
-The desktop app lives in `desktop/`. The **Desktop app** GitHub workflow builds the installer on
-every push to `main` and publishes it as a numbered release, which installed apps pick up as an
-update.
+The desktop app lives in `desktop/`, and the Windows install/update script in
+`scripts/windows/install.ps1`. GitHub Actions (`.github/workflows/ci.yml`) only runs when started
+by hand, so it never uses Actions minutes on its own; `npm run check` runs the same checks
+locally.
 
 Code is organised as independent, reusable modules. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module map and how to extend or fix one

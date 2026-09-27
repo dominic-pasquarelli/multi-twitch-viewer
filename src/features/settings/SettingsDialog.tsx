@@ -15,6 +15,7 @@ import formStyles from '@/ui/Form.module.css';
 import { logout, startLogin } from '../auth/authFlow';
 import { notificationPermission, requestNotifications } from '../alerts/notifications';
 import { LoginButton } from '../auth/LoginPrompt';
+import { useUpdateStatus } from '../updates/useUpdateStatus';
 
 export function SettingsDialog() {
   const open = useUi((s) => s.dialog === 'settings');
@@ -153,6 +154,13 @@ function SettingsForm() {
       <h3 className={formStyles.section}>Go-live alerts</h3>
       <LiveAlertSettings />
 
+      {desktop && (
+        <>
+          <h3 className={formStyles.section}>App updates</h3>
+          <AppUpdates />
+        </>
+      )}
+
       <h3 className={formStyles.section}>Performance</h3>
       <Field label="Stream quality">
         <select
@@ -178,11 +186,6 @@ function SettingsForm() {
       </Field>
 
       <div className={formStyles.row} style={{ justifyContent: 'flex-end', marginTop: 16 }}>
-        {desktop?.version && (
-          <span className={formStyles.help} style={{ flex: 1 }}>
-            Multi Twitch Viewer {desktop.version} · updates install automatically
-          </span>
-        )}
         <Button size="small" variant="ghost" onClick={() => s.reset()}>
           Reset settings to defaults
         </Button>
@@ -228,5 +231,49 @@ function LiveAlertSettings() {
         </div>
       )}
     </>
+  );
+}
+
+function AppUpdates() {
+  const status = useUpdateStatus();
+  const [checking, setChecking] = useState(false);
+  const short = (sha?: string | null) => (sha ? sha.slice(0, 7) : '');
+  const text = !status
+    ? ''
+    : status.state === 'dev'
+      ? 'Running from source code: update with git pull.'
+      : status.state === 'checking'
+        ? 'Checking GitHub…'
+        : status.state === 'up-to-date'
+          ? 'You have the latest version.'
+          : status.state === 'available'
+            ? `A newer version is on GitHub${status.latestMessage ? `: “${status.latestMessage}”` : ''}.`
+            : `Couldn’t check for updates (${status.error ?? 'offline?'}).`;
+  return (
+    <div className={formStyles.row} style={{ marginBottom: 12, alignItems: 'flex-start' }}>
+      <span className={formStyles.help} style={{ flex: 1 }}>
+        Version {desktop?.version}
+        {status?.current ? ` (${short(status.current)})` : ''}. {text} Updates are built on this PC
+        from the latest code on GitHub; it takes a few minutes and the app reopens by itself.
+      </span>
+      {status?.state === 'available' ? (
+        <Button size="small" variant="primary" onClick={() => desktop?.installUpdate()}>
+          Update now
+        </Button>
+      ) : (
+        status?.state !== 'dev' && (
+          <Button
+            size="small"
+            disabled={checking}
+            onClick={() => {
+              setChecking(true);
+              void desktop?.checkForUpdates().finally(() => setChecking(false));
+            }}
+          >
+            Check now
+          </Button>
+        )
+      )}
+    </div>
   );
 }

@@ -55,15 +55,15 @@ Features only use `useServices()`, so they don't know or care which one is activ
 Plain JavaScript modules, typechecked through `tsconfig.desktop.json` (`// @ts-check`), with no
 build step:
 
-| Module            | What it does                                                                                                                                                             |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `main.mjs`        | App lifecycle: single instance, window, close-to-tray, permissions, links, Twitch sign-in window.                                                                        |
-| `server.mjs`      | Serves `dist/` on `localhost:5757` (IPv4 + IPv6). The Twitch OAuth redirect and embed `parent` need exactly that origin.                                                 |
-| `windowState.mjs` | Saves and restores size, position, maximized and fullscreen; falls back to the primary monitor if the saved one is gone.                                                 |
-| `navigation.mjs`  | Only the app and `*.twitch.tv` pages may load in the window; everything else opens in the system browser. Also the permission allow-list and the Chrome-like user agent. |
-| `tray.mjs`        | Tray icon and menu (show, restart to install update, quit).                                                                                                              |
-| `updates.mjs`     | `electron-updater` against GitHub releases: checks at start and every 6 h, installs on quit.                                                                             |
-| `preload.cjs`     | The only bridge to the page: `window.mtvDesktop` (see `src/lib/desktop/bridge.ts`).                                                                                      |
+| Module            | What it does                                                                                                                                                                  |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main.mjs`        | App lifecycle: single instance, window, close-to-tray, permissions, links, Twitch sign-in window.                                                                             |
+| `server.mjs`      | Serves `dist/` on `localhost:5757` (IPv4 + IPv6). The Twitch OAuth redirect and embed `parent` need exactly that origin.                                                      |
+| `windowState.mjs` | Saves and restores size, position, maximized and fullscreen; falls back to the primary monitor if the saved one is gone.                                                      |
+| `navigation.mjs`  | Only the app and `*.twitch.tv` pages may load in the window; everything else opens in the system browser. Also the permission allow-list and the Chrome-like user agent.      |
+| `tray.mjs`        | Tray icon and menu (show, restart to install update, quit).                                                                                                                   |
+| `updates.mjs`     | Compares the commit stamped into the build with the newest commit on `main` (GitHub API, or the git refs endpoint if rate-limited); **Update now** runs the installer script. |
+| `preload.cjs`     | The only bridge to the page: `window.mtvDesktop` (see `src/lib/desktop/bridge.ts`).                                                                                           |
 
 Behaviour notes:
 
@@ -73,8 +73,19 @@ Behaviour notes:
   fire. Clicking one calls `showWindow()`.
 - The window is sandboxed (`contextIsolation`, `sandbox`, no Node integration). The page can only
   use the bridge functions.
-- Packaging: `electron-builder.yml` (NSIS one-click installer). Only `electron-updater` is a
-  runtime dependency; the web app's libraries are already bundled into `dist/`.
+- Packaging: `electron-builder.yml` (NSIS one-click installer, no publishing). The app has no
+  runtime dependencies; the web app's libraries are already bundled into `dist/`.
+- **Delivery without CI**: `scripts/windows/install.ps1` (run by `Install Multi Twitch Viewer.cmd`
+  or by **Update now**) does the whole pipeline on the user's PC:
+  1. finds the newest commit on `main`;
+  2. downloads a private portable Node.js LTS and the source zip for that commit, keeping
+     `node_modules` between runs;
+  3. runs `npm install`, then `npm run build`, then
+     `electron-builder --win -c.extraMetadata.buildCommit=<sha>`;
+  4. closes the app, runs the installer silently (`/S`) and relaunches it.
+
+  It skips the build when the installed commit is already the newest (use `-Force` to rebuild).
+
 - Tests: `desktop/desktop.test.mjs` (unit) and `e2e/desktop.spec.ts`, which drives the real app
   with Playwright: tray hide/show, blocked navigation, and window position across restarts.
 

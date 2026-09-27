@@ -8,6 +8,16 @@ contextBridge.exposeInMainWorld('mtvDesktop', {
   version: process.argv.find((a) => a.startsWith('--mtv-version='))?.split('=')[1] ?? '',
   showWindow: () => ipcRenderer.send('mtv:show-window'),
   openTwitchSignIn: () => ipcRenderer.invoke('mtv:twitch-sign-in'),
+  getUpdateStatus: () => ipcRenderer.invoke('mtv:update-status'),
+  checkForUpdates: () => ipcRenderer.invoke('mtv:update-check'),
+  installUpdate: () => ipcRenderer.send('mtv:update-install'),
+  /** @param {(status: unknown) => void} callback */
+  onUpdateStatus: (callback) => {
+    /** @param {unknown} _event @param {unknown} status */
+    const listener = (_event, status) => callback(status);
+    ipcRenderer.on('mtv:update-status', listener);
+    return () => ipcRenderer.removeListener('mtv:update-status', listener);
+  },
   /** @param {(hidden: boolean) => void} callback */
   onBackgroundChange: (callback) => {
     /** @param {unknown} _event @param {unknown} hidden */

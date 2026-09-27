@@ -1,9 +1,9 @@
 name: CI
 
+# Manual only (Actions tab → CI → Run workflow), so it never uses Actions
+# minutes on its own. The same checks run locally with: npm run check
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
