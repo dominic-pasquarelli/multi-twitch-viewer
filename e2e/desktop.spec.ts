@@ -21,7 +21,8 @@ const mainWindow = (app: ElectronApplication) =>
     return { visible: w.isVisible(), bounds: w.getBounds() };
   });
 
-test.describe.configure({ mode: 'serial' });
+// Two app launches in one test; CI runners start Electron slowly.
+test.describe.configure({ mode: 'serial', timeout: 90_000 });
 
 test('desktop app: plays streams, hides to the tray, remembers its window', async () => {
   const userData = mkdtempSync(join(tmpdir(), 'mtv-desktop-'));
