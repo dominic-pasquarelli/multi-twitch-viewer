@@ -151,6 +151,14 @@ function Find-InstalledApp {
     (Join-Path $env:LOCALAPPDATA "Programs\Multi Twitch Viewer\$AppExeName")
   )
   foreach ($c in $candidates) { if (Test-Path $c) { return $c } }
+  # Otherwise ask Windows where the installer put it (its uninstall entry).
+  $keys = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
+  foreach ($entry in (Get-ItemProperty $keys -ErrorAction SilentlyContinue)) {
+    if ($entry.DisplayName -like 'Multi Twitch Viewer*' -and $entry.InstallLocation) {
+      $exe = Join-Path $entry.InstallLocation $AppExeName
+      if (Test-Path $exe) { return $exe }
+    }
+  }
   return $null
 }
 
