@@ -64,6 +64,7 @@ export class MockPlayer implements PlayerAdapter {
     this.label.textContent = `${this.muted ? '🔇 muted' : `🔊 ${Math.round(this.volume * 100)}%`} · mock player`;
     this.el.dataset.muted = String(this.muted);
     this.el.dataset.volume = this.volume.toFixed(2);
+    this.el.dataset.paused = String(this.paused);
   }
 
   emit(event: PlayerEvent) {
@@ -88,10 +89,12 @@ export class MockPlayer implements PlayerAdapter {
   }
   play() {
     this.paused = false;
+    this.render();
     this.emit('playing');
   }
   pause() {
     this.paused = true;
+    this.render();
     this.emit('pause');
   }
   on(event: PlayerEvent, handler: () => void) {

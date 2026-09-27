@@ -96,9 +96,13 @@ Behaviour notes:
   their `left/top/width/height`. Moving an iframe in the DOM would restart the stream.
 - **Nothing covers a player while it starts.** Twitch refuses to autoplay embeds that are smaller
   than 400×300, covered by other elements, or transformed. So the audible-stream highlight is
-  an `outline` drawn in the gap _outside_ the player, the tile toolbar only appears on hover,
-  tiles are positioned without CSS transforms, and the layout engine avoids tiles below 400×300
-  when it can.
+  an `outline` drawn in the gap _outside_ the player, a stream's controls live in the top bar
+  (`StreamControls`, for the last hovered stream), tiles are positioned without CSS transforms,
+  and the layout engine avoids tiles below 400×300 when it can.
+- **Streams keep playing unless you paused them.** When a player reports `paused`, the tile
+  resumes it after a moment unless you interacted with that player just before
+  (`playerInteraction.ts`: click/focus inside it). `AutoResume` caps retries so a player that
+  keeps pausing isn't fought forever.
 - **`PlayerController` reconciles desired vs actual player state.** The app says what it wants
   (muted, volume, quality). The controller applies it once the player is ready, and polls
   cheaply once a second to notice changes made with Twitch's own controls, which feed back into
@@ -114,7 +118,7 @@ Behaviour notes:
 - `npm test`: Vitest unit tests next to the code (`*.test.ts`). The `lib/` modules are covered
   the most, because that's where the logic lives.
 - `npm run test:e2e`: Playwright, two projects:
-  - `mock`: user flows against the mock build (layouts, audio keys, drag-swap, presets,
+  - `mock`: user flows against the mock build (layouts, audio keys, drag-swap, auto-resume, presets,
     offline hiding, paste links).
   - `twitch`: the **real** build with Twitch's servers stubbed in the browser. It covers the
     OAuth redirect and state check, Helix calls and headers, the embed-script loader, the

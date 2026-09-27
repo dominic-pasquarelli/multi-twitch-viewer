@@ -1,0 +1,58 @@
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 2px 2px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  min-width: 0;
+}
+.chip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 190px;
+  height: 28px;
+  padding: 0 8px 0 4px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  cursor: grab;
+  user-select: none;
+}
+.chip:active {
+  cursor: grabbing;
+}
+.name {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.volume {
+  width: 80px;
+  accent-color: var(--accent);
+  margin: 0 2px 0 4px;
+}
+.percent {
+  width: 34px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.flash {
+  animation: flash 0.9s ease-out;
+}
+@keyframes flash {
+  from {
+    color: var(--text);
+    font-weight: 700;
+  }
+}

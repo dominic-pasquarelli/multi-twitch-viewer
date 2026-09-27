@@ -60,13 +60,13 @@ test('focus layout makes one stream big, and dragging swaps streams', async ({ p
   const other = await box(page, 'lunarlatte');
   expect(main.width).toBeGreaterThan(other.width * 1.5);
 
+  // Nothing is drawn on top of a stream; hovering it shows its controls in
+  // the top bar, and dragging its name there onto another stream swaps them.
   await tile(page, 'lunarlatte').hover();
-  const grip = tile(page, 'lunarlatte').getByTitle(/Drag onto another stream/);
-  const g = (await grip.boundingBox())!;
-  await page.mouse.move(g.x + 4, g.y + 4);
-  await page.mouse.down();
-  await page.mouse.move(main.x + main.width / 2, main.y + main.height / 2, { steps: 6 });
-  await page.mouse.up();
+  await expect(tile(page, 'lunarlatte').locator('button')).toHaveCount(0);
+  const chip = page.getByTestId('stream-chip');
+  await expect(chip).toContainText('LunarLatte');
+  await chip.dragTo(tile(page, 'pixelpaladin'));
 
   await expect.poll(async () => (await box(page, 'lunarlatte')).width).toBeCloseTo(main.width, 0);
   await expect(page).toHaveURL(

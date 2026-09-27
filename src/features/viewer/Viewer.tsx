@@ -6,7 +6,6 @@ import {
   useState,
   type DragEvent,
   type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import {
   computeLayout,
@@ -21,21 +20,15 @@ import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
-import { toast } from '@/state/toastStore';
 import { Button } from '@/ui/Button';
 import { useLiveStatus } from '../follows/queries';
 import { CHANNEL_MIME, setDragging } from './dnd';
+import { markInteraction } from './playerInteraction';
 import { playerRegistry } from './playerRegistry';
 import { EmptyState } from './EmptyState';
 import { PlayerTile } from './PlayerTile';
 import { useElementSize } from './useElementSize';
 import styles from './Viewer.module.css';
-
-interface DragState {
-  login: string;
-  pointerId: number;
-  target: string | null;
-}
 
 export function Viewer() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,6 +38,8 @@ export function Viewer() {
   const { tileGap, hideOffline, qualityMode, duckLevel, clickToFocus } = useSettings();
   const volumes = useChannelPrefs((s) => s.volumes);
   const playerStatus = useUi((s) => s.playerStatus);
+  const selected = useUi((s) => s.selected);
+  const setSelected = useUi((s) => s.setSelected);
   const [showOffline, setShowOffline] = useState(false);
   const liveStatus = useLiveStatus(view.channels);
 
@@ -62,7 +57,6 @@ export function Viewer() {
     [hiding, view.channels, offline],
   );
   const order = useMemo(() => slotOrder(view, visible), [view, visible]);
-  const main = mainChannel(view, visible);
 
   const options = useMemo(() => ({ ...DEFAULT_LAYOUT_OPTIONS, gap: tileGap }), [tileGap]);
   const rects = useMemo(
@@ -82,8 +76,7 @@ export function Viewer() {
   // Adding or removing a tile never moves its siblings either.
   const renderOrder = useMemo(() => [...visible].sort(), [visible]);
 
-  // ---- Drag a tile onto another to swap them ---------------------------------
-  const [drag, setDrag] = useState<DragState | null>(null);
+  // ---- Hit-testing helpers --------------------------------------------------
   const toLocal = (e: { clientX: number; clientY: number }): Point => {
     const box = containerRef.current!.getBoundingClientRect();
     return { x: e.clientX - box.left, y: e.clientY - box.top };
@@ -95,28 +88,6 @@ export function Viewer() {
     },
     [rects, order],
   );
-
-  const onTileDragStart = useCallback((login: string, e: ReactPointerEvent) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    // Pointer capture keeps events flowing to us even over player iframes.
-    containerRef.current?.setPointerCapture(e.pointerId);
-    setDragging(true);
-    setDrag({ login, pointerId: e.pointerId, target: null });
-  }, []);
-
-  const onPointerMove = (e: ReactPointerEvent) => {
-    if (!drag || e.pointerId !== drag.pointerId) return;
-    const target = slotAt(toLocal(e));
-    if (target !== drag.target) setDrag({ ...drag, target });
-  };
-  const endDrag = (e: ReactPointerEvent) => {
-    if (!drag || e.pointerId !== drag.pointerId) return;
-    setDragging(false);
-    containerRef.current?.releasePointerCapture(e.pointerId);
-    if (drag.target && drag.target !== drag.login) actions.swapChannels(drag.login, drag.target);
-    setDrag(null);
-  };
 
   // ---- Drop a channel from the sidebar ---------------------------------------
   const [sidebarDrop, setSidebarDrop] = useState<{ target: string | null } | null>(null);
@@ -141,18 +112,6 @@ export function Viewer() {
   // ---- Tile callbacks (stable, so memoised tiles don't re-render) -----------
   const setVolume = useChannelPrefs((s) => s.setVolume);
   const setPlayerStatus = useUi((s) => s.setPlayerStatus);
-  const onRemove = useCallback((login: string) => {
-    useViewStore.getState().removeChannel(login);
-    toast(`Removed ${login}`, {
-      action: { label: 'Undo', run: () => useViewStore.getState().undo() },
-    });
-  }, []);
-  const onToggleAudio = useCallback((l: string) => useViewStore.getState().toggleAudio(l), []);
-  const onMakeMain = useCallback((l: string) => useViewStore.getState().setMain(l), []);
-  const onOpenChat = useCallback(
-    (l: string) => useViewStore.getState().setChat({ open: true, channel: l }),
-    [],
-  );
   const onExternalMute = useCallback(
     (l: string, m: boolean) => useViewStore.getState().externalMuteChange(l, m),
     [],
@@ -171,22 +130,23 @@ export function Viewer() {
     setTimeout(() => playerRegistry.get(login)?.adapter.play(), 400);
   }, []);
   useEffect(() => {
-    if (!clickToFocus) return;
     // Clicks inside a player's iframe never reach the page, but they move the
     // keyboard focus into that iframe and blur the window, which we can see.
     const onBlur = () =>
       setTimeout(() => {
         const el = document.activeElement;
         if (!(el instanceof HTMLIFrameElement)) return;
-        const tile = el.closest<HTMLElement>('[data-testid=player-tile]');
-        if (tile?.dataset.channel) promote(tile.dataset.channel);
+        const login = el.closest<HTMLElement>('[data-testid=player-tile]')?.dataset.channel;
+        if (!login) return;
+        markInteraction(login); // a pause right after this is yours: don't undo it
+        if (useSettings.getState().clickToFocus) promote(login);
       }, 0);
     window.addEventListener('blur', onBlur);
     return () => window.removeEventListener('blur', onBlur);
-  }, [clickToFocus, promote]);
+  }, [promote]);
   const onViewerClick = (e: ReactMouseEvent) => {
     // Players that are part of the page (mock mode) report clicks directly.
-    if (!clickToFocus || drag) return;
+    if (!clickToFocus) return;
     const target = e.target as Element;
     if (!target.closest('[data-player-host]')) return;
     const login = target.closest<HTMLElement>('[data-testid=player-tile]')?.dataset.channel;
@@ -200,9 +160,6 @@ export function Viewer() {
       ref={containerRef}
       className={styles.viewer}
       data-testid="viewer"
-      onPointerMove={onPointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
       onDragOver={onDragOver}
       onDragLeave={(e) => {
         if (!containerRef.current?.contains(e.relatedTarget as Node)) setSidebarDrop(null);
@@ -222,34 +179,25 @@ export function Viewer() {
         const slot = order.indexOf(login);
         const rect = rects[slot];
         if (!rect) return null;
-        const stream = liveStatus.live.get(login);
         const level = audioLevel(view, login, duckLevel);
         return (
           <PlayerTile
             key={login}
             login={login}
-            displayName={stream?.displayName ?? login}
-            viewers={stream?.viewerCount}
             rect={rect}
             audible={level.focused}
             muted={level.muted}
             volumeScale={level.scale}
             volume={volumes[login] ?? null}
-            isMain={view.layout.mode === 'focus' && login === main}
-            showMainButton={view.channels.length > 1}
             fitQuality={qualityMode === 'fit'}
             belowMinimum={isBelowMinimum(rect, options.minTile)}
             status={playerStatus[login]}
-            dropTarget={drag?.target === login || sidebarDrop?.target === login}
-            dragging={drag?.login === login}
-            onToggleAudio={onToggleAudio}
+            selected={selected === login}
+            dropTarget={sidebarDrop?.target === login}
             onVolume={setVolume}
-            onRemove={onRemove}
-            onMakeMain={onMakeMain}
-            onOpenChat={onOpenChat}
             onExternalMute={onExternalMute}
             onStatus={onStatus}
-            onDragStart={onTileDragStart}
+            onSelect={setSelected}
           />
         );
       })}

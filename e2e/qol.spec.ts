@@ -63,15 +63,37 @@ test('arrow keys and the mouse wheel change volume', async ({ page }) => {
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('ArrowUp');
   await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.60');
-  await expect(page.getByTestId('volume-hud')).toContainText('60%');
+  // The top-bar controls show the stream whose volume changed.
+  await expect(page.getByTestId('stream-volume')).toHaveText('60%');
 
-  const t = tile(page, 'novastrike');
-  await t.hover();
-  const bar = t.getByTitle(/Drag onto another stream/);
-  const box = (await bar.boundingBox())!;
-  await page.mouse.move(box.x + 4, box.y + 4);
+  // Hover another stream, then scroll over its controls in the top bar.
+  await tile(page, 'novastrike').hover();
+  await expect(page.getByTestId('stream-chip')).toContainText('NovaStrike');
+  await page.getByTestId('stream-controls').hover();
   await page.mouse.wheel(0, 100); // scroll down = quieter
-  await expect(t.getByTestId('volume-hud')).toContainText('45%');
+  await expect(page.getByTestId('stream-volume')).toHaveText('45%');
+});
+
+test('streams that pause on their own resume; ones you pause stay paused', async ({ page }) => {
+  await page.goto('/#/pixelpaladin/novastrike');
+  await expect(tile(page, 'novastrike')).toHaveAttribute('data-status', 'playing');
+  await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-status', 'playing');
+  const pause = (login: string) =>
+    page.evaluate(
+      (l) => (window as unknown as { mtvMock: { pause(l: string): void } }).mtvMock.pause(l),
+      login,
+    );
+
+  // The player pauses by itself (e.g. Twitch pausing a covered player).
+  await pause('novastrike');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-paused', 'true');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-paused', 'false');
+
+  // You click the player and pause it: it stays paused.
+  await mockPlayer(page, 'pixelpaladin').click();
+  await pause('pixelpaladin');
+  await page.waitForTimeout(1500);
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-paused', 'true');
 });
 
 test('focus auto lines the small streams up with the main one; clicking one promotes it', async ({
