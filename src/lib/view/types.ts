@@ -1,6 +1,11 @@
 import type { LayoutMode, MainScale } from '../layout';
 
-export type AudioMode = 'solo' | 'mix';
+/**
+ * solo: one stream audible, the rest muted.
+ * duck: one stream at full volume, the rest quietly in the background.
+ * mix:  any number of streams at full volume.
+ */
+export type AudioMode = 'solo' | 'duck' | 'mix';
 
 /**
  * Everything that describes "what I'm watching": the channels in display
@@ -16,7 +21,6 @@ export interface ViewState {
     mainScale: MainScale;
   };
   audio: {
-    /** solo: one stream audible at a time. mix: any number. */
     mode: AudioMode;
     /** Channels that are unmuted. */
     active: string[];

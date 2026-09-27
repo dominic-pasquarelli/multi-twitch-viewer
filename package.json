@@ -1,7 +1,7 @@
 {
   "name": "multi-twitch-viewer",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A personal multi-stream Twitch viewer: followed channels, smart layouts, audio focus and saved presets.",
   "type": "module",
   "engines": {

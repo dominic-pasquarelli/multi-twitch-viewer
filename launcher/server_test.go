@@ -60,6 +60,14 @@ func TestHealthAndHeartbeat(t *testing.T) {
 	}
 }
 
+func TestVersionEndpoint(t *testing.T) {
+	h := newHandler(site, newIdleTracker(time.Now()), time.Now)
+	res, body := get(t, h, versionPath)
+	if res.StatusCode != 200 || body != "{\"commit\":\"dev\",\"version\":\"dev\"}\n" {
+		t.Fatalf("version: %d %q", res.StatusCode, body)
+	}
+}
+
 func TestIdleWhenNoWindowEverOpens(t *testing.T) {
 	start := time.Unix(0, 0)
 	tracker := newIdleTracker(start)

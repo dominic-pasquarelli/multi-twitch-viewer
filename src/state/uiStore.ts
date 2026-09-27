@@ -11,6 +11,9 @@ interface UiStore {
   /** Bumped to ask the "add channel" box to take focus. */
   addBoxFocusRequest: number;
   playerStatus: Record<string, PlayerStatus>;
+  /** Briefly shows a volume readout on a stream (bumped on every change). */
+  volumeFlash: { login: string; n: number } | null;
+  flashVolume(login: string): void;
   openDialog(d: DialogName): void;
   setPresetsMenuOpen(open: boolean): void;
   setFullscreen(v: boolean): void;
@@ -24,6 +27,8 @@ export const useUi = create<UiStore>()((set) => ({
   fullscreen: false,
   addBoxFocusRequest: 0,
   playerStatus: {},
+  volumeFlash: null,
+  flashVolume: (login) => set((s) => ({ volumeFlash: { login, n: (s.volumeFlash?.n ?? 0) + 1 } })),
   openDialog: (dialog) => set({ dialog, presetsMenuOpen: false }),
   setPresetsMenuOpen: (presetsMenuOpen) => set({ presetsMenuOpen }),
   setFullscreen: (fullscreen) => set({ fullscreen }),

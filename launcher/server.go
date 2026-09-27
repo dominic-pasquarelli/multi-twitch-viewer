@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io/fs"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 const (
 	healthPath    = "/__mtv/health"
 	heartbeatPath = "/__mtv/heartbeat"
+	versionPath   = "/__mtv/version"
 	healthBody    = "multi-twitch-viewer"
 )
 
@@ -53,6 +55,11 @@ func newHandler(site fs.FS, tracker *idleTracker, now func() time.Time) http.Han
 		case healthPath:
 			w.Header().Set("Cache-Control", "no-store")
 			_, _ = w.Write([]byte(healthBody))
+			return
+		case versionPath:
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]string{"version": version, "commit": commit})
 			return
 		case heartbeatPath:
 			tracker.beat(now())

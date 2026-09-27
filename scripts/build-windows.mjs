@@ -3,7 +3,7 @@
 //
 //   npm run build:windows
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = join(import.meta.dirname, '..');
@@ -49,9 +49,22 @@ run(
   },
 );
 
-// 4. Compile a GUI (no console window) Windows executable.
+// 4. Compile a GUI (no console window) Windows executable, stamped with the
+//    version and commit so the app can tell when a newer release exists.
+const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+let commit = process.env.GITHUB_SHA ?? 'dev';
+if (commit === 'dev') {
+  try {
+    const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: root }).toString().trim();
+    if (!dirty)
+      commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root }).toString().trim();
+  } catch {
+    // not a git checkout: stays "dev" (update checks are skipped)
+  }
+}
+const ldflags = `-H windowsgui -s -w -X main.version=${version} -X main.commit=${commit}`;
 mkdirSync(join(root, 'release'), { recursive: true });
-run('go', ['build', '-trimpath', '-ldflags', '-H windowsgui -s -w', '-o', out, '.'], {
+run('go', ['build', '-trimpath', '-ldflags', ldflags, '-o', out, '.'], {
   cwd: launcher,
   env: { ...process.env, GOOS: 'windows', GOARCH: 'amd64', CGO_ENABLED: '0' },
 });

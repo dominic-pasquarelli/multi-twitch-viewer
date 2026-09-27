@@ -15,6 +15,12 @@ import (
 //go:embed all:web
 var embedded embed.FS
 
+// Set at build time with -ldflags "-X main.version=… -X main.commit=…".
+var (
+	version = "dev"
+	commit  = "dev"
+)
+
 const (
 	// Must match the OAuth Redirect URL registered with Twitch, and keeps saved
 	// presets in the same browser storage as `npm start`.

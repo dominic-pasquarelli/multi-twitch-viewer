@@ -38,7 +38,7 @@ export function sanitizeView(input: unknown): ViewState | null {
       mainScale: typeof scale === 'number' && scale > 0 && scale <= 1 ? scale : 'auto',
     },
     audio: {
-      mode: audio.mode === 'mix' ? 'mix' : base.audio.mode,
+      mode: audio.mode === 'mix' || audio.mode === 'duck' ? audio.mode : base.audio.mode,
       active: logins(audio.active),
     },
     chat: { open: chat.open === true, channel: chatChannel },

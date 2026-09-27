@@ -26,7 +26,7 @@ export default defineConfig({
   projects: [
     {
       name: 'mock',
-      testMatch: 'viewer.spec.ts',
+      testMatch: ['viewer.spec.ts', 'qol.spec.ts'],
       use: { ...chromium, baseURL: `http://localhost:${PORT}` },
     },
     {

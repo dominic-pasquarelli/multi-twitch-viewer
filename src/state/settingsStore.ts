@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { LiveAlertMode } from '@/lib/alerts/goLive';
 import { zustandStorage } from '@/lib/persistence/zustandStorage';
 
 export type QualityMode = 'auto' | 'fit';
@@ -21,6 +22,10 @@ export interface Settings {
   sidebarSort: SidebarSort;
   sidebarCollapsed: boolean;
   showOfflineFollows: boolean;
+  /** Pop up a notification when favorites (or anyone you follow) go live. */
+  liveAlerts: LiveAlertMode;
+  /** Duck audio mode: how loud the background streams play (0–1 of their volume). */
+  duckLevel: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -34,6 +39,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sidebarSort: 'viewers',
   sidebarCollapsed: false,
   showOfflineFollows: true,
+  liveAlerts: 'favorites',
+  duckLevel: 0.2,
 };
 
 interface SettingsStore extends Settings {

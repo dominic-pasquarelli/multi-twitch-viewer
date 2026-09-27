@@ -26,6 +26,7 @@ src/
 | `twitch/`      | `TwitchApi` interface, Helix client (auth headers, pagination, 401/429), OAuth helpers, mock API. | Implement `TwitchApi` (e.g. a caching or proxy variant).            |
 | `player/`      | `PlayerAdapter` interface, Twitch embed adapter, mock player, `PlayerController`, quality picker. | Implement `PlayerAdapter` for another player.                       |
 | `persistence/` | `KeyValueStore` interface (localStorage with memory fallback) and the zustand adapter.            | Implement `KeyValueStore` (file, sync service…).                    |
+| `alerts/`      | Which streams just went live (for notifications), favorites-first sorting.                        |                                                                     |
 | `channels/`    | Parse names, `@names`, twitch.tv, player and multitwitch links.                                   |                                                                     |
 | `utils/`       | Formatting helpers (viewer counts, uptime, thumbnails).                                           |                                                                     |
 
@@ -62,6 +63,9 @@ A small Go program (`MultiTwitchViewer.exe`) that makes the app a double-click d
 - **Auto-quit**: the web app POSTs `/__mtv/heartbeat` every 20 s (`src/lib/launcher/heartbeat.ts`,
   which does nothing outside the launcher). The launcher exits 3 minutes after the last heartbeat,
   which allows for browsers throttling background windows.
+- **Update notice**: `/__mtv/version` reports the version and commit stamped in at build time.
+  `src/lib/launcher/updates.ts` compares that commit with GitHub's `latest` tag and
+  `features/updates/UpdateBanner` offers the download. Local builds (commit `dev`) skip this.
 - On first run it creates a desktop shortcut. Errors are shown in a Windows message box.
 - `winres/` holds the icon, version info and manifest (compiled in with `go-winres`).
 - Platform-specific code is in `platform_windows.go`; `platform_other.go` lets it build and be

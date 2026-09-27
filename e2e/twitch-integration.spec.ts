@@ -184,3 +184,21 @@ test('ignores a login redirect whose state does not match', async ({ page }) => 
   await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeVisible();
   expect(calls.filter((c) => c.startsWith('/helix'))).toHaveLength(0);
 });
+
+test('the Windows app offers a newer release', async ({ page }) => {
+  await stubTwitch(page, []);
+  await page.route('**/__mtv/version', (route) =>
+    route.fulfill({ json: { version: '0.2.0', commit: 'a'.repeat(40) } }),
+  );
+  await page.route('https://api.github.com/**', (route) =>
+    route.fulfill({ headers: cors, json: { object: { sha: 'b'.repeat(40) } } }),
+  );
+  await page.goto('/');
+  const banner = page.getByTestId('update-banner');
+  await expect(banner).toContainText('A new version');
+  await banner.getByRole('button', { name: 'Not now' }).click();
+  await expect(banner).toHaveCount(0);
+  await page.reload();
+  await page.waitForTimeout(500);
+  await expect(banner).toHaveCount(0); // stays dismissed for that version
+});

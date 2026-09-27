@@ -195,3 +195,34 @@
   font-weight: 600;
   margin-bottom: 2px;
 }
+
+.rowWrap {
+  position: relative;
+}
+.rowWrap .row {
+  padding-right: 34px;
+}
+.star {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-faint);
+}
+.star:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+.rowWrap:hover .star,
+.star:focus-visible,
+.favorite .star {
+  display: inline-flex;
+}
+.favorite .star {
+  color: #f5c518;
+}

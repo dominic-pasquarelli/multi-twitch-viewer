@@ -14,7 +14,7 @@ import {
   type Point,
 } from '@/lib/layout';
 import type { PlayerStatus } from '@/lib/player/types';
-import { mainChannel, slotOrder } from '@/lib/view/operations';
+import { audioLevel, mainChannel, slotOrder } from '@/lib/view/operations';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
 import { useUi } from '@/state/uiStore';
@@ -39,7 +39,7 @@ export function Viewer() {
   const size = useElementSize(containerRef);
   const view = useViewStore((s) => s.view);
   const actions = useViewStore.getState();
-  const { tileGap, hideOffline, qualityMode } = useSettings();
+  const { tileGap, hideOffline, qualityMode, duckLevel } = useSettings();
   const volumes = useChannelPrefs((s) => s.volumes);
   const playerStatus = useUi((s) => s.playerStatus);
   const [showOffline, setShowOffline] = useState(false);
@@ -188,6 +188,7 @@ export function Viewer() {
         const rect = rects[slot];
         if (!rect) return null;
         const stream = liveStatus.live.get(login);
+        const level = audioLevel(view, login, duckLevel);
         return (
           <PlayerTile
             key={login}
@@ -195,7 +196,9 @@ export function Viewer() {
             displayName={stream?.displayName ?? login}
             viewers={stream?.viewerCount}
             rect={rect}
-            audible={view.audio.active.includes(login)}
+            audible={level.focused}
+            muted={level.muted}
+            volumeScale={level.scale}
             volume={volumes[login] ?? null}
             isMain={view.layout.mode === 'focus' && login === main}
             showMainButton={view.channels.length > 1}

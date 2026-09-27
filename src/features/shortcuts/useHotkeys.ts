@@ -5,6 +5,7 @@ import { useSettings } from '@/state/settingsStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
 import { toggleFullscreen } from '../topbar/fullscreen';
+import { nudgeVolume, VOLUME_STEP } from '../viewer/volume';
 
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
@@ -31,7 +32,7 @@ export function useHotkeys(): void {
         const login = slotOrder(view.view)[Number(digit) - 1];
         if (!login) return;
         if (e.shiftKey) {
-          if (view.view.audio.mode === 'solo') view.setAudioMode('mix');
+          if (view.view.audio.mode !== 'mix') view.setAudioMode('mix');
           useViewStore.getState().toggleAudio(login);
         } else view.focusAudio(login);
         e.preventDefault();
@@ -47,7 +48,15 @@ export function useHotkeys(): void {
         if (view.view.layout.mode !== 'focus') view.setLayoutMode('focus');
       };
 
+      const nudgeHeard = (delta: number) => {
+        const heard = view.view.audio.active;
+        if (!heard.length) return;
+        heard.forEach((login) => nudgeVolume(login, delta));
+      };
+
       const actions: Record<string, () => void> = {
+        arrowup: () => nudgeHeard(VOLUME_STEP),
+        arrowdown: () => nudgeHeard(-VOLUME_STEP),
         m: () => view.toggleMuteAll(),
         l: () => view.setLayoutMode(view.view.layout.mode === 'grid' ? 'focus' : 'grid'),
         '[': () => step(-0.05),

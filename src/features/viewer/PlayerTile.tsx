@@ -23,8 +23,10 @@ import { PlayerController } from '@/lib/player/PlayerController';
 import { pickQualityForHeight } from '@/lib/player/quality';
 import type { PlayerStatus } from '@/lib/player/types';
 import { formatCount } from '@/lib/utils/format';
+import { useUi } from '@/state/uiStore';
 import { IconButton } from '@/ui/Button';
 import { playerRegistry } from './playerRegistry';
+import { nudgeVolume, VOLUME_STEP } from './volume';
 import styles from './PlayerTile.module.css';
 
 export interface PlayerTileProps {
@@ -32,7 +34,13 @@ export interface PlayerTileProps {
   displayName: string;
   viewers?: number;
   rect: Rect;
+  /** The stream you're focused on (full volume, highlighted). */
   audible: boolean;
+  /** Muted entirely (solo mode, or everything muted). */
+  muted: boolean;
+  /** Volume multiplier, e.g. 0.2 for background streams in duck mode. */
+  volumeScale: number;
+  /** The channel's remembered volume (null = leave the player's own). */
   volume: number | null;
   isMain: boolean;
   showMainButton: boolean;
@@ -55,8 +63,12 @@ export interface PlayerTileProps {
  * One stream. The player is created once per mount and then only steered
  * (mute/volume/quality) — never re-created — so streams don't restart.
  */
+/** Volume actually sent to the player: the channel's volume times the duck scale. */
+const effectiveVolume = (volume: number | null, scale: number): number | null =>
+  volume === null ? (scale === 1 ? null : 0.5 * scale) : volume * scale;
+
 export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
-  const { login, rect, audible, volume, status } = props;
+  const { login, rect, audible, muted, volume, volumeScale, status } = props;
   const { playerFactory } = useServices();
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<PlayerController | null>(null);
@@ -75,11 +87,16 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
     const adapter = playerFactory.create(host, { channel: login, muted: true });
     const controller = new PlayerController(
       adapter,
-      { muted: !p.audible, volume: p.volume, quality: null },
+      { muted: p.muted, volume: effectiveVolume(p.volume, p.volumeScale), quality: null },
       {
         onStatus: (s) => latest.current.onStatus(login, s),
-        onExternalMute: (m) => latest.current.onExternalMute(login, m),
-        onExternalVolume: (v) => latest.current.onVolume(login, v),
+        onExternalMute: (m) => {
+          // Muting a quiet background stream in duck mode doesn't change focus.
+          if (!m || latest.current.audible) latest.current.onExternalMute(login, m);
+        },
+        // Undo the duck scale so the remembered volume stays the "full" one.
+        onExternalVolume: (v) =>
+          latest.current.onVolume(login, Math.min(1, v / (latest.current.volumeScale || 1))),
       },
     );
     controllerRef.current = controller;
@@ -96,12 +113,30 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
   }, [login, playerFactory, reloadKey]);
 
   useEffect(() => {
-    controllerRef.current?.update({ muted: !audible });
-  }, [audible]);
+    controllerRef.current?.update({ muted });
+  }, [muted]);
 
   useEffect(() => {
-    if (volume !== null) controllerRef.current?.update({ volume });
-  }, [volume]);
+    if (volume === null && volumeScale !== 1) {
+      // About to play quieter: first remember the stream's own volume, so it
+      // can go back to exactly that when it becomes the focused stream.
+      const entry = playerRegistry.get(login);
+      latest.current.onVolume(login, entry?.controller.isReady ? entry.adapter.getVolume() : 0.5);
+      return;
+    }
+    const v = effectiveVolume(volume, volumeScale);
+    if (v !== null) controllerRef.current?.update({ volume: v });
+  }, [login, volume, volumeScale]);
+
+  // Brief "volume 65%" readout after wheel/keyboard changes.
+  const flash = useUi((s) => (s.volumeFlash?.login === login ? s.volumeFlash.n : 0));
+  const [showHud, setShowHud] = useState(false);
+  useEffect(() => {
+    if (!flash) return;
+    setShowHud(true);
+    const t = setTimeout(() => setShowHud(false), 900);
+    return () => clearTimeout(t);
+  }, [flash]);
 
   // Optional: match the stream quality to the tile size (saves bandwidth/CPU).
   const { fitQuality } = props;
@@ -140,6 +175,11 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       data-channel={login}
       data-audible={audible}
       style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
+      // The video itself is an iframe (it keeps its own wheel events), so this
+      // works over the name and control bars that appear on hover.
+      onWheel={(e) => {
+        if (e.deltaY !== 0) nudgeVolume(login, e.deltaY < 0 ? VOLUME_STEP : -VOLUME_STEP);
+      }}
       onMouseLeave={() => {
         // Clicking inside a player gives it keyboard focus; hand focus back to
         // the app when the pointer leaves so the shortcuts keep working.
@@ -168,6 +208,13 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         </div>
       )}
 
+      {showHud && (
+        <div className={styles.hud} data-testid="volume-hud">
+          {muted ? 'Muted · ' : ''}Volume {Math.round((volume ?? 0.5) * 100)}%
+          {volumeScale !== 1 && !muted ? ` (background ${Math.round(volumeScale * 100)}%)` : ''}
+        </div>
+      )}
+
       <div className={`${styles.bar} ${styles.left}`}>
         <span
           className={styles.grip}
@@ -188,9 +235,9 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       <div className={`${styles.bar} ${styles.right}`}>
         <IconButton
           size="sm"
-          label={audible ? 'Mute (M mutes all)' : 'Listen to this stream'}
+          label={audible ? 'Stop listening (M mutes all)' : 'Listen to this stream'}
           active={audible}
-          icon={audible ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          icon={muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
           onClick={() => props.onToggleAudio(login)}
         />
         <input
@@ -200,6 +247,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
           max={100}
           value={Math.round((volume ?? 0.5) * 100)}
           aria-label={`${props.displayName} volume`}
+          title="Volume — or scroll over this bar; ↑/↓ change the stream you're hearing"
           onChange={(e) => props.onVolume(login, Number(e.target.value) / 100)}
         />
         {props.showMainButton && !props.isMain && (
