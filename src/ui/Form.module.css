@@ -1,0 +1,71 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.label {
+  font-weight: 600;
+}
+.help {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.input {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+.check input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+.section {
+  margin: 18px 0 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+}
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.code {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  user-select: all;
+}
+.steps {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  color: var(--text-muted);
+}
+.steps li {
+  margin-bottom: 8px;
+}
+.steps strong {
+  color: var(--text);
+}
+.steps a {
+  color: var(--accent);
+}

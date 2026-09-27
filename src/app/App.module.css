@@ -1,0 +1,63 @@
+.app {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+  grid-template-areas:
+    'top top top'
+    'side main chat';
+  height: 100%;
+}
+.top {
+  grid-area: top;
+  min-width: 0;
+}
+.side {
+  grid-area: side;
+  width: var(--sidebar-w);
+  min-height: 0;
+}
+.side.collapsed {
+  width: var(--sidebar-collapsed-w);
+}
+.main {
+  grid-area: main;
+  min-width: 0;
+  min-height: 0;
+}
+.chat {
+  grid-area: chat;
+  width: var(--chat-w);
+  min-height: 0;
+}
+
+/* Fullscreen: only the streams (and chat, if open). Hover the top edge for the bar. */
+.fullscreen {
+  grid-template-rows: 0 minmax(0, 1fr);
+}
+.fullscreen .side {
+  display: none;
+}
+.fullscreen .top {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  height: var(--topbar-h);
+  visibility: hidden;
+}
+.fullscreen .top:hover,
+.fullscreen .top:focus-within {
+  visibility: visible;
+}
+.hotzone {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  z-index: 29;
+}
+.hotzone:hover + .top {
+  visibility: visible;
+}
