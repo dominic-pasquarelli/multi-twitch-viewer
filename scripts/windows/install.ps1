@@ -118,7 +118,9 @@ function Get-Source([string]$Root, [string]$Repo, [string]$Sha) {
 }
 
 function Invoke-Checked([string]$What, [scriptblock]$Command) {
-  & $Command
+  # Send the tool's output to the window. Without Out-Host, PowerShell would
+  # add every line it prints to the calling function's return value.
+  & $Command | Out-Host
   if ($LASTEXITCODE -ne 0) { throw "$What failed (exit code $LASTEXITCODE). See the messages above." }
 }
 
@@ -172,6 +174,9 @@ function Stop-App {
 }
 
 function Install-App([string]$Setup) {
+  if (-not $Setup -or -not (Test-Path -LiteralPath $Setup -PathType Leaf)) {
+    throw "The installer wasn't found at '$Setup'."
+  }
   Stop-App
   Write-Step 'Installing'
   $p = Start-Process -FilePath $Setup -ArgumentList '/S' -Wait -PassThru
@@ -199,9 +204,10 @@ function Invoke-InstallOrUpdate {
     return
   }
 
-  $node = Install-PortableNode $root
-  $src = Get-Source $root $Repo $latest.Sha
-  $setup = Build-App $root $src $node $latest.Sha
+  $node = @(Install-PortableNode $root)[-1]
+  $src = @(Get-Source $root $Repo $latest.Sha)[-1]
+  # Last item only: a function's return value is everything it outputs.
+  $setup = @(Build-App $root $src $node $latest.Sha)[-1]
   Install-App $setup
   Set-Content -Path $stamp -Value $latest.Sha
   Write-Host ''
