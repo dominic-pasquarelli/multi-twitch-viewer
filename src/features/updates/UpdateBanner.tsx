@@ -9,7 +9,21 @@ import styles from './UpdateBanner.module.css';
 export function UpdateBanner() {
   const status = useUpdateStatus();
   const [dismissed, setDismissed] = useState<string | null>(null);
-  if (!desktop || status?.state !== 'available' || dismissed === status.latest) return null;
+  if (!desktop || !status) return null;
+  if (status.state === 'installing') {
+    return (
+      <div className={styles.banner} role="status" data-testid="update-banner">
+        <div className={styles.text}>
+          <strong>Updating…</strong>
+          <span>
+            A window shows the progress (1–2 minutes). The app closes and reopens by itself when the
+            new version is ready; keep watching until then.
+          </span>
+        </div>
+      </div>
+    );
+  }
+  if (status.state !== 'available' || dismissed === status.latest) return null;
   return (
     <div className={styles.banner} role="status" data-testid="update-banner">
       <div className={styles.text}>

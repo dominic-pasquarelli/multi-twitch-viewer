@@ -252,9 +252,11 @@ function AppUpdates() {
         ? 'Checking GitHub…'
         : status.state === 'up-to-date'
           ? 'You have the latest version.'
-          : status.state === 'available'
-            ? `A newer version is on GitHub${status.latestMessage ? `: “${status.latestMessage}”` : ''}.`
-            : `Couldn’t check for updates (${status.error ?? 'offline?'}).`;
+          : status.state === 'installing'
+            ? 'Updating: a window shows the progress; the app reopens by itself.'
+            : status.state === 'available'
+              ? `A newer version is on GitHub${status.latestMessage ? `: “${status.latestMessage}”` : ''}.`
+              : `Couldn’t check for updates (${status.error ?? 'offline?'}).`;
   return (
     <div className={formStyles.row} style={{ marginBottom: 12, alignItems: 'flex-start' }}>
       <span className={formStyles.help} style={{ flex: 1 }}>
@@ -267,7 +269,8 @@ function AppUpdates() {
           Update now
         </Button>
       ) : (
-        status?.state !== 'dev' && (
+        status?.state !== 'dev' &&
+        status?.state !== 'installing' && (
           <Button
             size="small"
             disabled={checking}
