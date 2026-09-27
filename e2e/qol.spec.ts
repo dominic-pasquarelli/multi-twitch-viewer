@@ -123,3 +123,44 @@ test('focus auto lines the small streams up with the main one; clicking one prom
   await expect(tile(page, 'cozycartographer')).toHaveAttribute('data-audible', 'true');
   await expect(page).toHaveURL(/main=cozycartographer/);
 });
+
+test('the mixer balances streams, and consistent volume keeps switching at one loudness', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/novastrike');
+  await expect(tile(page, 'novastrike')).toHaveAttribute('data-status', 'playing');
+  await page.getByRole('button', { name: 'Mix', exact: true }).click();
+  await page.getByTestId('mixer-button').click();
+  const row = (c: string) => page.locator(`[data-testid=mixer-row][data-channel=${c}]`);
+
+  // Hear both, and turn NovaStrike down in the mix.
+  await row('novastrike')
+    .getByRole('button', { name: /Listen to/ })
+    .click();
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-muted', 'false');
+  await row('novastrike').getByRole('slider').fill('20');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-volume', '0.20');
+  await expect(row('novastrike').getByTestId('mixer-volume')).toHaveText('20%');
+
+  // Consistent volume: everything follows one master volume…
+  await page.getByText('Consistent volume').click();
+  await page.getByTestId('mixer-master').fill('70');
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.70');
+  // …and a stream balanced in the mixer stays balanced against it.
+  await row('novastrike').getByRole('slider').fill('35');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-volume', '0.35');
+  await page.getByTestId('mixer-master').fill('40');
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.40');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-volume', '0.20');
+
+  // Solo: switching streams keeps the master loudness.
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Solo', exact: true }).click();
+  await page.keyboard.press('1');
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.40');
+  await page.getByTestId('mixer-button').click();
+  await row('novastrike').getByRole('slider').fill('40'); // back to balance 1
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('2');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-volume', '0.40');
+});

@@ -24,12 +24,16 @@ export interface Settings {
   showOfflineFollows: boolean;
   /** Pop up a notification when favorites (or anyone you follow) go live. */
   liveAlerts: LiveAlertMode;
+  /** Every stream you listen to plays at one master volume (see lib/audio/volumeModel). */
+  consistentVolume: boolean;
   /** Duck audio mode: how loud the background streams play (0–1 of their volume). */
   duckLevel: number;
   /** Focus layout: clicking a small stream makes it the main one. */
   clickToFocus: boolean;
   /** Desktop app: hide Twitch's channel/title/Subscribe overlay at the top of each player. */
   hideStreamInfo: boolean;
+  /** Desktop app: click through Twitch's "intended for certain audiences" notice. */
+  skipContentWarning: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -44,9 +48,11 @@ export const DEFAULT_SETTINGS: Settings = {
   sidebarCollapsed: false,
   showOfflineFollows: true,
   liveAlerts: 'favorites',
+  consistentVolume: false,
   duckLevel: 0.2,
   clickToFocus: true,
   hideStreamInfo: true,
+  skipContentWarning: true,
 };
 
 interface SettingsStore extends Settings {

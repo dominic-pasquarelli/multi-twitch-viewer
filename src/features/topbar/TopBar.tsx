@@ -17,6 +17,7 @@ import { useViewStore } from '@/state/viewStore';
 import { Avatar } from '@/ui/Avatar';
 import { IconButton } from '@/ui/Button';
 import { LoginButton } from '../auth/LoginPrompt';
+import { Mixer } from '../mixer/Mixer';
 import { PresetsMenu } from '../presets/PresetsMenu';
 import { StreamControls } from '../viewer/StreamControls';
 import { AddChannelBox } from './AddChannelBox';
@@ -111,6 +112,7 @@ export function TopBar() {
           onClick={() => store.toggleMuteAll()}
           disabled={!view.channels.length}
         />
+        <Mixer />
       </div>
 
       <StreamControls />

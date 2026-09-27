@@ -18,17 +18,18 @@ src/
 
 ### `lib/`: the core modules
 
-| Module         | What it does                                                                                      | Swap / extend by…                                                   |
-| -------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `layout/`      | Pure geometry: `computeLayout({mode, count, container, options})` → one rect per slot.            | Adding a mode: write `myLayout.ts`, route it in `computeLayout.ts`. |
-| `view/`        | The "what I'm watching" model (`ViewState`) and pure operations: add, remove, swap, audio focus…  | Adding an operation + test; stores call it.                         |
-| `presets/`     | Preset type, export/import file format, validation, merging.                                      | Bump `EXPORT_VERSION` and migrate in `sanitizePreset`.              |
-| `twitch/`      | `TwitchApi` interface, Helix client (auth headers, pagination, 401/429), OAuth helpers, mock API. | Implement `TwitchApi` (e.g. a caching or proxy variant).            |
-| `player/`      | `PlayerAdapter` interface, Twitch embed adapter, mock player, `PlayerController`, quality picker. | Implement `PlayerAdapter` for another player.                       |
-| `persistence/` | `KeyValueStore` interface (localStorage with memory fallback) and the zustand adapter.            | Implement `KeyValueStore` (file, sync service…).                    |
-| `alerts/`      | Which streams just went live (for notifications), favorites-first sorting.                        |                                                                     |
-| `channels/`    | Parse names, `@names`, twitch.tv, player and multitwitch links.                                   |                                                                     |
-| `utils/`       | Formatting helpers (viewer counts, uptime, thumbnails).                                           |                                                                     |
+| Module         | What it does                                                                                        | Swap / extend by…                                                   |
+| -------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `layout/`      | Pure geometry: `computeLayout({mode, count, container, options})` → one rect per slot.              | Adding a mode: write `myLayout.ts`, route it in `computeLayout.ts`. |
+| `view/`        | The "what I'm watching" model (`ViewState`) and pure operations: add, remove, swap, audio focus…    | Adding an operation + test; stores call it.                         |
+| `audio/`       | Volume model: per-channel volumes, or one master volume with per-channel balance (consistent mode). | Add a mode in `volumeModel.ts` + tests.                             |
+| `presets/`     | Preset type, export/import file format, validation, merging.                                        | Bump `EXPORT_VERSION` and migrate in `sanitizePreset`.              |
+| `twitch/`      | `TwitchApi` interface, Helix client (auth headers, pagination, 401/429), OAuth helpers, mock API.   | Implement `TwitchApi` (e.g. a caching or proxy variant).            |
+| `player/`      | `PlayerAdapter` interface, Twitch embed adapter, mock player, `PlayerController`, quality picker.   | Implement `PlayerAdapter` for another player.                       |
+| `persistence/` | `KeyValueStore` interface (localStorage with memory fallback) and the zustand adapter.              | Implement `KeyValueStore` (file, sync service…).                    |
+| `alerts/`      | Which streams just went live (for notifications), favorites-first sorting.                          |                                                                     |
+| `channels/`    | Parse names, `@names`, twitch.tv, player and multitwitch links.                                     |                                                                     |
+| `utils/`       | Formatting helpers (viewer counts, uptime, thumbnails).                                             |                                                                     |
 
 ### `state/`: stores
 
@@ -55,16 +56,16 @@ Features only use `useServices()`, so they don't know or care which one is activ
 Plain JavaScript modules, typechecked through `tsconfig.desktop.json` (`// @ts-check`), with no
 build step:
 
-| Module             | What it does                                                                                                                                                                                               |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `main.mjs`         | App lifecycle: single instance, window, close-to-tray, permissions, links, Twitch sign-in window.                                                                                                          |
-| `server.mjs`       | Serves `dist/` on `localhost:5757` (IPv4 + IPv6). The Twitch OAuth redirect and embed `parent` need exactly that origin.                                                                                   |
-| `windowState.mjs`  | Saves and restores size, position, maximized and fullscreen; falls back to the primary monitor if the saved one is gone.                                                                                   |
-| `navigation.mjs`   | Only the app and `*.twitch.tv` pages may load in the window; everything else opens in the system browser. Also the permission allow-list and the Chrome-like user agent.                                   |
-| `tray.mjs`         | Tray icon and menu (show, restart to install update, quit).                                                                                                                                                |
-| `updates.mjs`      | Compares the commit stamped into the build with the newest commit on `main` (GitHub API, or the git refs endpoint if rate-limited); **Update now** runs the installer script.                              |
-| `playerChrome.mjs` | Tweaks Twitch's UI inside the player iframes (only the main process can reach them): hides the stream-info overlay. Finds it from the channel link and Follow/Subscribe buttons, not Twitch's class names. |
-| `preload.cjs`      | The only bridge to the page: `window.mtvDesktop` (see `src/lib/desktop/bridge.ts`).                                                                                                                        |
+| Module             | What it does                                                                                                                                                                                                                                                            |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `main.mjs`         | App lifecycle: single instance, window, close-to-tray, permissions, links, Twitch sign-in window.                                                                                                                                                                       |
+| `server.mjs`       | Serves `dist/` on `localhost:5757` (IPv4 + IPv6). The Twitch OAuth redirect and embed `parent` need exactly that origin.                                                                                                                                                |
+| `windowState.mjs`  | Saves and restores size, position, maximized and fullscreen; falls back to the primary monitor if the saved one is gone.                                                                                                                                                |
+| `navigation.mjs`   | Only the app and `*.twitch.tv` pages may load in the window; everything else opens in the system browser. Also the permission allow-list and the Chrome-like user agent.                                                                                                |
+| `tray.mjs`         | Tray icon and menu (show, restart to install update, quit).                                                                                                                                                                                                             |
+| `updates.mjs`      | Compares the commit stamped into the build with the newest commit on `main` (GitHub API, or the git refs endpoint if rate-limited); **Update now** runs the installer script.                                                                                           |
+| `playerChrome.mjs` | Tweaks Twitch's UI inside the player iframes (only the main process can reach them): hides the stream-info overlay (found from the channel link and Follow/Subscribe buttons, not Twitch's class names) and clicks through the "intended for certain audiences" notice. |
+| `preload.cjs`      | The only bridge to the page: `window.mtvDesktop` (see `src/lib/desktop/bridge.ts`).                                                                                                                                                                                     |
 
 Behaviour notes:
 

@@ -11,9 +11,12 @@ contextBridge.exposeInMainWorld('mtvDesktop', {
   getUpdateStatus: () => ipcRenderer.invoke('mtv:update-status'),
   checkForUpdates: () => ipcRenderer.invoke('mtv:update-check'),
   installUpdate: () => ipcRenderer.send('mtv:update-install'),
-  /** @param {{ hideStreamInfo: boolean }} options */
+  /** @param {{ hideStreamInfo: boolean, skipContentWarning: boolean }} options */
   setPlayerChrome: (options) =>
-    ipcRenderer.send('mtv:player-chrome', { hideStreamInfo: Boolean(options?.hideStreamInfo) }),
+    ipcRenderer.send('mtv:player-chrome', {
+      hideStreamInfo: Boolean(options?.hideStreamInfo),
+      skipContentWarning: Boolean(options?.skipContentWarning),
+    }),
   /** @param {(status: unknown) => void} callback */
   onUpdateStatus: (callback) => {
     /** @param {unknown} _event @param {unknown} status */

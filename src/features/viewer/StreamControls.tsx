@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { audioLevel, mainChannel } from '@/lib/view/operations';
 import { formatCount } from '@/lib/utils/format';
-import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
 import { toast } from '@/state/toastStore';
 import { useUi } from '@/state/uiStore';
@@ -18,7 +17,7 @@ import { useViewStore } from '@/state/viewStore';
 import { IconButton } from '@/ui/Button';
 import { useLiveStatus } from '../follows/queries';
 import { CHANNEL_MIME, setDragging } from './dnd';
-import { currentVolume, nudgeVolume, VOLUME_STEP } from './volume';
+import { currentVolume, nudgeVolume, setStreamVolume, useVolumeModel, VOLUME_STEP } from './volume';
 import styles from './StreamControls.module.css';
 
 /**
@@ -30,7 +29,7 @@ export function StreamControls() {
   const selected = useUi((s) => s.selected);
   const view = useViewStore((s) => s.view);
   const duckLevel = useSettings((s) => s.duckLevel);
-  const volumes = useChannelPrefs((s) => s.volumes);
+  const volumeModel = useVolumeModel();
   const live = useLiveStatus(view.channels).live;
   const flashN = useUi((s) => (s.volumeFlash?.login === selected ? s.volumeFlash.n : 0));
 
@@ -39,7 +38,7 @@ export function StreamControls() {
   const store = useViewStore.getState();
   const stream = live.get(login);
   const level = audioLevel(view, login, duckLevel);
-  const volume = volumes[login] ?? currentVolume(login);
+  const volume = currentVolume(login, volumeModel);
   const isMain = view.layout.mode === 'focus' && mainChannel(view) === login;
 
   return (
@@ -82,7 +81,7 @@ export function StreamControls() {
         value={Math.round(volume * 100)}
         aria-label={`${stream?.displayName ?? login} volume`}
         title="Volume (scroll here, or ↑/↓ for the stream you're hearing)"
-        onChange={(e) => useChannelPrefs.getState().setVolume(login, Number(e.target.value) / 100)}
+        onChange={(e) => setStreamVolume(login, Number(e.target.value) / 100)}
       />
       <span
         key={flashN} // replays the highlight animation on every change

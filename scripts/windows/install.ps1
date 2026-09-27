@@ -185,7 +185,9 @@ function Install-App([string]$Setup) {
 
 function Start-App {
   $exe = Find-InstalledApp
-  if ($exe) { Start-Process -FilePath $exe } else { Write-Warning "Installed, but couldn't find the app to start it. Use the desktop shortcut." }
+  # Start it through Explorer so it isn't a child of this window: closing
+  # this window must not close the app.
+  if ($exe) { Start-Process -FilePath 'explorer.exe' -ArgumentList "`"$exe`"" } else { Write-Warning "Installed, but couldn't find the app to start it. Use the desktop shortcut." }
 }
 
 function Invoke-InstallOrUpdate {
@@ -212,6 +214,7 @@ function Invoke-InstallOrUpdate {
   Set-Content -Path $stamp -Value $latest.Sha
   Write-Host ''
   Write-Host 'Multi Twitch Viewer is installed and up to date.' -ForegroundColor Green
+  Write-Host 'You can close this window; the app keeps running.'
   if (-not $NoLaunch) { Start-App }
 }
 
