@@ -69,7 +69,7 @@ export function TopBar() {
           <Presentation size={15} /> <span className={styles.segLabel}>Focus</span>
         </button>
         {mode === 'focus' && (
-          <label className={styles.scale} title="Main stream size ([ and ] keys; \ for auto)">
+          <label className={styles.scale} title="Zoom: main stream size ([ and ] keys)">
             <input
               type="range"
               min={MIN_MAIN_SCALE * 100}
@@ -81,6 +81,7 @@ export function TopBar() {
             <button
               className={styles.seg}
               aria-pressed={scale === 'auto'}
+              title="Auto: the small streams line up with the main one, beside or below it (\ key)"
               onClick={() => store.setMainScale('auto')}
             >
               Auto

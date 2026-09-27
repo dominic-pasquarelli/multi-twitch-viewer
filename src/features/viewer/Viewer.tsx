@@ -1,9 +1,11 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type DragEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import {
@@ -23,6 +25,7 @@ import { toast } from '@/state/toastStore';
 import { Button } from '@/ui/Button';
 import { useLiveStatus } from '../follows/queries';
 import { CHANNEL_MIME, setDragging } from './dnd';
+import { playerRegistry } from './playerRegistry';
 import { EmptyState } from './EmptyState';
 import { PlayerTile } from './PlayerTile';
 import { useElementSize } from './useElementSize';
@@ -39,7 +42,7 @@ export function Viewer() {
   const size = useElementSize(containerRef);
   const view = useViewStore((s) => s.view);
   const actions = useViewStore.getState();
-  const { tileGap, hideOffline, qualityMode, duckLevel } = useSettings();
+  const { tileGap, hideOffline, qualityMode, duckLevel, clickToFocus } = useSettings();
   const volumes = useChannelPrefs((s) => s.volumes);
   const playerStatus = useUi((s) => s.playerStatus);
   const [showOffline, setShowOffline] = useState(false);
@@ -159,6 +162,37 @@ export function Viewer() {
     [setPlayerStatus],
   );
 
+  // ---- Click a small stream to make it the main one (focus layout) ---------
+  const promote = useCallback((login: string) => {
+    const store = useViewStore.getState();
+    if (store.view.layout.mode !== 'focus' || mainChannel(store.view) === login) return;
+    store.setMain(login);
+    // Clicking a Twitch video also pauses it; keep the new main stream playing.
+    setTimeout(() => playerRegistry.get(login)?.adapter.play(), 400);
+  }, []);
+  useEffect(() => {
+    if (!clickToFocus) return;
+    // Clicks inside a player's iframe never reach the page, but they move the
+    // keyboard focus into that iframe and blur the window, which we can see.
+    const onBlur = () =>
+      setTimeout(() => {
+        const el = document.activeElement;
+        if (!(el instanceof HTMLIFrameElement)) return;
+        const tile = el.closest<HTMLElement>('[data-testid=player-tile]');
+        if (tile?.dataset.channel) promote(tile.dataset.channel);
+      }, 0);
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, [clickToFocus, promote]);
+  const onViewerClick = (e: ReactMouseEvent) => {
+    // Players that are part of the page (mock mode) report clicks directly.
+    if (!clickToFocus || drag) return;
+    const target = e.target as Element;
+    if (!target.closest('[data-player-host]')) return;
+    const login = target.closest<HTMLElement>('[data-testid=player-tile]')?.dataset.channel;
+    if (login) promote(login);
+  };
+
   const hiddenOffline = hiding ? offline : [];
 
   return (
@@ -174,6 +208,7 @@ export function Viewer() {
         if (!containerRef.current?.contains(e.relatedTarget as Node)) setSidebarDrop(null);
       }}
       onDrop={onDrop}
+      onClick={onViewerClick}
     >
       {view.channels.length === 0 && <EmptyState />}
       {view.channels.length > 0 && visible.length === 0 && (

@@ -123,15 +123,41 @@ describe('computeFocusLayout', () => {
     }
   });
 
-  it('auto mode keeps side tiles big enough to autoplay on a 1080p screen', () => {
-    for (let n = 2; n <= 6; n++) {
-      const rects = computeFocusLayout(n, FHD, opts);
-      for (const r of rects) expect(isBelowMinimum(r, opts.minTile)).toBe(false);
-    }
+  it('auto lines the side strip up with the main stream (top and bottom edges)', () => {
+    const area = { width: 1868, height: 905 }; // a typical window with the sidebar collapsed
+    const rects = computeFocusLayout(5, area, opts);
+    const [main, ...side] = rects as [Rect, ...Rect[]];
+    // One column to the right, flush with the main stream.
+    for (const r of side) expect(r.x).toBeGreaterThan(main.x + main.width);
+    expect(side[0]!.y).toBeCloseTo(main.y, 3);
+    expect(side.at(-1)!.y + side.at(-1)!.height).toBeCloseTo(main.y + main.height, 3);
+    // Fills the width.
+    expect(side[0]!.x + side[0]!.width - main.x).toBeCloseTo(area.width, 1);
+    expectNoOverlap(rects);
+    expectAspect(rects);
   });
 
-  it('wraps extra tiles under the main stream (L shape)', () => {
-    const rects = computeFocusLayout(6, FHD, opts);
+  it('auto puts the strip below the main stream in a tall area, as wide as the main stream', () => {
+    const area = { width: 1000, height: 1100 };
+    const rects = computeFocusLayout(4, area, opts); // main + 3 in one row
+    const [main, ...row] = rects as [Rect, ...Rect[]];
+    for (const r of row) expect(r.y).toBeGreaterThan(main.y + main.height);
+    expect(row[0]!.x).toBeCloseTo(main.x, 3);
+    expect(row.at(-1)!.x + row.at(-1)!.width).toBeCloseTo(main.x + main.width, 3);
+    expectInside(rects, area);
+    expectNoOverlap(rects);
+  });
+
+  it('auto uses more strip columns when there are many streams', () => {
+    const rects = computeFocusLayout(9, FHD, opts);
+    const xs = new Set(rects.slice(1).map((r) => Math.round(r.x)));
+    expect(xs.size).toBeGreaterThan(1);
+    expectInside(rects, FHD);
+    expectNoOverlap(rects);
+  });
+
+  it('manual zoom wraps extra tiles under the main stream (L shape)', () => {
+    const rects = computeFocusLayout(6, FHD, opts, 0.66);
     const main = rects[0]!;
     expect(rects.slice(1).some((r) => r.y >= main.y + main.height)).toBe(true);
     expect(rects.slice(1).some((r) => r.x >= main.x + main.width)).toBe(true);

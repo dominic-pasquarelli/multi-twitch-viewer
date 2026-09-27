@@ -108,6 +108,12 @@ function SettingsForm() {
         />
       </Field>
       <Checkbox
+        checked={s.clickToFocus}
+        onChange={(v) => s.update({ clickToFocus: v })}
+        label="Click a stream to make it the main one"
+        help="In focus layout, clicking one of the small streams swaps it into the big spot."
+      />
+      <Checkbox
         checked={s.hideOffline}
         onChange={(v) => s.update({ hideOffline: v })}
         label="Hide offline channels"

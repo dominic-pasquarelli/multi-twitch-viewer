@@ -172,6 +172,13 @@ test('logs in with Twitch, lists live follows and plays them through the embed A
     'data-audible',
     'true',
   );
+  // Focus layout: clicking into a (real iframe) player makes it the main stream.
+  await page.keyboard.press('l');
+  const width = async (c: string) =>
+    (await page.locator(`[data-testid=player-tile][data-channel=${c}]`).boundingBox())!.width;
+  await expect.poll(() => width('alpha')).toBeGreaterThan(await width('bravo'));
+  await page.locator('iframe[data-fake-twitch=bravo]').click();
+  await expect.poll(async () => (await width('bravo')) > (await width('alpha'))).toBe(true);
 });
 
 test('ignores a login redirect whose state does not match', async ({ page }) => {

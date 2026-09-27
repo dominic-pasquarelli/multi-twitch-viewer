@@ -110,7 +110,8 @@ follow. The app walks you through this (**Set up Twitch login**). The steps are:
 1. Open the [Twitch developer console](https://dev.twitch.tv/console/apps/create). Twitch requires
    two-factor authentication on your account for this.
 2. Register an application:
-   - **Name**: anything unique, e.g. `yourname-multi-viewer`
+   - **Name**: anything unique that does **not** contain the word “Twitch” (Twitch rejects
+     those with “Invalid client name”), e.g. `yourname-multiviewer`
    - **OAuth Redirect URL**: `http://localhost:5757` (exactly: no trailing slash, and `localhost`, not `127.0.0.1`)
    - **Category**: Website Integration
    - **Client type**: Public
