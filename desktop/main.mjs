@@ -22,7 +22,7 @@ import {
 } from './navigation.mjs';
 import { APP_URL, startServer } from './server.mjs';
 import { createTray } from './tray.mjs';
-import { startAutoUpdates } from './updates.mjs';
+import { checkForUpdate, readBuildCommit, startUpdater } from './updates.mjs';
 import { parseState, restoreBounds } from './windowState.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -68,9 +68,6 @@ async function start() {
     ALLOWED_PERMISSIONS.has(permission),
   );
 
-  /** @type {{ installNow(): void } | null} */
-  let updates = null;
-
   createWindow();
   tray = createTray({
     iconPath: ICON,
@@ -79,23 +76,55 @@ async function start() {
       quitting = true;
       app.quit();
     },
-    onInstallUpdate: () => updates?.installNow(),
+    onInstallUpdate: () => installUpdate(),
   });
 
-  if (app.isPackaged) {
-    updates = startAutoUpdates({
-      onReady: (version) => {
-        tray?.setUpdateReady();
-        new Notification({
-          title: 'Update ready',
-          body: `Version ${version} will be installed the next time Multi Twitch Viewer starts. Or use “Restart to install update” in the tray menu.`,
-        }).show();
-      },
-    });
-  }
+  startUpdateChecks();
 
   ipcMain.on('mtv:show-window', () => showWindow());
   ipcMain.handle('mtv:twitch-sign-in', () => openTwitchSignIn());
+  ipcMain.handle('mtv:update-status', () => updateStatus);
+  ipcMain.handle('mtv:update-check', () => runUpdateCheck());
+  ipcMain.on('mtv:update-install', () => installUpdate());
+}
+
+// ---- Updates ---------------------------------------------------------------
+
+const UPDATE_CHECK_EVERY = 6 * 60 * 60 * 1000;
+const buildCommit = readBuildCommit(app.getAppPath());
+/** @type {import('./updates.mjs').UpdateStatus} */
+let updateStatus = { state: buildCommit ? 'checking' : 'dev', current: buildCommit };
+/** @type {string | null} */
+let notifiedFor = null;
+
+async function runUpdateCheck() {
+  updateStatus = await checkForUpdate(buildCommit);
+  win?.webContents.send('mtv:update-status', updateStatus);
+  tray?.setUpdateAvailable(updateStatus.state === 'available');
+  if (updateStatus.state === 'available' && updateStatus.latest !== notifiedFor) {
+    notifiedFor = updateStatus.latest ?? null;
+    const n = new Notification({
+      title: 'Update available',
+      body: `${updateStatus.latestMessage ?? 'A new version is on GitHub.'}\nOpen Settings or the tray menu to install it.`,
+    });
+    n.on('click', () => showWindow());
+    n.show();
+  }
+  return updateStatus;
+}
+
+function startUpdateChecks() {
+  if (!buildCommit) return; // running from source: update with git instead
+  setTimeout(() => void runUpdateCheck(), 15_000);
+  setInterval(() => void runUpdateCheck(), UPDATE_CHECK_EVERY);
+}
+
+/** Runs the installer script (it rebuilds, reinstalls and restarts the app), then quits. */
+function installUpdate() {
+  if (process.platform !== 'win32') return;
+  startUpdater();
+  quitting = true;
+  setTimeout(() => app.quit(), 500);
 }
 
 function createWindow() {

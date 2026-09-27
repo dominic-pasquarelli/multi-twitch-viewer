@@ -17,6 +17,7 @@ import { useHotkeys } from '@/features/shortcuts/useHotkeys';
 import { useFullscreenSync } from '@/features/topbar/fullscreen';
 import { TopBar } from '@/features/topbar/TopBar';
 import { installAudioUnlock } from '@/features/viewer/playerRegistry';
+import { UpdateBanner } from '@/features/updates/UpdateBanner';
 import { useHashSync } from '@/features/viewer/useHashSync';
 import { Viewer } from '@/features/viewer/Viewer';
 import styles from './App.module.css';
@@ -59,6 +60,7 @@ export function App() {
       <SetupDialog />
       <SavePresetDialog />
       <ShortcutsDialog />
+      <UpdateBanner />
       <Toasts />
     </div>
   );

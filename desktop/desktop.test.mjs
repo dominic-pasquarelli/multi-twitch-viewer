@@ -78,3 +78,66 @@ describe('local server', () => {
     }
   });
 });
+
+describe('updates', async () => {
+  const { checkForUpdate, readBuildCommit, startUpdater, updaterCommand, INSTALL_SCRIPT_URL } =
+    await import('./updates.mjs');
+  const A = 'a'.repeat(40);
+  const B = 'b'.repeat(40);
+  const github = (body, status = 200, refs = '', refsStatus = 200) =>
+    /** @type {typeof fetch} */ (
+      async (/** @type {string} */ url) =>
+        url.includes('/info/refs')
+          ? new Response(refs, { status: refsStatus })
+          : new Response(JSON.stringify(body), { status })
+    );
+
+  it('reports a newer commit on GitHub', async () => {
+    const s = await checkForUpdate(A, github({ sha: B, commit: { message: 'Add thing\n\nbody' } }));
+    expect(s).toMatchObject({
+      state: 'available',
+      current: A,
+      latest: B,
+      latestMessage: 'Add thing',
+    });
+  });
+  it('reports up to date, dev builds and errors', async () => {
+    expect((await checkForUpdate(A, github({ sha: A }))).state).toBe('up-to-date');
+    expect((await checkForUpdate(null, github({ sha: A }))).state).toBe('dev');
+    expect(await checkForUpdate(A, github({}, 403, '', 500))).toMatchObject({
+      state: 'error',
+      error: 'GitHub answered 403 / 500',
+    });
+  });
+  it('falls back to git refs when the API is rate-limited', async () => {
+    const refs = `001e# service=git-upload-pack\n0000015d${B} HEAD\0caps\n003f${B} refs/heads/main\n0044${A} refs/heads/mainline\n0000`;
+    const s = await checkForUpdate(A, github({ message: 'rate limit' }, 403, refs));
+    expect(s).toMatchObject({ state: 'available', latest: B });
+    expect(s.latestMessage).toBeUndefined();
+  });
+
+  it('reads the commit stamped into the packaged app', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mtv-app-'));
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ buildCommit: A }));
+    expect(readBuildCommit(dir)).toBe(A);
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ buildCommit: 'nope' }));
+    expect(readBuildCommit(dir)).toBeNull();
+  });
+  it('runs the latest installer script in its own window', () => {
+    /** @type {any[]} */
+    const calls = [];
+    const fakeSpawn = /** @type {any} */ (
+      (/** @type {any[]} */ ...args) => {
+        calls.push(args);
+        return { unref() {} };
+      }
+    );
+    startUpdater(fakeSpawn);
+    const [cmd, args, opts] = calls[0];
+    expect(cmd).toBe('powershell.exe');
+    expect(args.at(-1)).toBe(updaterCommand());
+    expect(updaterCommand()).toContain(INSTALL_SCRIPT_URL);
+    expect(updaterCommand()).toContain('-FromApp');
+    expect(opts).toMatchObject({ detached: true, windowsHide: false });
+  });
+});

@@ -9,13 +9,13 @@ export function createTray(opts) {
   const image = nativeImage.createFromPath(opts.iconPath).resize({ width: 16, height: 16 });
   const tray = new Tray(image);
   tray.setToolTip('Multi Twitch Viewer');
-  let updateReady = false;
+  let updateAvailable = false;
   const render = () =>
     tray.setContextMenu(
       Menu.buildFromTemplate([
         { label: 'Show Multi Twitch Viewer', click: opts.onShow },
-        ...(updateReady
-          ? [{ label: 'Restart to install update', click: opts.onInstallUpdate }]
+        ...(updateAvailable
+          ? [{ label: 'Update available: install now', click: opts.onInstallUpdate }]
           : []),
         { type: 'separator' },
         { label: 'Quit', click: opts.onQuit },
@@ -25,9 +25,11 @@ export function createTray(opts) {
   tray.on('click', opts.onShow);
   return {
     tray,
-    setUpdateReady() {
-      updateReady = true;
-      tray.setToolTip('Multi Twitch Viewer: update ready (restart to install)');
+    /** @param {boolean} available */
+    setUpdateAvailable(available) {
+      if (available === updateAvailable) return;
+      updateAvailable = available;
+      tray.setToolTip(available ? 'Multi Twitch Viewer: update available' : 'Multi Twitch Viewer');
       render();
     },
   };
