@@ -77,3 +77,39 @@ test('desktop app: plays streams, hides to the tray, remembers its window', asyn
   await app.evaluate(({ app: a }) => a.quit());
   await app.close().catch(() => {});
 });
+
+test("desktop app: hides Twitch's stream info in the players (setting)", async () => {
+  const app = await launch(mkdtempSync(join(tmpdir(), 'mtv-desktop-')));
+  const win = await app.firstWindow();
+  // A stand-in for Twitch's player: stream info on top, controls below.
+  await app.context().route('https://player.twitch.tv/**', (route) =>
+    route.fulfill({
+      contentType: 'text/html',
+      body: `<style>body{margin:0;height:300px}video{position:absolute;inset:0}</style><div><video></video><div>
+        <div id="info"><a href="https://www.twitch.tv/tpain">TPAIN</a>
+          <button data-a-target="subscribe-button">Subscribe</button></div>
+        <div data-a-target="player-controls" id="controls"><button>play</button></div>
+      </div></div>`,
+    }),
+  );
+  await win.evaluate(() => {
+    const f = document.createElement('iframe');
+    f.src = 'https://player.twitch.tv/?channel=tpain&parent=localhost';
+    document.body.append(f);
+  });
+  const player = () => win.frames().find((f) => f.url().startsWith('https://player.twitch.tv'));
+  const hiddenIds = () =>
+    player()!.evaluate(() => [...document.querySelectorAll('[data-mtv-hidden]')].map((e) => e.id));
+
+  await expect.poll(() => player()?.url() ?? '').toContain('player.twitch.tv');
+  await expect.poll(hiddenIds).toEqual(['info']);
+
+  // Turning the setting off shows it again.
+  await win.evaluate(() =>
+    (
+      window as unknown as { mtvDesktop: { setPlayerChrome(o: { hideStreamInfo: boolean }): void } }
+    ).mtvDesktop.setPlayerChrome({ hideStreamInfo: false }),
+  );
+  await expect.poll(hiddenIds).toEqual([]);
+  await app.close();
+});

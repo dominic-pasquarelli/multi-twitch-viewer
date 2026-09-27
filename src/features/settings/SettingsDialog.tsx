@@ -119,6 +119,14 @@ function SettingsForm() {
         label="Hide offline channels"
         help="Their space goes to the live streams; they pop back in when they go live."
       />
+      {desktop && (
+        <Checkbox
+          checked={s.hideStreamInfo}
+          onChange={(v) => s.update({ hideStreamInfo: v })}
+          label="Hide Twitch's stream info on the players"
+          help="Hides the channel name, title and Follow/Subscribe/Gift buttons Twitch shows at the top of a player. Its play, volume and fullscreen buttons stay."
+        />
+      )}
 
       <h3 className={formStyles.section}>Audio</h3>
       <Field
