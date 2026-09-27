@@ -1,9 +1,13 @@
 {
   "name": "multi-twitch-viewer",
+  "productName": "Multi Twitch Viewer",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A personal multi-stream Twitch viewer: followed channels, smart layouts, audio focus and saved presets.",
+  "author": "Dominic Pasquarelli",
+  "homepage": "https://github.com/dominic-pasquarelli/multi-twitch-viewer",
   "type": "module",
+  "main": "desktop/main.mjs",
   "engines": {
     "node": ">=22.12.0"
   },
@@ -20,18 +24,18 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "desktop": "vite build && electron .",
+    "desktop:mock": "vite build --mode mock && electron .",
+    "desktop:dist": "vite build && electron-builder --win --publish never"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.104.0",
-    "lucide-react": "^1.48.0",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "zustand": "^5.0.15"
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
+    "@tanstack/react-query": "^5.104.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
@@ -40,15 +44,21 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.12.0",
     "jsdom": "^30.1.1",
+    "lucide-react": "^1.48.0",
     "prettier": "^3.9.9",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.1",
     "vite": "^8.3.1",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.2",
+    "zustand": "^5.0.15"
   }
 }

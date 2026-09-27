@@ -26,6 +26,7 @@ src/
 | `twitch/`      | `TwitchApi` interface, Helix client (auth headers, pagination, 401/429), OAuth helpers, mock API. | Implement `TwitchApi` (e.g. a caching or proxy variant).            |
 | `player/`      | `PlayerAdapter` interface, Twitch embed adapter, mock player, `PlayerController`, quality picker. | Implement `PlayerAdapter` for another player.                       |
 | `persistence/` | `KeyValueStore` interface (localStorage with memory fallback) and the zustand adapter.            | Implement `KeyValueStore` (file, sync service…).                    |
+| `alerts/`      | Which streams just went live (for notifications), favorites-first sorting.                        |                                                                     |
 | `channels/`    | Parse names, `@names`, twitch.tv, player and multitwitch links.                                   |                                                                     |
 | `utils/`       | Formatting helpers (viewer counts, uptime, thumbnails).                                           |                                                                     |
 
@@ -48,6 +49,34 @@ old entry falls back to defaults instead of crashing the app. All keys are prefi
 `ServicesProvider` decides which implementations features get: the real Helix API and Twitch
 embed, or the mock ones (`VITE_TWITCH_MOCK=true`, used by `npm run dev:mock` and the e2e tests).
 Features only use `useServices()`, so they don't know or care which one is active.
+
+## Desktop app (`desktop/`, Electron)
+
+Plain JavaScript modules, typechecked through `tsconfig.desktop.json` (`// @ts-check`), with no
+build step:
+
+| Module            | What it does                                                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `main.mjs`        | App lifecycle: single instance, window, close-to-tray, permissions, links, Twitch sign-in window.                                                                        |
+| `server.mjs`      | Serves `dist/` on `localhost:5757` (IPv4 + IPv6). The Twitch OAuth redirect and embed `parent` need exactly that origin.                                                 |
+| `windowState.mjs` | Saves and restores size, position, maximized and fullscreen; falls back to the primary monitor if the saved one is gone.                                                 |
+| `navigation.mjs`  | Only the app and `*.twitch.tv` pages may load in the window; everything else opens in the system browser. Also the permission allow-list and the Chrome-like user agent. |
+| `tray.mjs`        | Tray icon and menu (show, restart to install update, quit).                                                                                                              |
+| `updates.mjs`     | `electron-updater` against GitHub releases: checks at start and every 6 h, installs on quit.                                                                             |
+| `preload.cjs`     | The only bridge to the page: `window.mtvDesktop` (see `src/lib/desktop/bridge.ts`).                                                                                      |
+
+Behaviour notes:
+
+- **Hidden to the tray**, the page gets `mtvDesktop.onBackgroundChange(true)` and unmounts the
+  players and chat (no hidden audio or bandwidth). The live-list polling keeps running
+  (`backgroundThrottling: false`, `refetchIntervalInBackground`), so go-live notifications still
+  fire. Clicking one calls `showWindow()`.
+- The window is sandboxed (`contextIsolation`, `sandbox`, no Node integration). The page can only
+  use the bridge functions.
+- Packaging: `electron-builder.yml` (NSIS one-click installer). Only `electron-updater` is a
+  runtime dependency; the web app's libraries are already bundled into `dist/`.
+- Tests: `desktop/desktop.test.mjs` (unit) and `e2e/desktop.spec.ts`, which drives the real app
+  with Playwright: tray hide/show, blocked navigation, and window position across restarts.
 
 ## Key design decisions
 

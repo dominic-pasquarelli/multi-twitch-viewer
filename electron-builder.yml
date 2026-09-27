@@ -1,0 +1,32 @@
+# Windows installer for the desktop app. Built and published by
+# .github/workflows/desktop-release.yml; locally: npm run desktop:dist
+appId: com.dominicpasquarelli.multitwitchviewer
+productName: Multi Twitch Viewer
+copyright: Personal use
+directories:
+  output: release
+  buildResources: desktop/assets
+files:
+  - dist/**
+  - desktop/**
+  - '!desktop/**/*.test.mjs'
+  - package.json
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: desktop/assets/icon.png
+  artifactName: MultiTwitchViewer-Setup-${version}.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Multi Twitch Viewer
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+publish:
+  provider: github
+  owner: dominic-pasquarelli
+  repo: multi-twitch-viewer
+  releaseType: release

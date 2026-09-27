@@ -102,7 +102,7 @@ export function toggleAudio(view: ViewState, login: string): ViewState {
   if (!view.channels.includes(login)) return view;
   const isActive = view.audio.active.includes(login);
   let active: string[];
-  if (view.audio.mode === 'solo') active = isActive ? [] : [login];
+  if (hasSingleFocus(view.audio.mode)) active = isActive ? [] : [login];
   else
     active = isActive
       ? view.audio.active.filter((c) => c !== login)
@@ -115,7 +115,7 @@ export function muteAll(view: ViewState): ViewState {
 }
 
 export function setAudioMode(view: ViewState, mode: AudioMode): ViewState {
-  const active = mode === 'solo' ? view.audio.active.slice(0, 1) : view.audio.active;
+  const active = hasSingleFocus(mode) ? view.audio.active.slice(0, 1) : view.audio.active;
   return { ...view, audio: { mode, active } };
 }
 
@@ -131,7 +131,7 @@ export function externalMuteChange(view: ViewState, login: string, muted: boolea
       audio: { ...view.audio, active: view.audio.active.filter((c) => c !== login) },
     };
   if (view.audio.active.includes(login)) return view;
-  return view.audio.mode === 'solo' ? focusAudio(view, login) : toggleAudio(view, login);
+  return hasSingleFocus(view.audio.mode) ? focusAudio(view, login) : toggleAudio(view, login);
 }
 
 export function setChat(view: ViewState, chat: Partial<ViewState['chat']>): ViewState {
@@ -154,7 +154,7 @@ export function mainChannel(view: ViewState, visible: string[] = view.channels):
 export function normalize(view: ViewState): ViewState {
   const has = (c: string | null): c is string => !!c && view.channels.includes(c);
   let active = view.audio.active.filter(has);
-  if (view.audio.mode === 'solo') active = active.slice(0, 1);
+  if (hasSingleFocus(view.audio.mode)) active = active.slice(0, 1);
   return {
     ...view,
     layout: { ...view.layout, main: has(view.layout.main) ? view.layout.main : null },
@@ -164,6 +164,30 @@ export function normalize(view: ViewState): ViewState {
       channel: has(view.chat.channel) ? view.chat.channel : (view.channels[0] ?? null),
     },
   };
+}
+
+/** Solo and duck both have exactly one "focused" stream. */
+export const hasSingleFocus = (mode: AudioMode): boolean => mode !== 'mix';
+
+export interface AudioLevel {
+  muted: boolean;
+  /** Multiplier applied to the channel's own volume (1 = as set). */
+  scale: number;
+  /** The stream you're focused on (full volume). */
+  focused: boolean;
+}
+
+/**
+ * How loud a stream should play. In duck mode the non-focused streams keep
+ * playing at `duckLevel` of their volume; muting everything (M) silences all.
+ */
+export function audioLevel(view: ViewState, login: string, duckLevel: number): AudioLevel {
+  const focused = view.audio.active.includes(login);
+  if (focused) return { muted: false, scale: 1, focused };
+  if (view.audio.mode === 'duck' && view.audio.active.length > 0 && duckLevel > 0) {
+    return { muted: false, scale: duckLevel, focused };
+  }
+  return { muted: true, scale: 1, focused };
 }
 
 export const emptyView = (): ViewState => structuredClone(EMPTY_VIEW);

@@ -6,7 +6,12 @@ import tseslint from 'typescript-eslint';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  globalIgnores(['dist', 'dist-e2e', 'coverage', 'playwright-report', 'test-results']),
+  globalIgnores(['dist', 'dist-e2e', 'release', 'coverage', 'playwright-report', 'test-results']),
+  {
+    files: ['desktop/**/*.{mjs,cjs}'],
+    extends: [js.configs.recommended],
+    languageOptions: { ecmaVersion: 2023, globals: globals.node },
+  },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

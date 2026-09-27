@@ -13,11 +13,16 @@ channels are live, and watch several streams at once with layouts that actually 
     others at or above Twitch's 400×300 autoplay minimum. Adjust it with the slider or `[` `]`.
   - Drag a stream by its grip onto another to swap them. Streams never reload when they move.
   - Offline channels step aside and give their space to live ones, then come back when they go live.
-- **Audio without the chaos**
-  - One stream is audible at a time. Press `1`–`9` or click the speaker to switch. Unmuting
-    inside a Twitch player also mutes the rest.
-  - Mix mode (`Shift+1`–`9`) lets you hear several streams. `M` mutes all and restores.
-  - Volume is remembered **per channel**, so loud streamers stay tamed.
+- **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar) to keep them at the
+  top. When a favorite goes live you get a Windows notification; click it to start watching.
+  Settings can switch this to everyone you follow, or off.
+- **Audio without the chaos**: pick a stream with `1`–`9` or its speaker button, and choose what
+  the others do (top bar):
+  - **Solo**: the others are muted. Unmuting inside a Twitch player also mutes the rest.
+  - **Duck**: the others keep playing quietly (20% by default) so you notice when something happens.
+  - **Mix** (`Shift+1`–`9`): several streams at full volume.
+  - `↑`/`↓` changes the volume of the stream you're hearing, or scroll over a stream's hover
+    bar. Volume is remembered **per channel**, so loud streamers stay tamed. `M` mutes all and restores.
 - **Presets**: save the current streams, layout, audio and chat as a named preset and load it in
   one click, with a live count for each. Export and import them as a JSON file for backup.
 - **Bookmarkable links**: the address bar always matches what you're watching
@@ -26,12 +31,42 @@ channels are live, and watch several streams at once with layouts that actually 
 - **Also**: tabbed chat (`C`) that follows the stream you're hearing, fullscreen (`F`), undo
   (`Ctrl+Z`), and optional "match quality to tile size" to save bandwidth.
 
-## Requirements
+## Windows desktop app (easiest)
+
+1. Go to the repository's **Releases** page, open the newest release, and download
+   **`MultiTwitchViewer-Setup-<version>.exe`**.
+2. Double-click it. It installs in a few seconds, with no questions, and opens the app.
+   - Windows may say _"Windows protected your PC"_ because the installer isn't code-signed.
+     Click **More info → Run anyway**. You only need to do this once.
+3. From then on, use the **Multi Twitch Viewer** shortcut on your desktop or in the Start menu.
+
+**First run:**
+
+1. Do the [one-time Twitch setup](#one-time-twitch-setup-about-3-minutes) and log in when the app
+   asks.
+2. For Turbo in the players, open **Settings → Sign in to Twitch players** once. The desktop app
+   has its own built-in browser, so it doesn't use your normal browser's Twitch login.
+
+**How it behaves:**
+
+- **Closing the window keeps it in the system tray** (bottom-right, near the clock). Streams stop,
+  but go-live alerts for your favorites keep coming. Click the tray icon to reopen, or right-click
+  → **Quit**.
+- **Updates install themselves.** New versions download in the background and are installed the
+  next time the app starts (or use **Restart to install update** in the tray menu).
+- It reopens at the same size, position and monitor, maximized or fullscreen included, and
+  restores your last streams.
+- Its presets and settings are separate from the browser version (`npm start`). To move presets
+  between them, use **Presets → Export / Import**.
+
+## Run from source (any OS)
+
+### Requirements
 
 - [Node.js](https://nodejs.org/) **22.12 or newer** (24 LTS recommended; `.nvmrc` included).
 - **Chrome or Edge** is recommended for Turbo; see [Turbo / no ads](#turbo--no-ads).
 
-## Quick start
+### Quick start
 
 ```bash
 npm install
@@ -65,7 +100,9 @@ that the app shows **Log in again**, which is one click because Twitch remembers
 
 ## Turbo / no ads
 
-The video players are Twitch's official embedded players. They use the Twitch login from the
+**Desktop app:** use **Settings → Sign in to Twitch players** once; that's all.
+
+**Browser version (`npm start`):** the video players are Twitch's official embedded players. They use the Twitch login from the
 browser you run the app in, so your Turbo (or sub) benefits apply when:
 
 1. You're logged in at [twitch.tv](https://www.twitch.tv) in the **same browser**, and
@@ -82,16 +119,19 @@ lack of a "Log in" prompt) is logged in.
 
 ## Using it
 
-| Do this                | How                                                                              |
-| ---------------------- | -------------------------------------------------------------------------------- |
-| Add a stream           | Click it in the sidebar, drag it in, or type names or links in the top box (`/`) |
-| Remove a stream        | Click it again in the sidebar, or use ✕ on the stream (then Undo)                |
-| Choose what you hear   | `1`–`9`, the speaker button on a stream, or unmute it in the player              |
-| Hear several at once   | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                         |
-| Make one stream big    | `L` or **Focus**; the ⤢ button on a stream makes it the main one                 |
-| Rearrange              | Drag a stream's grip (top-left on hover) onto another stream                     |
-| Save the current setup | **Presets** → **Save current…**                                                  |
-| Keyboard shortcuts     | `?`                                                                              |
+| Do this                         | How                                                                              |
+| ------------------------------- | -------------------------------------------------------------------------------- |
+| Add a stream                    | Click it in the sidebar, drag it in, or type names or links in the top box (`/`) |
+| Remove a stream                 | Click it again in the sidebar, or use ✕ on the stream (then Undo)                |
+| Choose what you hear            | `1`–`9`, the speaker button on a stream, or unmute it in the player              |
+| Hear the others quietly         | **Duck** in the top bar (background level in Settings)                           |
+| Change volume                   | `↑`/`↓`, or scroll over a stream's hover bar                                     |
+| Get told when someone goes live | Star them in the sidebar; allow notifications in Settings → Go-live alerts       |
+| Hear several at once            | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                         |
+| Make one stream big             | `L` or **Focus**; the ⤢ button on a stream makes it the main one                 |
+| Rearrange                       | Drag a stream's grip (top-left on hover) onto another stream                     |
+| Save the current setup          | **Presets** → **Save current…**                                                  |
+| Keyboard shortcuts              | `?`                                                                              |
 
 Shortcuts pause while a Twitch player has keyboard focus (after you click inside it). Moving the
 mouse off the player hands focus back.
@@ -126,7 +166,14 @@ npm run dev:mock     # dev server with fake Twitch data
 npm run check        # typecheck + lint + unit tests
 npm run test:e2e     # browser tests (first time: npx playwright install chromium)
 npm run format       # prettier
+npm run desktop      # run the desktop (Electron) app from source
+npm run desktop:mock # …with fake Twitch data
+npm run desktop:dist # build the Windows installer into release/ (best run on Windows)
 ```
+
+The desktop app lives in `desktop/`. The **Desktop app** GitHub workflow builds the installer on
+every push to `main` and publishes it as a numbered release, which installed apps pick up as an
+update.
 
 Code is organised as independent, reusable modules. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module map and how to extend or fix one

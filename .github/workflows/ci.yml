@@ -8,6 +8,8 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1' # not needed for these checks
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,7 +33,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      # Electron downloads its binary on first use; do it up front, not inside a test.
+      - run: node node_modules/electron/install.js
+      # xvfb provides a display for the Electron (desktop app) tests.
+      - run: xvfb-run -a npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

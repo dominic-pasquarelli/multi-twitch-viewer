@@ -52,6 +52,7 @@ const NAMES = [
   'WaffleWizard',
 ];
 
+/** Mock channels are mutable so tests and demos can simulate going live. */
 export const MOCK_CHANNELS: MockChannel[] = NAMES.map((displayName, i) => ({
   id: String(1000 + i),
   login: displayName.toLowerCase(),
@@ -62,6 +63,12 @@ export const MOCK_CHANNELS: MockChannel[] = NAMES.map((displayName, i) => ({
   viewers: Math.round(40_000 / (i + 1) ** 1.3),
   hue: HUES[i % HUES.length]!,
 }));
+
+/** Simulates a channel going live/offline (mock mode only; exposed as window.mtvMock). */
+export function setMockLive(login: string, live: boolean): void {
+  const channel = MOCK_CHANNELS.find((c) => c.login === login);
+  if (channel) channel.live = live;
+}
 
 export const MOCK_ME: TwitchUser = {
   id: '42',

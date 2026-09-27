@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addChannels,
+  audioLevel,
   emptyView,
   externalMuteChange,
   focusAudio,
@@ -69,6 +70,24 @@ describe('view operations', () => {
     expect(v.audio.active).toEqual(['b']);
     v = setAudioMode(toggleAudio(v, 'a'), 'solo');
     expect(v.audio.active).toEqual(['b']);
+  });
+
+  it('duck mode: one stream loud, the others quiet; mute-all silences everything', () => {
+    let v = setAudioMode(withChannels('a', 'b', 'c'), 'duck');
+    expect(audioLevel(v, 'a', 0.2)).toEqual({ muted: false, scale: 1, focused: true });
+    expect(audioLevel(v, 'b', 0.2)).toEqual({ muted: false, scale: 0.2, focused: false });
+    v = toggleAudio(v, 'b');
+    expect(v.audio.active).toEqual(['b']);
+    expect(audioLevel(v, 'a', 0.2).scale).toBe(0.2);
+    v = toggleAudio(v, 'b'); // nothing focused = silence
+    expect(audioLevel(v, 'a', 0.2).muted).toBe(true);
+    expect(audioLevel(focusAudio(v, 'a'), 'b', 0).muted).toBe(true);
+    expect(sanitizeView({ channels: ['a'], audio: { mode: 'duck' } })?.audio.mode).toBe('duck');
+  });
+
+  it('solo mode mutes everything that is not focused', () => {
+    const v = withChannels('a', 'b');
+    expect(audioLevel(v, 'b', 0.2).muted).toBe(true);
   });
 
   it('unmuting inside a player mutes the others in solo mode', () => {

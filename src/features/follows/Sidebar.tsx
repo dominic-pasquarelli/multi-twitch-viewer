@@ -1,10 +1,19 @@
 import { useMemo, useState, type DragEvent, type MouseEvent } from 'react';
-import { ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, RefreshCw } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
+  RefreshCw,
+  Star,
+} from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useServices } from '@/app/servicesContext';
+import { favoritesFirst } from '@/lib/alerts/goLive';
 import type { LiveStream } from '@/lib/twitch/types';
 import { formatCount, formatUptime, sizedThumbnail } from '@/lib/utils/format';
 import { useAuth } from '@/state/authStore';
+import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings, type SidebarSort } from '@/state/settingsStore';
 import { useViewStore } from '@/state/viewStore';
 import { Avatar } from '@/ui/Avatar';
@@ -60,23 +69,26 @@ function useRows() {
   const live = useFollowedLive();
   const follows = useFollowedChannels();
   const sort = useSettings((s) => s.sidebarSort);
+  const favorites = useChannelPrefs((s) => s.favorites);
   return useMemo(() => {
     const avatars = new Map<string, FollowedChannelInfo>(
       (follows.data ?? []).map((f) => [f.login, f]),
     );
-    const liveRows: Row[] = sortLive(live.data ?? [], sort).map((s) => ({
+    const liveRows: Row[] = favoritesFirst(sortLive(live.data ?? [], sort), favorites).map((s) => ({
       login: s.login,
       displayName: s.displayName,
       avatar: avatars.get(s.login)?.profileImageUrl ?? '',
       stream: s,
     }));
     const liveSet = new Set(liveRows.map((r) => r.login));
-    const offlineRows: Row[] = (follows.data ?? [])
-      .filter((f) => !liveSet.has(f.login))
-      .sort((a, b) => a.displayName.localeCompare(b.displayName))
-      .map((f) => ({ login: f.login, displayName: f.displayName, avatar: f.profileImageUrl }));
+    const offlineRows: Row[] = favoritesFirst(
+      (follows.data ?? [])
+        .filter((f) => !liveSet.has(f.login))
+        .sort((a, b) => a.displayName.localeCompare(b.displayName)),
+      favorites,
+    ).map((f) => ({ login: f.login, displayName: f.displayName, avatar: f.profileImageUrl }));
     return { liveRows, offlineRows, live, follows };
-  }, [live, follows, sort]);
+  }, [live, follows, sort, favorites]);
 }
 
 function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
@@ -230,37 +242,54 @@ function ChannelRow({
   onHover?(el: HTMLElement | null): void;
 }) {
   const handlers = useRowHandlers(row.login);
+  const favorite = useChannelPrefs((p) => p.favorites.includes(row.login));
+  const toggleFavorite = useChannelPrefs((p) => p.toggleFavorite);
   const s = row.stream;
   return (
-    <button
-      className={`${styles.row} ${inView ? styles.inView : ''} ${s ? '' : styles.offline}`}
-      data-testid="channel-row"
-      data-channel={row.login}
-      aria-pressed={inView}
-      title={
-        (inView ? 'Click to remove' : 'Click to add') +
-        ' · Shift+click to watch only this · drag onto a stream to replace it'
-      }
-      onMouseEnter={(e) => onHover?.(e.currentTarget)}
-      onMouseLeave={() => onHover?.(null)}
-      {...handlers}
-      onClick={(e) => {
-        onHover?.(null); // the preview must not cover players while they start
-        handlers.onClick(e);
-      }}
-    >
-      <Avatar src={row.avatar} name={row.displayName} size={30} live={!!s} />
-      <span className={styles.text}>
-        <div className={styles.name}>{row.displayName}</div>
-        {s && <div className={styles.game}>{s.gameName || 'No category'}</div>}
-      </span>
-      {s && (
-        <span className={styles.viewers}>
-          <span className={styles.dot} />
-          {formatCount(s.viewerCount)}
+    <div className={`${styles.rowWrap} ${favorite ? styles.favorite : ''}`}>
+      <button
+        className={`${styles.row} ${inView ? styles.inView : ''} ${s ? '' : styles.offline}`}
+        data-testid="channel-row"
+        data-channel={row.login}
+        data-live={!!s}
+        aria-pressed={inView}
+        title={
+          (inView ? 'Click to remove' : 'Click to add') +
+          ' · Shift+click to watch only this · drag onto a stream to replace it'
+        }
+        onMouseEnter={(e) => onHover?.(e.currentTarget)}
+        onMouseLeave={() => onHover?.(null)}
+        {...handlers}
+        onClick={(e) => {
+          onHover?.(null); // the preview must not cover players while they start
+          handlers.onClick(e);
+        }}
+      >
+        <Avatar src={row.avatar} name={row.displayName} size={30} live={!!s} />
+        <span className={styles.text}>
+          <div className={styles.name}>{row.displayName}</div>
+          {s && <div className={styles.game}>{s.gameName || 'No category'}</div>}
         </span>
-      )}
-    </button>
+        {s && (
+          <span className={styles.viewers}>
+            <span className={styles.dot} />
+            {formatCount(s.viewerCount)}
+          </span>
+        )}
+      </button>
+      <button
+        className={styles.star}
+        aria-pressed={favorite}
+        aria-label={favorite ? `Unfavorite ${row.displayName}` : `Favorite ${row.displayName}`}
+        title={
+          favorite ? 'Remove from favorites' : 'Favorite: keep at the top and get go-live alerts'
+        }
+        data-testid="favorite-toggle"
+        onClick={() => toggleFavorite(row.login)}
+      >
+        <Star size={14} fill={favorite ? 'currentColor' : 'none'} />
+      </button>
+    </div>
   );
 }
 

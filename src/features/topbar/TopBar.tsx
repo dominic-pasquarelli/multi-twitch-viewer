@@ -10,6 +10,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { MIN_MAIN_SCALE } from '@/lib/layout';
+import type { AudioMode } from '@/lib/view/types';
 import { useAuth } from '@/state/authStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
@@ -20,6 +21,16 @@ import { PresetsMenu } from '../presets/PresetsMenu';
 import { AddChannelBox } from './AddChannelBox';
 import { toggleFullscreen } from './fullscreen';
 import styles from './TopBar.module.css';
+
+const AUDIO_MODES: { mode: AudioMode; label: string; help: string }[] = [
+  { mode: 'solo', label: 'Solo', help: 'Solo: hear one stream; the others are muted.' },
+  {
+    mode: 'duck',
+    label: 'Duck',
+    help: 'Duck: hear one stream loudly, the others quietly in the background (level in Settings).',
+  },
+  { mode: 'mix', label: 'Mix', help: 'Mix: any number of streams at full volume (Shift+1–9).' },
+];
 
 export function TopBar() {
   const view = useViewStore((s) => s.view);
@@ -79,18 +90,17 @@ export function TopBar() {
       </div>
 
       <div className={styles.group} role="group" aria-label="Audio">
-        <button
-          className={styles.seg}
-          aria-pressed={view.audio.mode === 'solo'}
-          onClick={() => store.setAudioMode(view.audio.mode === 'solo' ? 'mix' : 'solo')}
-          title={
-            view.audio.mode === 'solo'
-              ? 'Solo: hearing one stream mutes the others. Click to allow mixing.'
-              : 'Mix: several streams can play sound. Click for one-at-a-time.'
-          }
-        >
-          {view.audio.mode === 'solo' ? 'Solo audio' : 'Mix audio'}
-        </button>
+        {AUDIO_MODES.map((m) => (
+          <button
+            key={m.mode}
+            className={styles.seg}
+            aria-pressed={view.audio.mode === m.mode}
+            onClick={() => store.setAudioMode(m.mode)}
+            title={m.help}
+          >
+            {m.label}
+          </button>
+        ))}
         <IconButton
           size="sm"
           label={muted ? 'Unmute (M)' : 'Mute all (M)'}
