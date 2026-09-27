@@ -26,12 +26,32 @@ channels are live, and watch several streams at once with layouts that actually 
 - **Also**: tabbed chat (`C`) that follows the stream you're hearing, fullscreen (`F`), undo
   (`Ctrl+Z`), and optional "match quality to tile size" to save bandwidth.
 
-## Requirements
+## Windows: one-click app (easiest)
+
+1. Go to the repository's **Releases** page, open **Latest Windows app**, and download
+   **`MultiTwitchViewer.exe`**.
+2. Put it wherever you like (for example `Documents`) and double-click it.
+   - Windows may say _"Windows protected your PC"_ because the file isn't code-signed. Click
+     **More info → Run anyway**. You only need to do this once.
+3. The app opens in its own window. A **Multi Twitch Viewer** shortcut is added to your desktop,
+   so next time just double-click that.
+
+No Node.js, no commands and no installer. The exe contains the whole app and runs it on
+`http://localhost:5757`. It uses your installed Chrome or Edge (Edge comes with Windows), so your
+twitch.tv login and Turbo carry over. It quits on its own a few minutes after you close the
+window. Opening it again while it's running just opens another window.
+
+To update, download the new exe over the old one. Presets and settings are kept, because they're
+stored in the browser, not in the exe.
+
+## Run from source (any OS)
+
+### Requirements
 
 - [Node.js](https://nodejs.org/) **22.12 or newer** (24 LTS recommended; `.nvmrc` included).
 - **Chrome or Edge** is recommended for Turbo; see [Turbo / no ads](#turbo--no-ads).
 
-## Quick start
+### Quick start
 
 ```bash
 npm install
@@ -126,7 +146,13 @@ npm run dev:mock     # dev server with fake Twitch data
 npm run check        # typecheck + lint + unit tests
 npm run test:e2e     # browser tests (first time: npx playwright install chromium)
 npm run format       # prettier
+npm run build:windows  # release/MultiTwitchViewer.exe (needs Go 1.24+; works from any OS)
+npm run test:launcher  # Go tests for the Windows launcher
 ```
+
+The Windows app is a small Go program in `launcher/` that embeds the built web app. The
+**Windows app** GitHub workflow rebuilds it on every push to `main` and attaches it to the
+**Latest Windows app** release.
 
 Code is organised as independent, reusable modules. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the module map and how to extend or fix one

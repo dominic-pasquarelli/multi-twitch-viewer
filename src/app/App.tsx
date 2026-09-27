@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { startLauncherHeartbeat } from '@/lib/launcher/heartbeat';
 import { useClientId } from '@/app/servicesContext';
 import { useSettings } from '@/state/settingsStore';
 import { useUi } from '@/state/uiStore';
@@ -26,6 +27,15 @@ export function App() {
   useHashSync();
   useFullscreenSync();
   useEffect(() => installAudioUnlock(), []);
+  useEffect(() => {
+    let stop = () => {};
+    let cancelled = false;
+    void startLauncherHeartbeat().then((s) => (cancelled ? s() : (stop = s)));
+    return () => {
+      cancelled = true;
+      stop();
+    };
+  }, []);
 
   const sidebarCollapsed = useSettings((s) => s.sidebarCollapsed);
   const chatOpen = useViewStore((s) => s.view.chat.open);

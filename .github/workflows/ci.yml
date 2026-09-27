@@ -20,6 +20,12 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: launcher/go.mod
+          cache: false
+      - run: npm run test:launcher
+      - run: cd launcher && go vet ./... && GOOS=windows go vet ./... && test -z "$(gofmt -l .)"
 
   e2e:
     runs-on: ubuntu-latest

@@ -49,6 +49,24 @@ old entry falls back to defaults instead of crashing the app. All keys are prefi
 embed, or the mock ones (`VITE_TWITCH_MOCK=true`, used by `npm run dev:mock` and the e2e tests).
 Features only use `useServices()`, so they don't know or care which one is active.
 
+## Windows launcher (`launcher/`)
+
+A small Go program (`MultiTwitchViewer.exe`) that makes the app a double-click desktop tool:
+
+- It embeds the built web app (`launcher/web`, filled by `npm run build:windows`) and serves it on
+  `127.0.0.1:5757`, the same origin as `npm start`, so logins and presets are shared.
+- It opens the app with `chrome.exe`/`msedge.exe --app=…`, a window without tabs that still uses
+  your normal browser profile, so the twitch.tv cookies (Turbo) work. If neither browser is found,
+  it opens the default browser.
+- **Single instance**: if port 5757 already answers `/__mtv/health`, it just opens another window.
+- **Auto-quit**: the web app POSTs `/__mtv/heartbeat` every 20 s (`src/lib/launcher/heartbeat.ts`,
+  which does nothing outside the launcher). The launcher exits 3 minutes after the last heartbeat,
+  which allows for browsers throttling background windows.
+- On first run it creates a desktop shortcut. Errors are shown in a Windows message box.
+- `winres/` holds the icon, version info and manifest (compiled in with `go-winres`).
+- Platform-specific code is in `platform_windows.go`; `platform_other.go` lets it build and be
+  tested on Linux or macOS.
+
 ## Key design decisions
 
 - **Streams never reload when the layout changes.** Tiles are absolutely positioned and rendered

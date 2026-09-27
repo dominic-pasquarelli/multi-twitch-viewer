@@ -20,7 +20,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "build:windows": "node scripts/build-windows.mjs",
+    "test:launcher": "cd launcher && go test ./..."
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.0",

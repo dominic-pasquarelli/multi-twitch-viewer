@@ -10,3 +10,7 @@ test-results
 !.env.example
 !.env.mock
 .DS_Store
+release
+launcher/web/*
+!launcher/web/README.md
+launcher/*.syso
