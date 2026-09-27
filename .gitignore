@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-e2e
+coverage
+playwright-report
+test-results
+*.local
+.env
+.env.*
+!.env.example
+!.env.mock
+.DS_Store
