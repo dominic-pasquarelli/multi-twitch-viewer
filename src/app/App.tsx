@@ -1,0 +1,58 @@
+import { useEffect } from 'react';
+import { useClientId } from '@/app/servicesContext';
+import { useSettings } from '@/state/settingsStore';
+import { useUi } from '@/state/uiStore';
+import { useViewStore } from '@/state/viewStore';
+import { Toasts } from '@/ui/Toasts';
+import { SetupDialog } from '@/features/auth/SetupDialog';
+import { useAuthBootstrap } from '@/features/auth/useAuthBootstrap';
+import { ChatPanel } from '@/features/chat/ChatPanel';
+import { Sidebar } from '@/features/follows/Sidebar';
+import { SavePresetDialog } from '@/features/presets/SavePresetDialog';
+import { SettingsDialog } from '@/features/settings/SettingsDialog';
+import { ShortcutsDialog } from '@/features/shortcuts/ShortcutsDialog';
+import { useHotkeys } from '@/features/shortcuts/useHotkeys';
+import { useFullscreenSync } from '@/features/topbar/fullscreen';
+import { TopBar } from '@/features/topbar/TopBar';
+import { installAudioUnlock } from '@/features/viewer/playerRegistry';
+import { useHashSync } from '@/features/viewer/useHashSync';
+import { Viewer } from '@/features/viewer/Viewer';
+import styles from './App.module.css';
+
+export function App() {
+  const clientId = useClientId();
+  useAuthBootstrap(clientId);
+  useHotkeys();
+  useHashSync();
+  useFullscreenSync();
+  useEffect(() => installAudioUnlock(), []);
+
+  const sidebarCollapsed = useSettings((s) => s.sidebarCollapsed);
+  const chatOpen = useViewStore((s) => s.view.chat.open);
+  const fullscreen = useUi((s) => s.fullscreen);
+
+  return (
+    <div className={`${styles.app} ${fullscreen ? styles.fullscreen : ''}`}>
+      {fullscreen && <div className={styles.hotzone} />}
+      <div className={styles.top}>
+        <TopBar />
+      </div>
+      <div className={`${styles.side} ${sidebarCollapsed ? styles.collapsed : ''}`}>
+        <Sidebar />
+      </div>
+      <main className={styles.main}>
+        <Viewer />
+      </main>
+      {chatOpen && (
+        <div className={styles.chat}>
+          <ChatPanel />
+        </div>
+      )}
+      <SettingsDialog />
+      <SetupDialog />
+      <SavePresetDialog />
+      <ShortcutsDialog />
+      <Toasts />
+    </div>
+  );
+}

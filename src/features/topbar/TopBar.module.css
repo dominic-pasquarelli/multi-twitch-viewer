@@ -1,0 +1,79 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--topbar-h);
+  padding: 0 8px 0 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+.brand img {
+  width: 22px;
+  height: 22px;
+}
+.spacer {
+  flex: 1;
+}
+.group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.seg {
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.seg[aria-pressed='true'] {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.scale {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.scale input {
+  width: 90px;
+  accent-color: var(--accent);
+}
+.user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.expired {
+  color: var(--danger);
+  font-weight: 600;
+}
+@media (max-width: 1100px) {
+  .brandText,
+  .segLabel {
+    display: none;
+  }
+}

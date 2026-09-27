@@ -1,0 +1,75 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--surface-3);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+.button:hover:not(:disabled) {
+  background: #36363d;
+}
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.primary {
+  background: var(--accent-strong);
+  color: #fff;
+}
+.primary:hover:not(:disabled) {
+  background: #772ce8;
+}
+.ghost {
+  background: transparent;
+}
+.ghost:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+.danger {
+  color: var(--danger);
+}
+.small {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  flex: none;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.icon:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.icon:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.icon.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.icon.sm {
+  width: 26px;
+  height: 26px;
+}
