@@ -10,6 +10,7 @@ import {
   screen,
   session,
   shell,
+  webFrameMain,
 } from 'electron';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -20,6 +21,7 @@ import {
   isAllowedInApp,
   isExternalWebLink,
 } from './navigation.mjs';
+import { applyPlayerChrome } from './playerChrome.mjs';
 import { APP_URL, startServer } from './server.mjs';
 import { createTray } from './tray.mjs';
 import { checkForUpdate, readBuildCommit, startUpdater } from './updates.mjs';
@@ -86,7 +88,16 @@ async function start() {
   ipcMain.handle('mtv:update-status', () => updateStatus);
   ipcMain.handle('mtv:update-check', () => runUpdateCheck());
   ipcMain.on('mtv:update-install', () => installUpdate());
+  ipcMain.on('mtv:player-chrome', (_e, options) => {
+    playerChrome = { hideStreamInfo: Boolean(options?.hideStreamInfo) };
+    for (const frame of win?.webContents.mainFrame.framesInSubtree ?? []) {
+      applyPlayerChrome(frame, playerChrome);
+    }
+  });
 }
+
+/** How Twitch's own player UI should look (set from the app's settings). */
+let playerChrome = { hideStreamInfo: true };
 
 // ---- Updates ---------------------------------------------------------------
 
@@ -179,6 +190,10 @@ function createWindow() {
       event.preventDefault();
       if (isExternalWebLink(url)) void shell.openExternal(url);
     }
+  });
+  // Each Twitch player (an iframe) gets its UI tweaks once it has loaded.
+  wc.on('did-frame-finish-load', (_e, isMainFrame, processId, routingId) => {
+    if (!isMainFrame) applyPlayerChrome(webFrameMain.fromId(processId, routingId), playerChrome);
   });
   wc.on('before-input-event', (_e, input) => {
     if (input.type !== 'keyDown') return;

@@ -35,6 +35,9 @@ export function App() {
     [],
   );
 
+  const hideStreamInfo = useSettings((s) => s.hideStreamInfo);
+  useEffect(() => desktop?.setPlayerChrome?.({ hideStreamInfo }), [hideStreamInfo]);
+
   const sidebarCollapsed = useSettings((s) => s.sidebarCollapsed);
   const chatOpen = useViewStore((s) => s.view.chat.open);
   const fullscreen = useUi((s) => s.fullscreen);

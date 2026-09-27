@@ -82,6 +82,9 @@ involved.
 - **Closing the window keeps it in the system tray** (bottom-right, near the clock). Streams stop,
   but go-live alerts for your favorites keep coming. Click the tray icon to reopen, or right-click
   → **Quit**.
+- Twitch's own stream info at the top of each player (channel, title, Follow/Subscribe/Gift) is
+  hidden so it doesn't get in the way; Twitch's play, volume and fullscreen buttons stay. Turn it
+  back on in **Settings → Layout**.
 - It reopens at the same size, position and monitor, maximized or fullscreen included, and
   restores your last streams.
 - Its presets and settings are separate from the browser version (`npm start`). To move presets

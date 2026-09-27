@@ -28,6 +28,8 @@ export interface Settings {
   duckLevel: number;
   /** Focus layout: clicking a small stream makes it the main one. */
   clickToFocus: boolean;
+  /** Desktop app: hide Twitch's channel/title/Subscribe overlay at the top of each player. */
+  hideStreamInfo: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -44,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   liveAlerts: 'favorites',
   duckLevel: 0.2,
   clickToFocus: true,
+  hideStreamInfo: true,
 };
 
 interface SettingsStore extends Settings {

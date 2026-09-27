@@ -13,6 +13,11 @@ export default defineConfig([
     languageOptions: { ecmaVersion: 2023, globals: globals.node },
   },
   {
+    // Runs inside the Twitch player frames (and is tested in jsdom).
+    files: ['desktop/playerChrome*.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
