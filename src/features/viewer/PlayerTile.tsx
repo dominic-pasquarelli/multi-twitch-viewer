@@ -187,7 +187,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         if (active instanceof HTMLIFrameElement && hostRef.current?.contains(active)) active.blur();
       }}
     >
-      <div ref={hostRef} key={reloadKey} className={styles.host} />
+      <div ref={hostRef} key={reloadKey} className={styles.host} data-player-host />
 
       {status === 'blocked' && (
         <div className={styles.overlay}>

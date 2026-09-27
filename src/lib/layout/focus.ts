@@ -22,12 +22,15 @@ interface Region {
 }
 
 /**
- * "Focus" layout: slot 0 is a large main stream in the top-left, and the other
- * streams fill the L-shaped space to its right and below it, all at one size.
- * The whole composition is centred in the container.
+ * "Focus" layout: slot 0 is a large main stream, the others are smaller.
  *
- * With `scale: 'auto'` the main stream is made as big as possible while every
- * other tile stays big enough for Twitch to autoplay it.
+ * - `scale: 'auto'`: the small streams form a strip beside or below the main
+ *   stream whose edges line up exactly with it (a column as tall as the main
+ *   stream, or a row as wide), sized so everything is as big as possible.
+ * - a number (the zoom slider): the main stream gets that share of the space
+ *   and the others fill the L-shape to its right and below it.
+ *
+ * The whole composition is centred in the container.
  */
 export function computeFocusLayout(
   count: number,
@@ -45,11 +48,89 @@ export function computeFocusLayout(
   }
 
   const others = count - 1;
-  const mainWidth =
-    scale === 'auto'
-      ? autoMainWidth(others, container, opts, maxMainWidth)
-      : manualMainWidth(others, container, opts, maxMainWidth, scale);
-  return arrange(mainWidth, others, container, opts).rects;
+  if (scale === 'auto') {
+    const aligned = alignedStrip(others, container, opts);
+    if (aligned) return aligned;
+    return arrange(autoMainWidth(others, container, opts, maxMainWidth), others, container, opts)
+      .rects;
+  }
+  return arrange(
+    manualMainWidth(others, container, opts, maxMainWidth, scale),
+    others,
+    container,
+    opts,
+  ).rects;
+}
+
+/** The main stream stays at least this many times wider than the strip's tiles. */
+const ALIGNED_MIN_RATIO = 1.5;
+/** Streams per line along the main stream's edge before a second line is added. */
+const MAX_PER_LINE = 4;
+
+/**
+ * Main stream plus a strip of the other streams, flush with the main stream's
+ * edges: beside it (strip height = main height) or below it (strip width =
+ * main width). Up to 4 streams sit in one line; more use up to 3 lines.
+ * Picks the side (right or bottom) with the most total video area. Returns null if none fits sensibly.
+ */
+export function alignedStrip(others: number, c: Size, opts: LayoutOptions): Rect[] | null {
+  const { gap: g, aspect: a } = opts;
+  let best: Rect[] | null = null;
+  let bestArea = 0;
+
+  // One clean line along the main stream's edge for up to 4 streams; extra
+  // lines (up to 3) only when there are more, or when one line won't fit.
+  const firstLines = Math.min(3, Math.ceil(others / MAX_PER_LINE));
+  for (const side of ['right', 'bottom'] as const) {
+    for (let lines = firstLines; lines <= Math.min(3, others); lines++) {
+      // lines = columns in a side strip, rows in a bottom strip.
+      const per = Math.ceil(others / lines); // tiles along the main stream's edge
+      let mw: number;
+      if (side === 'right') {
+        // Tile height fills the main height: tileW = (mw - a·(per-1)·g) / per.
+        // Width: mw + g + lines·tileW + (lines-1)·g = W.
+        mw = (c.width - g * lines + (lines * a * (per - 1) * g) / per) / (1 + lines / per);
+        mw = Math.min(mw, c.height * a);
+      } else {
+        // Tile width fills the main width: tileW = (mw - (per-1)·g) / per.
+        // Height: mw/a + g + lines·tileW/a + (lines-1)·g = H.
+        mw = (c.height - g * lines + (lines * (per - 1) * g) / (per * a)) / ((1 + lines / per) / a);
+        mw = Math.min(mw, c.width);
+      }
+      const mh = mw / a;
+      const tileW = side === 'right' ? (mw - a * (per - 1) * g) / per : (mw - (per - 1) * g) / per;
+      const tileH = tileW / a;
+      if (tileW <= 0 || mw < ALIGNED_MIN_RATIO * tileW) continue;
+
+      const rects: Rect[] = [{ x: 0, y: 0, width: mw, height: mh }];
+      for (let i = 0; i < others; i++) {
+        const along = i % per; // position along the main stream's edge
+        const line = Math.floor(i / per);
+        rects.push(
+          side === 'right'
+            ? {
+                x: mw + g + line * (tileW + g),
+                y: along * (tileH + g),
+                width: tileW,
+                height: tileH,
+              }
+            : {
+                x: along * (tileW + g),
+                y: mh + g + line * (tileH + g),
+                width: tileW,
+                height: tileH,
+              },
+        );
+      }
+      const area = rects.reduce((sum, r) => sum + r.width * r.height, 0);
+      if (area > bestArea) {
+        bestArea = area;
+        best = rects;
+      }
+      break; // the fewest lines that fit wins for this side
+    }
+  }
+  return best && centerRects(best, c);
 }
 
 function autoMainWidth(others: number, c: Size, opts: LayoutOptions, maxMain: number): number {

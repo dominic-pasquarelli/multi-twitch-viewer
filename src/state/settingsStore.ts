@@ -26,6 +26,8 @@ export interface Settings {
   liveAlerts: LiveAlertMode;
   /** Duck audio mode: how loud the background streams play (0–1 of their volume). */
   duckLevel: number;
+  /** Focus layout: clicking a small stream makes it the main one. */
+  clickToFocus: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -41,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showOfflineFollows: true,
   liveAlerts: 'favorites',
   duckLevel: 0.2,
+  clickToFocus: true,
 };
 
 interface SettingsStore extends Settings {
