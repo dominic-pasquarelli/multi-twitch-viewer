@@ -25,3 +25,6 @@ nsis:
   shortcutName: Multi Twitch Viewer
   runAfterFinish: true
   deleteAppDataOnUninstall: false
+# No publishing: builds happen on your PC (scripts/windows/install.ps1). Must be
+# explicit, or electron-builder fails when the source has no .git folder (zip).
+publish: null
