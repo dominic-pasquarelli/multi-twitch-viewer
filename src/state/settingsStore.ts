@@ -30,6 +30,8 @@ export interface Settings {
   clickToFocus: boolean;
   /** Desktop app: hide Twitch's channel/title/Subscribe overlay at the top of each player. */
   hideStreamInfo: boolean;
+  /** Desktop app: click through Twitch's "intended for certain audiences" notice. */
+  skipContentWarning: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -47,6 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   duckLevel: 0.2,
   clickToFocus: true,
   hideStreamInfo: true,
+  skipContentWarning: true,
 };
 
 interface SettingsStore extends Settings {

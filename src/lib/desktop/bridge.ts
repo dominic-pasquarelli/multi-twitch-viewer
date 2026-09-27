@@ -12,6 +12,13 @@ export interface UpdateStatus {
   checkedAt?: string;
 }
 
+export interface PlayerChrome {
+  /** Hide the channel/title/Follow/Subscribe overlay at the top of each player. */
+  hideStreamInfo: boolean;
+  /** Click through the "intended for certain audiences" notice. */
+  skipContentWarning: boolean;
+}
+
 export interface DesktopBridge {
   isDesktop: true;
   version: string;
@@ -23,8 +30,8 @@ export interface DesktopBridge {
   checkForUpdates(): Promise<UpdateStatus>;
   /** Rebuilds and reinstalls from the latest code on GitHub; the app closes and reopens. */
   installUpdate(): void;
-  /** Tweaks Twitch's own UI inside the players (e.g. hide the stream-info overlay). */
-  setPlayerChrome?(options: { hideStreamInfo: boolean }): void;
+  /** Tweaks Twitch's own UI inside the players (see desktop/playerChrome.mjs). */
+  setPlayerChrome?(options: PlayerChrome): void;
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void;
   /** Called with true when the window is hidden to the tray, false when shown. */
   onBackgroundChange(callback: (hidden: boolean) => void): () => void;

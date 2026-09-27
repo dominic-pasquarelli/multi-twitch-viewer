@@ -36,7 +36,11 @@ export function App() {
   );
 
   const hideStreamInfo = useSettings((s) => s.hideStreamInfo);
-  useEffect(() => desktop?.setPlayerChrome?.({ hideStreamInfo }), [hideStreamInfo]);
+  const skipContentWarning = useSettings((s) => s.skipContentWarning);
+  useEffect(
+    () => desktop?.setPlayerChrome?.({ hideStreamInfo, skipContentWarning }),
+    [hideStreamInfo, skipContentWarning],
+  );
 
   const sidebarCollapsed = useSettings((s) => s.sidebarCollapsed);
   const chatOpen = useViewStore((s) => s.view.chat.open);

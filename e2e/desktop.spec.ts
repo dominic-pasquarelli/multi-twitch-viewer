@@ -78,7 +78,7 @@ test('desktop app: plays streams, hides to the tray, remembers its window', asyn
   await app.close().catch(() => {});
 });
 
-test("desktop app: hides Twitch's stream info in the players (setting)", async () => {
+test("desktop app: hides Twitch's stream info and content notice in the players (settings)", async () => {
   const app = await launch(mkdtempSync(join(tmpdir(), 'mtv-desktop-')));
   const win = await app.firstWindow();
   // A stand-in for Twitch's player: stream info on top, controls below.
@@ -89,6 +89,7 @@ test("desktop app: hides Twitch's stream info in the players (setting)", async (
         <div id="info"><a href="https://www.twitch.tv/tpain">TPAIN</a>
           <button data-a-target="subscribe-button">Subscribe</button></div>
         <div data-a-target="player-controls" id="controls"><button>play</button></div>
+        <div id="gate"><button onclick="this.parentElement.remove()">Start Watching</button></div>
       </div></div>`,
     }),
   );
@@ -103,12 +104,14 @@ test("desktop app: hides Twitch's stream info in the players (setting)", async (
 
   await expect.poll(() => player()?.url() ?? '').toContain('player.twitch.tv');
   await expect.poll(hiddenIds).toEqual(['info']);
+  // The "intended for certain audiences" notice is clicked through.
+  await expect.poll(() => player()!.evaluate(() => !!document.getElementById('gate'))).toBe(false);
 
   // Turning the setting off shows it again.
   await win.evaluate(() =>
     (
-      window as unknown as { mtvDesktop: { setPlayerChrome(o: { hideStreamInfo: boolean }): void } }
-    ).mtvDesktop.setPlayerChrome({ hideStreamInfo: false }),
+      window as unknown as { mtvDesktop: { setPlayerChrome(o: Record<string, boolean>): void } }
+    ).mtvDesktop.setPlayerChrome({ hideStreamInfo: false, skipContentWarning: false }),
   );
   await expect.poll(hiddenIds).toEqual([]);
   await app.close();

@@ -2,7 +2,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyPlayerChrome,
-  applyStreamInfoHiding,
+  applyPlayerTweaks,
+  normalizePlayerChrome,
   isPlayerFrameUrl,
   playerChromeScript,
 } from './playerChrome.mjs';
@@ -29,7 +30,11 @@ const PLAYER = `
 const hidden = () => [...document.querySelectorAll('[data-mtv-hidden]')].map((e) => e.id);
 const tick = () => new Promise((r) => setTimeout(r, 80));
 
-afterEach(() => applyStreamInfoHiding(false));
+const INFO = { hideStreamInfo: true, skipContentWarning: false };
+const OFF = { hideStreamInfo: false, skipContentWarning: false };
+const applyStreamInfoHiding = (on) => applyPlayerTweaks(on ? INFO : OFF);
+
+afterEach(() => applyPlayerTweaks(OFF));
 
 describe('hiding Twitch stream info', () => {
   it('hides the top info block and keeps the video and controls', () => {
@@ -64,8 +69,57 @@ describe('hiding Twitch stream info', () => {
 
   it('runs as a standalone script', () => {
     document.body.innerHTML = PLAYER;
-    new Function(playerChromeScript({ hideStreamInfo: true }))();
+    new Function(playerChromeScript(INFO))();
     expect(hidden()).toEqual(['info']);
+  });
+});
+
+describe('skipping the content notice', () => {
+  const GATE = `<div class="player"><video></video>
+    <div id="gate"><p>Intended for certain audiences</p>
+      <button data-a-target="content-classification-gate-overlay-start-watching-button">Start Watching</button>
+    </div></div>`;
+  const clicks = () => {
+    const seen = [];
+    document.addEventListener('click', (e) => seen.push(e.target.textContent.trim()), true);
+    return seen;
+  };
+
+  it('clicks Start Watching once it appears', async () => {
+    document.body.innerHTML = '<div class="player"><video></video></div>';
+    const seen = clicks();
+    applyPlayerTweaks({ hideStreamInfo: true, skipContentWarning: true });
+    document.querySelector('.player').insertAdjacentHTML('beforeend', GATE);
+    await tick();
+    expect(seen).toEqual(['Start Watching']);
+    await tick();
+    expect(seen).toHaveLength(1); // only once per notice
+  });
+
+  it('finds the button by its text if Twitch renames its ids', () => {
+    document.body.innerHTML =
+      '<div><p>Intended for certain audiences</p><button> Start watching </button></div>';
+    const seen = clicks();
+    applyPlayerTweaks({ hideStreamInfo: false, skipContentWarning: true });
+    expect(seen).toEqual(['Start watching']);
+  });
+
+  it('leaves the notice alone when turned off', () => {
+    document.body.innerHTML = GATE;
+    const seen = clicks();
+    applyPlayerTweaks(INFO);
+    expect(seen).toEqual([]);
+  });
+
+  it('only accepts known options, defaulting to on', () => {
+    expect(normalizePlayerChrome(undefined)).toEqual({
+      hideStreamInfo: true,
+      skipContentWarning: true,
+    });
+    expect(normalizePlayerChrome({ hideStreamInfo: 0, skipContentWarning: 'yes', x: 1 })).toEqual({
+      hideStreamInfo: false,
+      skipContentWarning: true,
+    });
   });
 });
 

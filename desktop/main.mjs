@@ -21,7 +21,11 @@ import {
   isAllowedInApp,
   isExternalWebLink,
 } from './navigation.mjs';
-import { applyPlayerChrome } from './playerChrome.mjs';
+import {
+  applyPlayerChrome,
+  DEFAULT_PLAYER_CHROME,
+  normalizePlayerChrome,
+} from './playerChrome.mjs';
 import { APP_URL, startServer } from './server.mjs';
 import { createTray } from './tray.mjs';
 import { checkForUpdate, readBuildCommit, startUpdater } from './updates.mjs';
@@ -89,7 +93,7 @@ async function start() {
   ipcMain.handle('mtv:update-check', () => runUpdateCheck());
   ipcMain.on('mtv:update-install', () => installUpdate());
   ipcMain.on('mtv:player-chrome', (_e, options) => {
-    playerChrome = { hideStreamInfo: Boolean(options?.hideStreamInfo) };
+    playerChrome = normalizePlayerChrome(options);
     for (const frame of win?.webContents.mainFrame.framesInSubtree ?? []) {
       applyPlayerChrome(frame, playerChrome);
     }
@@ -97,7 +101,7 @@ async function start() {
 }
 
 /** How Twitch's own player UI should look (set from the app's settings). */
-let playerChrome = { hideStreamInfo: true };
+let playerChrome = DEFAULT_PLAYER_CHROME;
 
 // ---- Updates ---------------------------------------------------------------
 

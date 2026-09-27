@@ -127,6 +127,14 @@ function SettingsForm() {
           help="Hides the channel name, title and Follow/Subscribe/Gift buttons Twitch shows at the top of a player. Its play, volume and fullscreen buttons stay."
         />
       )}
+      {desktop && (
+        <Checkbox
+          checked={s.skipContentWarning}
+          onChange={(v) => s.update({ skipContentWarning: v })}
+          label="Skip Twitch's “intended for certain audiences” notice"
+          help="Clicks Start Watching for you, so those streams play straight away."
+        />
+      )}
 
       <h3 className={formStyles.section}>Audio</h3>
       <Field
