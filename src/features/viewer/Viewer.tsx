@@ -15,8 +15,8 @@ import {
   type Point,
 } from '@/lib/layout';
 import type { PlayerStatus } from '@/lib/player/types';
+import { streamVolume } from '@/lib/audio/volumeModel';
 import { audioLevel, mainChannel, slotOrder } from '@/lib/view/operations';
-import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
@@ -28,6 +28,7 @@ import { playerRegistry } from './playerRegistry';
 import { EmptyState } from './EmptyState';
 import { PlayerTile } from './PlayerTile';
 import { useElementSize } from './useElementSize';
+import { setStreamVolume, useVolumeModel } from './volume';
 import styles from './Viewer.module.css';
 
 export function Viewer() {
@@ -36,7 +37,7 @@ export function Viewer() {
   const view = useViewStore((s) => s.view);
   const actions = useViewStore.getState();
   const { tileGap, hideOffline, qualityMode, duckLevel, clickToFocus } = useSettings();
-  const volumes = useChannelPrefs((s) => s.volumes);
+  const volumeModel = useVolumeModel();
   const playerStatus = useUi((s) => s.playerStatus);
   const selected = useUi((s) => s.selected);
   const setSelected = useUi((s) => s.setSelected);
@@ -110,7 +111,6 @@ export function Viewer() {
   };
 
   // ---- Tile callbacks (stable, so memoised tiles don't re-render) -----------
-  const setVolume = useChannelPrefs((s) => s.setVolume);
   const setPlayerStatus = useUi((s) => s.setPlayerStatus);
   const onExternalMute = useCallback(
     (l: string, m: boolean) => useViewStore.getState().externalMuteChange(l, m),
@@ -188,13 +188,13 @@ export function Viewer() {
             audible={level.focused}
             muted={level.muted}
             volumeScale={level.scale}
-            volume={volumes[login] ?? null}
+            volume={streamVolume(volumeModel, login)}
             fitQuality={qualityMode === 'fit'}
             belowMinimum={isBelowMinimum(rect, options.minTile)}
             status={playerStatus[login]}
             selected={selected === login}
             dropTarget={sidebarDrop?.target === login}
-            onVolume={setVolume}
+            onVolume={setStreamVolume}
             onExternalMute={onExternalMute}
             onStatus={onStatus}
             onSelect={setSelected}

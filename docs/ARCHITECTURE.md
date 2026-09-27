@@ -18,17 +18,18 @@ src/
 
 ### `lib/`: the core modules
 
-| Module         | What it does                                                                                      | Swap / extend by…                                                   |
-| -------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `layout/`      | Pure geometry: `computeLayout({mode, count, container, options})` → one rect per slot.            | Adding a mode: write `myLayout.ts`, route it in `computeLayout.ts`. |
-| `view/`        | The "what I'm watching" model (`ViewState`) and pure operations: add, remove, swap, audio focus…  | Adding an operation + test; stores call it.                         |
-| `presets/`     | Preset type, export/import file format, validation, merging.                                      | Bump `EXPORT_VERSION` and migrate in `sanitizePreset`.              |
-| `twitch/`      | `TwitchApi` interface, Helix client (auth headers, pagination, 401/429), OAuth helpers, mock API. | Implement `TwitchApi` (e.g. a caching or proxy variant).            |
-| `player/`      | `PlayerAdapter` interface, Twitch embed adapter, mock player, `PlayerController`, quality picker. | Implement `PlayerAdapter` for another player.                       |
-| `persistence/` | `KeyValueStore` interface (localStorage with memory fallback) and the zustand adapter.            | Implement `KeyValueStore` (file, sync service…).                    |
-| `alerts/`      | Which streams just went live (for notifications), favorites-first sorting.                        |                                                                     |
-| `channels/`    | Parse names, `@names`, twitch.tv, player and multitwitch links.                                   |                                                                     |
-| `utils/`       | Formatting helpers (viewer counts, uptime, thumbnails).                                           |                                                                     |
+| Module         | What it does                                                                                        | Swap / extend by…                                                   |
+| -------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `layout/`      | Pure geometry: `computeLayout({mode, count, container, options})` → one rect per slot.              | Adding a mode: write `myLayout.ts`, route it in `computeLayout.ts`. |
+| `view/`        | The "what I'm watching" model (`ViewState`) and pure operations: add, remove, swap, audio focus…    | Adding an operation + test; stores call it.                         |
+| `audio/`       | Volume model: per-channel volumes, or one master volume with per-channel balance (consistent mode). | Add a mode in `volumeModel.ts` + tests.                             |
+| `presets/`     | Preset type, export/import file format, validation, merging.                                        | Bump `EXPORT_VERSION` and migrate in `sanitizePreset`.              |
+| `twitch/`      | `TwitchApi` interface, Helix client (auth headers, pagination, 401/429), OAuth helpers, mock API.   | Implement `TwitchApi` (e.g. a caching or proxy variant).            |
+| `player/`      | `PlayerAdapter` interface, Twitch embed adapter, mock player, `PlayerController`, quality picker.   | Implement `PlayerAdapter` for another player.                       |
+| `persistence/` | `KeyValueStore` interface (localStorage with memory fallback) and the zustand adapter.              | Implement `KeyValueStore` (file, sync service…).                    |
+| `alerts/`      | Which streams just went live (for notifications), favorites-first sorting.                          |                                                                     |
+| `channels/`    | Parse names, `@names`, twitch.tv, player and multitwitch links.                                     |                                                                     |
+| `utils/`       | Formatting helpers (viewer counts, uptime, thumbnails).                                             |                                                                     |
 
 ### `state/`: stores
 

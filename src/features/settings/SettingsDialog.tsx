@@ -163,6 +163,12 @@ function SettingsForm() {
         />
       </Field>
       <Checkbox
+        checked={s.consistentVolume}
+        onChange={(v) => s.update({ consistentVolume: v })}
+        label="Consistent volume"
+        help="Switching streams keeps the same loudness: one master volume for whatever you hear. Balance loud or quiet streamers in the Mixer (top bar)."
+      />
+      <Checkbox
         checked={s.audioFollowsMain}
         onChange={(v) => s.update({ audioFollowsMain: v })}
         label="Hear the main stream in focus layout"

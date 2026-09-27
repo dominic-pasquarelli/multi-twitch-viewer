@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { VolumePatch } from '@/lib/audio/volumeModel';
 import { zustandStorage } from '@/lib/persistence/zustandStorage';
 
 /**
@@ -9,8 +10,13 @@ import { zustandStorage } from '@/lib/persistence/zustandStorage';
  */
 interface ChannelPrefsStore {
   volumes: Record<string, number>;
+  /** Consistent-volume mode: the one volume you hear (see lib/audio/volumeModel). */
+  master: number;
+  /** Consistent-volume mode: each channel's level against the master (1 = same). */
+  balance: Record<string, number>;
   favorites: string[];
   setVolume(login: string, volume: number): void;
+  applyVolume(patch: VolumePatch): void;
   toggleFavorite(login: string): void;
 }
 
@@ -18,7 +24,10 @@ export const useChannelPrefs = create<ChannelPrefsStore>()(
   persist(
     (set) => ({
       volumes: {},
+      master: 0.5,
+      balance: {},
       favorites: [],
+      applyVolume: (patch) => set(patch),
       toggleFavorite: (login) =>
         set((s) => ({
           favorites: s.favorites.includes(login)
@@ -41,7 +50,9 @@ export const useChannelPrefs = create<ChannelPrefsStore>()(
         const p = (persisted ?? {}) as Partial<ChannelPrefsStore>;
         return {
           ...current,
-          volumes: p.volumes && typeof p.volumes === 'object' ? p.volumes : {},
+          volumes: numberRecord(p.volumes),
+          balance: numberRecord(p.balance),
+          master: typeof p.master === 'number' && p.master >= 0 && p.master <= 1 ? p.master : 0.5,
           favorites: Array.isArray(p.favorites)
             ? p.favorites.filter((f): f is string => typeof f === 'string')
             : [],
@@ -50,3 +61,10 @@ export const useChannelPrefs = create<ChannelPrefsStore>()(
     },
   ),
 );
+
+function numberRecord(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => typeof v === 'number' && Number.isFinite(v) && v >= 0),
+  );
+}
