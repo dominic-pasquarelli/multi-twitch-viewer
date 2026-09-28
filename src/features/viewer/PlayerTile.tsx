@@ -3,7 +3,7 @@ import { Play } from 'lucide-react';
 import { useServices } from '@/app/servicesContext';
 import type { Rect } from '@/lib/layout';
 import { PlayerController } from '@/lib/player/PlayerController';
-import { pickQualityForHeight } from '@/lib/player/quality';
+import { pickQuality, type QualityChoice } from '@/lib/player/quality';
 import type { PlayerStatus } from '@/lib/player/types';
 import { useUi } from '@/state/uiStore';
 import { IconButton } from '@/ui/Button';
@@ -23,7 +23,8 @@ export interface PlayerTileProps {
   volumeScale: number;
   /** The channel's remembered volume (null = leave the player's own). */
   volume: number | null;
-  fitQuality: boolean;
+  /** Which quality to ask for (depends on whether it's the main stream). */
+  quality: QualityChoice;
   belowMinimum: boolean;
   status: PlayerStatus | undefined;
   /** Its controls are shown in the top bar. */
@@ -120,26 +121,28 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
     if (v !== null) controllerRef.current?.update({ volume: v });
   }, [login, volume, volumeScale]);
 
-  // Optional: match the stream quality to the tile size (saves bandwidth/CPU).
-  const { fitQuality } = props;
+  // Quality: e.g. source for the main stream, sized to the tile for the rest.
+  const { quality } = props;
   useEffect(() => {
     const entry = playerRegistry.get(login);
     if (!entry) return;
-    if (!fitQuality) {
+    if (quality === 'auto') {
       entry.controller.update({ quality: null });
       return;
     }
+    // The list of qualities is only known once the stream plays.
     if (status !== 'playing') return;
     const t = setTimeout(() => {
-      const q = pickQualityForHeight(
+      const q = pickQuality(
         entry.adapter.getQualities(),
+        quality,
         rect.height,
         window.devicePixelRatio,
       );
       entry.controller.update({ quality: q });
     }, 800);
     return () => clearTimeout(t);
-  }, [login, fitQuality, status, rect.height]);
+  }, [login, quality, status, rect.height]);
 
   const classes = [
     styles.tile,

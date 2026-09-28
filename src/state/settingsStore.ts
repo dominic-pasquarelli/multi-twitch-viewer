@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { LiveAlertMode } from '@/lib/alerts/goLive';
+import { isQualityChoice, type QualityChoice } from '@/lib/player/quality';
 import { zustandStorage } from '@/lib/persistence/zustandStorage';
 
-export type QualityMode = 'auto' | 'fit';
 export type SidebarSort = 'viewers' | 'name' | 'uptime';
 
 export interface Settings {
@@ -16,8 +16,10 @@ export interface Settings {
   audioFollowsMain: boolean;
   /** The chat panel switches to whichever stream you are listening to. */
   chatFollowsAudio: boolean;
-  /** 'fit' picks a stream quality that matches each tile's size (saves bandwidth). */
-  qualityMode: QualityMode;
+  /** Quality of the main stream (focus layout) or the one you're hearing (grid). */
+  mainQuality: QualityChoice;
+  /** Quality of all the other streams; lower saves bandwidth and CPU. */
+  otherQuality: QualityChoice;
   refreshSeconds: number;
   sidebarSort: SidebarSort;
   sidebarCollapsed: boolean;
@@ -42,7 +44,8 @@ export const DEFAULT_SETTINGS: Settings = {
   hideOffline: true,
   audioFollowsMain: true,
   chatFollowsAudio: true,
-  qualityMode: 'auto',
+  mainQuality: 'source',
+  otherQuality: 'fit',
   refreshSeconds: 60,
   sidebarSort: 'viewers',
   sidebarCollapsed: false,
@@ -71,7 +74,13 @@ export const useSettings = create<SettingsStore>()(
       name: 'settings',
       version: 1,
       storage: zustandStorage(),
-      merge: (persisted, current) => ({ ...current, ...(persisted as Partial<Settings>) }),
+      merge: (persisted, current) => {
+        const p = { ...(persisted as Partial<Settings> & { qualityMode?: unknown }) };
+        delete p.qualityMode; // replaced by mainQuality/otherQuality
+        if (!isQualityChoice(p.mainQuality)) delete p.mainQuality;
+        if (!isQualityChoice(p.otherQuality)) delete p.otherQuality;
+        return { ...current, ...p };
+      },
     },
   ),
 );
