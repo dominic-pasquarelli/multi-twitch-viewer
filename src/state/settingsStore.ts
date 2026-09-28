@@ -32,6 +32,8 @@ export interface Settings {
   duckLevel: number;
   /** Focus layout: clicking a small stream makes it the main one. */
   clickToFocus: boolean;
+  /** Right-clicking a small stream (not the main one in focus layout) closes it. */
+  rightClickCloses: boolean;
   /** Desktop app: hide Twitch's channel/title/Subscribe overlay at the top of each player. */
   hideStreamInfo: boolean;
   /** Desktop app: click through Twitch's "intended for certain audiences" notice. */
@@ -54,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   consistentVolume: false,
   duckLevel: 0.2,
   clickToFocus: true,
+  rightClickCloses: true,
   hideStreamInfo: true,
   skipContentWarning: true,
 };

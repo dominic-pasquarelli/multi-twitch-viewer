@@ -250,3 +250,14 @@ test('the main stream plays at source quality, the smaller ones match their size
   await expect(small).toHaveAttribute('data-quality', '360p30');
   await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-quality', 'chunked');
 });
+
+test('right-clicking a small stream closes it (not the main one), with Undo', async ({ page }) => {
+  await page.goto('/#/pixelpaladin/novastrike/lunarlatte?layout=focus');
+  await expect(tile(page, 'lunarlatte')).toBeVisible();
+  await mockPlayer(page, 'pixelpaladin').click({ button: 'right' }); // main: stays
+  await mockPlayer(page, 'lunarlatte').click({ button: 'right' });
+  await expect(tile(page, 'lunarlatte')).toHaveCount(0);
+  await expect(tile(page, 'pixelpaladin')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(tile(page, 'lunarlatte')).toBeVisible();
+});

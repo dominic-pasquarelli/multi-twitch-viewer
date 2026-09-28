@@ -15,6 +15,17 @@ export function isPlayerFrameUrl(url) {
 }
 
 /**
+ * The channel a Twitch player frame shows (its `?channel=` parameter).
+ * @param {string} url
+ * @returns {string | null}
+ */
+export function channelFromPlayerUrl(url) {
+  if (!isPlayerFrameUrl(url)) return null;
+  const channel = new URL(url).searchParams.get('channel');
+  return channel ? channel.toLowerCase() : null;
+}
+
+/**
  * @typedef {object} PlayerChrome
  * @property {boolean} hideStreamInfo Hide the channel/title/Follow/Subscribe overlay at the top.
  * @property {boolean} skipContentWarning Click "Start watching" on the
