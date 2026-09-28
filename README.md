@@ -169,6 +169,8 @@ lack of a "Log in" prompt) is logged in.
 | Hear several at once             | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                              |
 | Balance volumes                  | The Mixer (sliders button in the top bar); **Consistent volume** keeps switching even |
 | Unpause everything               | **Play all** (▷ in the top bar)                                                       |
+| Watch everyone who's live        | **Watch all** next to _Live_ in the sidebar (only the matches, if you filtered)       |
+| Start over with no streams       | 🗑 **Clear all** in the top bar (then Undo if it was a mistake)                        |
 | Remove a stream you don't follow | Click it under **Also watching** in the sidebar, or ✕ in the Mixer                    |
 | Make one stream big              | `L` or **Focus**; click a small stream (or ⤢ in the top bar) to make it main          |
 | Rearrange                        | Hover a stream, drag its name in the top bar onto another stream                      |
@@ -196,6 +198,8 @@ port or `127.0.0.1` starts with empty presets.
 - **A stream shows a play button**: Twitch only autoplays players that are at least 400×300 and
   not covered by anything. Click to start it, or give it more room (fewer streams, focus layout,
   hide chat or the sidebar).
+- **A stream shows unmuted but makes no sound**: fixed in the desktop app, which now lets the app
+  unmute players itself. If it happens anyway, use **Reload player** (hover the stream, top bar).
 - **No sound after reopening the app**: browsers block sound until you interact with the page.
   Click anywhere or press any key.
 - **Followed list is empty or says "login expired"**: click **Log in again**.
