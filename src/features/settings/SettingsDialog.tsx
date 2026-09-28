@@ -126,8 +126,8 @@ function SettingsForm() {
           <Checkbox
             checked={s.clickToFocus}
             onChange={(v) => s.update({ clickToFocus: v })}
-            label="Click a stream to make it the main one"
-            help="In focus layout, clicking one of the small streams swaps it into the big spot."
+            label="Click a stream to make it the main one (or, in grid, the one you hear)"
+            help="Focus layout: a small stream moves into the big spot. Grid with Solo or Duck: the stream you click becomes the one you hear. Clicking a paused stream just plays it."
           />
           <Checkbox
             checked={s.rightClickCloses}
