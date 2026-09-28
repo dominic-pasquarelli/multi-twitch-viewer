@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MockPlayer } from './mockPlayer';
 import { PlayerController } from './PlayerController';
-import { pickQualityForHeight } from './quality';
+import { pickQuality, pickQualityForHeight } from './quality';
 
 function setup(initial = { muted: true, volume: 0.4 as number | null, quality: null }) {
   let now = 0;
@@ -85,5 +85,29 @@ describe('pickQualityForHeight', () => {
     expect(pickQualityForHeight(q, 540, 2)).toBe('chunked');
     expect(pickQualityForHeight(q, 3000)).toBe('chunked');
   });
+  it('never goes below 360p for tiny tiles', () => {
+    expect(pickQualityForHeight(q, 120)).toBe('480p30'); // no 360p here: next one up
+  });
   it('returns null without qualities', () => expect(pickQualityForHeight([], 300)).toBeNull());
+});
+
+describe('pickQuality', () => {
+  const q = [
+    { group: 'auto', name: 'Auto', height: 0 },
+    { group: 'chunked', name: '1080p60', height: 1080 },
+    { group: '720p60', name: '720p60', height: 720 },
+    { group: '480p30', name: '480p', height: 480 },
+    { group: '160p30', name: '160p', height: 160 },
+  ];
+  it('auto leaves it to Twitch, source takes the best', () => {
+    expect(pickQuality(q, 'auto', 300)).toBeNull();
+    expect(pickQuality(q, 'source', 100)).toBe('chunked');
+  });
+  it('fit matches the tile size', () => expect(pickQuality(q, 'fit', 700)).toBe('720p60'));
+  it('a cap takes the best at or below it, else the lowest', () => {
+    expect(pickQuality(q, '720p', 2000)).toBe('720p60');
+    expect(pickQuality(q, '360p', 2000)).toBe('160p30');
+    expect(pickQuality([q[1]!], '480p', 100)).toBe('chunked');
+  });
+  it('waits for the qualities to be known', () => expect(pickQuality([], 'source', 1)).toBeNull());
 });

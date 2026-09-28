@@ -15,6 +15,7 @@ import {
   type Point,
 } from '@/lib/layout';
 import type { PlayerStatus } from '@/lib/player/types';
+import type { ViewState } from '@/lib/view/types';
 import { streamVolume } from '@/lib/audio/volumeModel';
 import { audioLevel, mainChannel, slotOrder } from '@/lib/view/operations';
 import { useSettings } from '@/state/settingsStore';
@@ -31,12 +32,17 @@ import { useElementSize } from './useElementSize';
 import { setStreamVolume, useVolumeModel } from './volume';
 import styles from './Viewer.module.css';
 
+/** The stream that gets the main-stream quality: the big one in focus layout, else the one you hear. */
+const isPrimary = (view: ViewState, login: string) =>
+  view.layout.mode === 'focus' ? mainChannel(view) === login : view.audio.active.includes(login);
+
 export function Viewer() {
   const containerRef = useRef<HTMLDivElement>(null);
   const size = useElementSize(containerRef);
   const view = useViewStore((s) => s.view);
   const actions = useViewStore.getState();
-  const { tileGap, hideOffline, qualityMode, duckLevel, clickToFocus } = useSettings();
+  const { tileGap, hideOffline, mainQuality, otherQuality, duckLevel, clickToFocus } =
+    useSettings();
   const volumeModel = useVolumeModel();
   const playerStatus = useUi((s) => s.playerStatus);
   const selected = useUi((s) => s.selected);
@@ -195,7 +201,7 @@ export function Viewer() {
             muted={level.muted}
             volumeScale={level.scale}
             volume={streamVolume(volumeModel, login)}
-            fitQuality={qualityMode === 'fit'}
+            quality={isPrimary(view, login) ? mainQuality : otherQuality}
             belowMinimum={isBelowMinimum(rect, options.minTile)}
             status={playerStatus[login]}
             selected={selected === login}

@@ -40,7 +40,10 @@ channels are live, and watch several streams at once with layouts that actually 
   (`http://localhost:5757/#/chan1/chan2?layout=focus`). Pasting a multitwitch.tv link into the
   add box loads all of its channels.
 - **Also**: tabbed chat (`C`) that follows the stream you're hearing, fullscreen (`F`), undo
-  (`Ctrl+Z`), and optional "match quality to tile size" to save bandwidth.
+  (`Ctrl+Z`).
+- **Quality where it counts**: the main stream plays at source quality, the smaller ones at a
+  quality that matches their size (never below 360p), which saves bandwidth and CPU. Change both in
+  **Settings → Players**.
 
 ## Windows desktop app (easiest)
 
@@ -69,7 +72,7 @@ last run is saved there as `last-run.log`).
 ### Updates
 
 The app checks GitHub for new code (at start and every 6 hours). When there is some, you get a
-notification and an **Update now** button (also in **Settings → App updates** and the tray menu).
+notification and an **Update now** button (also in **Settings → App & updates** and the tray menu).
 One click closes the app, rebuilds it from the latest code, reinstalls and reopens it. Your
 presets, settings and Twitch login are kept.
 
@@ -80,7 +83,7 @@ involved.
 
 1. Do the [one-time Twitch setup](#one-time-twitch-setup-about-3-minutes) and log in when the app
    asks.
-2. For Turbo in the players, open **Settings → Sign in to Twitch players** once. The desktop app
+2. For Turbo in the players, open **Settings → Account → Sign in to Twitch players** once. The desktop app
    has its own built-in browser, so it doesn't use your normal browser's Twitch login.
 
 ### How it behaves
@@ -91,7 +94,7 @@ involved.
 - Twitch's own stream info at the top of each player (channel, title, Follow/Subscribe/Gift) is
   hidden so it doesn't get in the way; Twitch's play, volume and fullscreen buttons stay. The
   "intended for certain audiences" notice is clicked through for you (blurred streams start playing). Both can be turned off in
-  **Settings → Layout**.
+  **Settings → Players**.
 - It reopens at the same size, position and monitor, maximized or fullscreen included, and
   restores your last streams.
 - Its presets and settings are separate from the browser version (`npm start`). To move presets
@@ -139,7 +142,7 @@ that the app shows **Log in again**, which is one click because Twitch remembers
 
 ## Turbo / no ads
 
-**Desktop app:** use **Settings → Sign in to Twitch players** once; that's all.
+**Desktop app:** use **Settings → Account → Sign in to Twitch players** once; that's all.
 
 **Browser version (`npm start`):** the video players are Twitch's official embedded players. They use the Twitch login from the
 browser you run the app in, so your Turbo (or sub) benefits apply when:
@@ -165,7 +168,7 @@ lack of a "Log in" prompt) is logged in.
 | Choose what you hear             | `1`–`9`, the speaker button in the top bar, or unmute it in the player                |
 | Hear the others quietly          | **Duck** in the top bar (background level in Settings)                                |
 | Change volume                    | `↑`/`↓`, or scroll over the stream controls in the top bar                            |
-| Get told when someone goes live  | Star them in the sidebar; allow notifications in Settings → Go-live alerts            |
+| Get told when someone goes live  | Star them in the sidebar; allow notifications in Settings → Alerts                    |
 | Hear several at once             | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                              |
 | Balance volumes                  | The Mixer (sliders button in the top bar); **Consistent volume** keeps switching even |
 | Unpause everything               | **Play all** (▷ in the top bar)                                                       |

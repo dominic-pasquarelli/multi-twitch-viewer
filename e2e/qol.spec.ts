@@ -228,3 +228,25 @@ test('clicking a paused stream plays it where it is; clicking again makes it mai
   await mockPlayer(page, 'lunarlatte').click();
   await expect(page).toHaveURL(/main=lunarlatte/);
 });
+
+test('the main stream plays at source quality, the smaller ones match their size', async ({
+  page,
+}) => {
+  await page.goto(
+    '/#/pixelpaladin/novastrike/cozycartographer/lunarlatte/quickscopequeen?layout=focus',
+  );
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-quality', 'chunked');
+  const small = mockPlayer(page, 'lunarlatte');
+  await expect(small).toHaveAttribute(
+    'data-quality',
+    /^(720p60|480p30|360p30)$/ /* sized, never 160p */,
+  );
+
+  // Settings → Players: cap the others at 360p.
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('tab', { name: 'Players' }).click();
+  await page.getByLabel('Other streams quality').selectOption('360p');
+  await page.keyboard.press('Escape');
+  await expect(small).toHaveAttribute('data-quality', '360p30');
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-quality', 'chunked');
+});
