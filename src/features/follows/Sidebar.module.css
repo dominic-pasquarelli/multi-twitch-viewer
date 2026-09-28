@@ -226,3 +226,15 @@
 .favorite .star {
   color: #f5c518;
 }
+.sectionAction {
+  padding: 2px 6px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.sectionAction:hover {
+  background: var(--surface-3);
+}

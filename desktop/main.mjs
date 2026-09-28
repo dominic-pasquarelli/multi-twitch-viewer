@@ -175,6 +175,10 @@ function createWindow() {
       nodeIntegration: false,
       // Keep checking who's live (for alerts) while hidden in the tray.
       backgroundThrottling: false,
+      // Let the app unmute the players itself. Chromium's autoplay rules only
+      // allow sound after a click inside that player; otherwise a stream can
+      // show "unmuted" in Twitch's controls and still be silent.
+      autoplayPolicy: 'no-user-gesture-required',
       additionalArguments: [`--mtv-version=${app.getVersion()}`],
     },
   });

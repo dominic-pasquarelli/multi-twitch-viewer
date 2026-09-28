@@ -15,6 +15,7 @@ import { formatCount, formatUptime, sizedThumbnail } from '@/lib/utils/format';
 import { useAuth } from '@/state/authStore';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings, type SidebarSort } from '@/state/settingsStore';
+import { toast } from '@/state/toastStore';
 import { useViewStore } from '@/state/viewStore';
 import { Avatar } from '@/ui/Avatar';
 import { IconButton } from '@/ui/Button';
@@ -94,6 +95,16 @@ function useRows() {
     ).map((f) => ({ login: f.login, displayName: f.displayName, avatar: f.profileImageUrl }));
     return { liveRows, offlineRows, live, follows };
   }, [live, follows, sort, favorites]);
+}
+
+/** Adds these channels to the view (Undo puts it back as it was). */
+function watchAll(logins: string[]) {
+  const store = useViewStore.getState();
+  const added = logins.filter((l) => !store.view.channels.includes(l)).length;
+  store.addChannels(logins);
+  toast(`Added ${added} live stream${added === 1 ? '' : 's'}`, {
+    action: { label: 'Undo', run: () => useViewStore.getState().undo() },
+  });
 }
 
 /** Streams in the view that aren't in your follows, so they can be removed here too. */
@@ -204,6 +215,20 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
             )}
             <div className={styles.section}>
               <span>Live · {live.isLoading ? '…' : shownLive.length}</span>
+              {shownLive.some((r) => !inView.includes(r.login)) && (
+                <button
+                  className={styles.sectionAction}
+                  onClick={() => watchAll(shownLive.map((r) => r.login))}
+                  title={
+                    filter
+                      ? 'Add every live channel matching the filter'
+                      : 'Add every live channel you follow'
+                  }
+                  data-testid="watch-all-live"
+                >
+                  Watch all
+                </button>
+              )}
             </div>
             {live.isError && (
               <div className={styles.empty}>Couldn't load live channels: {live.error.message}</div>
