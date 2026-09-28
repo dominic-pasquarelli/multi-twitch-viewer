@@ -23,6 +23,7 @@ import {
 } from './navigation.mjs';
 import {
   applyPlayerChrome,
+  channelFromPlayerUrl,
   DEFAULT_PLAYER_CHROME,
   normalizePlayerChrome,
   playAllFrames,
@@ -206,6 +207,12 @@ function createWindow() {
   // Each Twitch player (an iframe) gets its UI tweaks once it has loaded.
   wc.on('did-frame-finish-load', (_e, isMainFrame, processId, routingId) => {
     if (!isMainFrame) applyPlayerChrome(webFrameMain.fromId(processId, routingId), playerChrome);
+  });
+  // Right-clicks inside a player (an iframe the page can't see into) are
+  // reported here; the page decides what to do (close a small stream).
+  wc.on('context-menu', (_e, params) => {
+    const channel = channelFromPlayerUrl(params.frame?.url ?? params.frameURL);
+    if (channel) wc.send('mtv:player-context-menu', channel);
   });
   wc.on('before-input-event', (_e, input) => {
     if (input.type !== 'keyDown') return;

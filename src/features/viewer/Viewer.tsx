@@ -14,11 +14,13 @@ import {
   rectIndexAt,
   type Point,
 } from '@/lib/layout';
+import { desktop } from '@/lib/desktop/bridge';
 import type { PlayerStatus } from '@/lib/player/types';
 import type { ViewState } from '@/lib/view/types';
 import { streamVolume } from '@/lib/audio/volumeModel';
 import { audioLevel, mainChannel, slotOrder } from '@/lib/view/operations';
 import { useSettings } from '@/state/settingsStore';
+import { toast } from '@/state/toastStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
 import { Button } from '@/ui/Button';
@@ -31,6 +33,18 @@ import { PlayerTile } from './PlayerTile';
 import { useElementSize } from './useElementSize';
 import { setStreamVolume, useVolumeModel } from './volume';
 import styles from './Viewer.module.css';
+
+/** Closes a stream, unless it's the main one in focus layout (with Undo). */
+function closeSmallStream(login: string) {
+  if (!useSettings.getState().rightClickCloses) return;
+  const store = useViewStore.getState();
+  if (!store.view.channels.includes(login)) return;
+  if (store.view.layout.mode === 'focus' && mainChannel(store.view) === login) return;
+  store.removeChannel(login);
+  toast(`Closed ${login}`, {
+    action: { label: 'Undo', run: () => useViewStore.getState().undo() },
+  });
+}
 
 /** The stream that gets the main-stream quality: the big one in focus layout, else the one you hear. */
 const isPrimary = (view: ViewState, login: string) =>
@@ -156,6 +170,17 @@ export function Viewer() {
     window.addEventListener('blur', onBlur);
     return () => window.removeEventListener('blur', onBlur);
   }, [promote]);
+  // Right-click a small stream to close it. Clicks inside real players are
+  // reported by the desktop app; mock players are part of the page.
+  useEffect(() => desktop?.onPlayerContextMenu?.(closeSmallStream), []);
+  const onViewerContextMenu = (e: ReactMouseEvent) => {
+    const target = e.target as Element;
+    if (!target.closest('[data-player-host]')) return;
+    const login = target.closest<HTMLElement>('[data-testid=player-tile]')?.dataset.channel;
+    if (!login) return;
+    e.preventDefault();
+    closeSmallStream(login);
+  };
   const onViewerClick = (e: ReactMouseEvent) => {
     // Players that are part of the page (mock mode) report clicks directly.
     if (!clickToFocus) return;
@@ -178,6 +203,7 @@ export function Viewer() {
       }}
       onDrop={onDrop}
       onClick={onViewerClick}
+      onContextMenu={onViewerContextMenu}
     >
       {view.channels.length === 0 && <EmptyState />}
       {view.channels.length > 0 && visible.length === 0 && (

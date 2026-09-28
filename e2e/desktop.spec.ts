@@ -97,6 +97,7 @@ test("desktop app: hides Twitch's stream info and content notice in the players 
   await win.evaluate(() => {
     const f = document.createElement('iframe');
     f.src = 'https://player.twitch.tv/?channel=tpain&parent=localhost';
+    f.style.cssText = 'position:fixed;left:300px;top:200px;width:400px;height:300px;z-index:99';
     document.body.append(f);
   });
   const player = () => win.frames().find((f) => f.url().startsWith('https://player.twitch.tv'));
@@ -115,6 +116,13 @@ test("desktop app: hides Twitch's stream info and content notice in the players 
   await expect
     .poll(() => player()!.evaluate(() => (window as unknown as { presses?: number }).presses))
     .toBe(1);
+
+  // Right-clicking inside a player closes that stream (a small one).
+  await win.evaluate(() => (location.hash = '#/pixelpaladin/tpain'));
+  await expect(win.locator('[data-testid=player-tile][data-channel=tpain]')).toHaveCount(1);
+  const frameBox = (await win.locator('iframe[src*="player.twitch.tv"]').boundingBox())!;
+  await win.mouse.click(frameBox.x + 200, frameBox.y + 250, { button: 'right' });
+  await expect(win.locator('[data-testid=player-tile][data-channel=tpain]')).toHaveCount(0);
 
   // Turning the setting off shows it again.
   await win.evaluate(() =>

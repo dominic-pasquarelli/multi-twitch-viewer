@@ -35,6 +35,8 @@ export interface DesktopBridge {
   /** Tweaks Twitch's own UI inside the players (see desktop/playerChrome.mjs). */
   setPlayerChrome?(options: PlayerChrome): void;
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void;
+  /** Called with the channel when a player is right-clicked. */
+  onPlayerContextMenu?(callback: (channel: string) => void): () => void;
   /** Called with true when the window is hidden to the tray, false when shown. */
   onBackgroundChange(callback: (hidden: boolean) => void): () => void;
 }

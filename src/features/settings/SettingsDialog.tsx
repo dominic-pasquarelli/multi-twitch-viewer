@@ -130,6 +130,12 @@ function SettingsForm() {
             help="In focus layout, clicking one of the small streams swaps it into the big spot."
           />
           <Checkbox
+            checked={s.rightClickCloses}
+            onChange={(v) => s.update({ rightClickCloses: v })}
+            label="Right-click a stream to close it"
+            help="Not the main one in focus layout. Undo brings it back."
+          />
+          <Checkbox
             checked={s.hideOffline}
             onChange={(v) => s.update({ hideOffline: v })}
             label="Hide offline channels"

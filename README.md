@@ -161,24 +161,24 @@ lack of a "Log in" prompt) is logged in.
 
 ## Using it
 
-| Do this                          | How                                                                                   |
-| -------------------------------- | ------------------------------------------------------------------------------------- |
-| Add a stream                     | Click it in the sidebar, drag it in, or type names or links in the top box (`/`)      |
-| Remove a stream                  | Click it again in the sidebar, or hover it and use ✕ in the top bar (then Undo)       |
-| Choose what you hear             | `1`–`9`, the speaker button in the top bar, or unmute it in the player                |
-| Hear the others quietly          | **Duck** in the top bar (background level in Settings)                                |
-| Change volume                    | `↑`/`↓`, or scroll over the stream controls in the top bar                            |
-| Get told when someone goes live  | Star them in the sidebar; allow notifications in Settings → Alerts                    |
-| Hear several at once             | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                              |
-| Balance volumes                  | The Mixer (sliders button in the top bar); **Consistent volume** keeps switching even |
-| Unpause everything               | **Play all** (▷ in the top bar)                                                       |
-| Watch everyone who's live        | **Watch all** next to _Live_ in the sidebar (only the matches, if you filtered)       |
-| Start over with no streams       | 🗑 **Clear all** in the top bar (then Undo if it was a mistake)                        |
-| Remove a stream you don't follow | Click it under **Also watching** in the sidebar, or ✕ in the Mixer                    |
-| Make one stream big              | `L` or **Focus**; click a small playing stream (or ⤢ in the top bar) to make it main  |
-| Rearrange                        | Hover a stream, drag its name in the top bar onto another stream                      |
-| Save the current setup           | **Presets** → **Save current…**                                                       |
-| Keyboard shortcuts               | `?`                                                                                   |
+| Do this                          | How                                                                                                        |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Add a stream                     | Click it in the sidebar, drag it in, or type names or links in the top box (`/`)                           |
+| Remove a stream                  | Right-click it (not the main one in focus), click it again in the sidebar, or ✕ in the top bar (then Undo) |
+| Choose what you hear             | `1`–`9`, the speaker button in the top bar, or unmute it in the player                                     |
+| Hear the others quietly          | **Duck** in the top bar (background level in Settings)                                                     |
+| Change volume                    | `↑`/`↓`, or scroll over the stream controls in the top bar                                                 |
+| Get told when someone goes live  | Star them in the sidebar; allow notifications in Settings → Alerts                                         |
+| Hear several at once             | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                                                   |
+| Balance volumes                  | The Mixer (sliders button in the top bar); **Consistent volume** keeps switching even                      |
+| Unpause everything               | **Play all** (▷ in the top bar)                                                                            |
+| Watch everyone who's live        | **Watch all** next to _Live_ in the sidebar (only the matches, if you filtered)                            |
+| Start over with no streams       | 🗑 **Clear all** in the top bar (then Undo if it was a mistake)                                             |
+| Remove a stream you don't follow | Click it under **Also watching** in the sidebar, or ✕ in the Mixer                                         |
+| Make one stream big              | `L` or **Focus**; click a small playing stream (or ⤢ in the top bar) to make it main                       |
+| Rearrange                        | Hover a stream, drag its name in the top bar onto another stream                                           |
+| Save the current setup           | **Presets** → **Save current…**                                                                            |
+| Keyboard shortcuts               | `?`                                                                                                        |
 
 Shortcuts pause while a Twitch player has keyboard focus (after you click inside it). Moving the
 mouse off the player hands focus back.

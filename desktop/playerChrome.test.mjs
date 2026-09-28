@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyPlayerChrome,
   applyPlayerTweaks,
+  channelFromPlayerUrl,
   normalizePlayerChrome,
   isPlayerFrameUrl,
   playerChromeScript,
@@ -177,6 +178,16 @@ describe('pressing play (Play all)', () => {
     });
     playAllFrames([frame('https://player.twitch.tv/?channel=a'), frame('http://localhost:5757/')]);
     expect(calls).toEqual([['https://player.twitch.tv/?channel=a', true]]);
+  });
+});
+
+describe('channelFromPlayerUrl', () => {
+  it('reads the channel of a player frame only', () => {
+    expect(channelFromPlayerUrl('https://player.twitch.tv/?channel=TPain&parent=localhost')).toBe(
+      'tpain',
+    );
+    expect(channelFromPlayerUrl('https://player.twitch.tv/?video=123')).toBeNull();
+    expect(channelFromPlayerUrl('https://evil.example/?channel=x')).toBeNull();
   });
 });
 

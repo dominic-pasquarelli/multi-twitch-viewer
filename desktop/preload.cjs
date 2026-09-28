@@ -25,6 +25,13 @@ contextBridge.exposeInMainWorld('mtvDesktop', {
     ipcRenderer.on('mtv:update-status', listener);
     return () => ipcRenderer.removeListener('mtv:update-status', listener);
   },
+  /** @param {(channel: string) => void} callback */
+  onPlayerContextMenu: (callback) => {
+    /** @param {unknown} _event @param {unknown} channel */
+    const listener = (_event, channel) => callback(String(channel));
+    ipcRenderer.on('mtv:player-context-menu', listener);
+    return () => ipcRenderer.removeListener('mtv:player-context-menu', listener);
+  },
   /** @param {(hidden: boolean) => void} callback */
   onBackgroundChange: (callback) => {
     /** @param {unknown} _event @param {unknown} hidden */
