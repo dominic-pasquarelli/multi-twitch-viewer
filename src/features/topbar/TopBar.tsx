@@ -7,12 +7,14 @@ import {
   Settings,
   Keyboard,
   Play,
+  Trash2,
   VolumeX,
   Volume2,
 } from 'lucide-react';
 import { MIN_MAIN_SCALE } from '@/lib/layout';
 import type { AudioMode } from '@/lib/view/types';
 import { useAuth } from '@/state/authStore';
+import { toast } from '@/state/toastStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
 import { Avatar } from '@/ui/Avatar';
@@ -128,6 +130,20 @@ export function TopBar() {
         onClick={playAll}
         disabled={!view.channels.length}
         data-testid="play-all"
+      />
+      <IconButton
+        size="sm"
+        label="Clear all streams"
+        icon={<Trash2 size={16} />}
+        onClick={() => {
+          const n = view.channels.length;
+          store.clear();
+          toast(`Cleared ${n} stream${n === 1 ? '' : 's'}`, {
+            action: { label: 'Undo', run: () => useViewStore.getState().undo() },
+          });
+        }}
+        disabled={!view.channels.length}
+        data-testid="clear-all"
       />
 
       <StreamControls />

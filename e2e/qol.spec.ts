@@ -28,7 +28,7 @@ test('starring a channel keeps it at the top and alerts when it goes live', asyn
   await expect(page.getByText('WaffleWizard just went live')).toBeVisible();
   // Now live and, as a favorite, first in the live list.
   await expect(rows.first()).toHaveAttribute('data-channel', 'wafflewizard');
-  await page.getByRole('button', { name: 'Watch' }).click();
+  await page.getByRole('button', { name: 'Watch', exact: true }).click();
   await expect(tile(page, 'wafflewizard')).toBeVisible();
 });
 
@@ -186,4 +186,22 @@ test('streams you do not follow are listed in the sidebar so you can remove them
   await row.click();
   await expect(tile(page, 'somestranger')).toHaveCount(0);
   await expect(row).toHaveCount(0);
+});
+
+test('Watch all adds every live follow; Clear all empties the view (with Undo)', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const liveRows = page.locator('[data-testid=channel-row][data-live=true]');
+  await expect(liveRows.first()).toBeVisible();
+  const live = await liveRows.count();
+
+  await page.getByTestId('watch-all-live').click();
+  await expect(page.getByTestId('player-tile')).toHaveCount(live);
+  await expect(page.getByTestId('watch-all-live')).toHaveCount(0); // all added
+
+  await page.getByTestId('clear-all').click();
+  await expect(page.getByTestId('player-tile')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo' }).last().click();
+  await expect(page.getByTestId('player-tile')).toHaveCount(live);
 });
