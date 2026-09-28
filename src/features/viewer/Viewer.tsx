@@ -141,15 +141,22 @@ export function Viewer() {
     [setPlayerStatus],
   );
 
-  // ---- Click a small stream to make it the main one (focus layout) ---------
+  // ---- Click a stream: main one (focus layout) or the one you hear (grid) ---
   const promote = useCallback((login: string, statusAtClick?: PlayerStatus) => {
     // A click on a stopped stream is a click on its play button: let it play
     // where it is. Click it again (while playing) to make it the main one.
     if ((statusAtClick ?? useUi.getState().playerStatus[login]) !== 'playing') return;
     const store = useViewStore.getState();
-    if (store.view.layout.mode !== 'focus' || mainChannel(store.view) === login) return;
-    store.setMain(login);
-    // Clicking a Twitch video also pauses it; keep the new main stream playing.
+    const { view } = store;
+    if (view.layout.mode === 'focus') {
+      if (mainChannel(view) === login) return;
+      store.setMain(login);
+    } else {
+      // Grid, Solo or Duck: clicking a stream makes it the one you hear.
+      if (view.audio.mode === 'mix' || view.audio.active.includes(login)) return;
+      store.focusAudio(login);
+    }
+    // Clicking a Twitch video also pauses it; keep the stream playing.
     setTimeout(() => playerRegistry.get(login)?.adapter.play(), 400);
   }, []);
   useEffect(() => {

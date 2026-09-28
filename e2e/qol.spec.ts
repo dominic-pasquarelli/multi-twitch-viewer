@@ -261,3 +261,17 @@ test('right-clicking a small stream closes it (not the main one), with Undo', as
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(tile(page, 'lunarlatte')).toBeVisible();
 });
+
+test('in grid with Solo or Duck, clicking a stream makes it the one you hear', async ({ page }) => {
+  await page.goto('/#/pixelpaladin/novastrike/lunarlatte');
+  await expect(tile(page, 'novastrike')).toHaveAttribute('data-status', 'playing');
+  await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-audible', 'true');
+  await mockPlayer(page, 'novastrike').click();
+  await expect(tile(page, 'novastrike')).toHaveAttribute('data-audible', 'true');
+  await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-audible', 'false');
+
+  await page.getByRole('button', { name: 'Duck', exact: true }).click();
+  await mockPlayer(page, 'lunarlatte').click();
+  await expect(tile(page, 'lunarlatte')).toHaveAttribute('data-audible', 'true');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-muted', 'false'); // ducked
+});
