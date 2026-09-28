@@ -90,7 +90,7 @@ involved.
   → **Quit**.
 - Twitch's own stream info at the top of each player (channel, title, Follow/Subscribe/Gift) is
   hidden so it doesn't get in the way; Twitch's play, volume and fullscreen buttons stay. The
-  "intended for certain audiences" notice is clicked through for you. Both can be turned off in
+  "intended for certain audiences" notice is clicked through for you (blurred streams start playing). Both can be turned off in
   **Settings → Layout**.
 - It reopens at the same size, position and monitor, maximized or fullscreen included, and
   restores your last streams.
@@ -172,7 +172,7 @@ lack of a "Log in" prompt) is logged in.
 | Watch everyone who's live        | **Watch all** next to _Live_ in the sidebar (only the matches, if you filtered)       |
 | Start over with no streams       | 🗑 **Clear all** in the top bar (then Undo if it was a mistake)                        |
 | Remove a stream you don't follow | Click it under **Also watching** in the sidebar, or ✕ in the Mixer                    |
-| Make one stream big              | `L` or **Focus**; click a small stream (or ⤢ in the top bar) to make it main          |
+| Make one stream big              | `L` or **Focus**; click a small playing stream (or ⤢ in the top bar) to make it main  |
 | Rearrange                        | Hover a stream, drag its name in the top bar onto another stream                      |
 | Save the current setup           | **Presets** → **Save current…**                                                       |
 | Keyboard shortcuts               | `?`                                                                                   |

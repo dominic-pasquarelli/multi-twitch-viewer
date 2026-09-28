@@ -90,6 +90,7 @@ test("desktop app: hides Twitch's stream info and content notice in the players 
           <button data-a-target="subscribe-button">Subscribe</button></div>
         <div data-a-target="player-controls" id="controls"><button>play</button></div>
         <div id="gate"><button onclick="this.parentElement.remove()">Start Watching</button></div>
+        <button data-a-target="player-overlay-play-button" onclick="window.presses = (window.presses || 0) + 1">play</button>
       </div></div>`,
     }),
   );
@@ -106,6 +107,14 @@ test("desktop app: hides Twitch's stream info and content notice in the players 
   await expect.poll(hiddenIds).toEqual(['info']);
   // The "intended for certain audiences" notice is clicked through.
   await expect.poll(() => player()!.evaluate(() => !!document.getElementById('gate'))).toBe(false);
+
+  // Play all presses play inside the player itself.
+  await win.evaluate(() =>
+    (window as unknown as { mtvDesktop: { playAll(): void } }).mtvDesktop.playAll(),
+  );
+  await expect
+    .poll(() => player()!.evaluate(() => (window as unknown as { presses?: number }).presses))
+    .toBe(1);
 
   // Turning the setting off shows it again.
   await win.evaluate(() =>

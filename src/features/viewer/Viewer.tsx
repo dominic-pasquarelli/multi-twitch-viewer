@@ -122,7 +122,10 @@ export function Viewer() {
   );
 
   // ---- Click a small stream to make it the main one (focus layout) ---------
-  const promote = useCallback((login: string) => {
+  const promote = useCallback((login: string, statusAtClick?: PlayerStatus) => {
+    // A click on a stopped stream is a click on its play button: let it play
+    // where it is. Click it again (while playing) to make it the main one.
+    if ((statusAtClick ?? useUi.getState().playerStatus[login]) !== 'playing') return;
     const store = useViewStore.getState();
     if (store.view.layout.mode !== 'focus' || mainChannel(store.view) === login) return;
     store.setMain(login);
@@ -132,15 +135,18 @@ export function Viewer() {
   useEffect(() => {
     // Clicks inside a player's iframe never reach the page, but they move the
     // keyboard focus into that iframe and blur the window, which we can see.
-    const onBlur = () =>
+    const onBlur = () => {
+      // Before the click can change it (a click on a paused player plays it).
+      const statuses = { ...useUi.getState().playerStatus };
       setTimeout(() => {
         const el = document.activeElement;
         if (!(el instanceof HTMLIFrameElement)) return;
         const login = el.closest<HTMLElement>('[data-testid=player-tile]')?.dataset.channel;
         if (!login) return;
         markInteraction(login); // a pause right after this is yours: don't undo it
-        if (useSettings.getState().clickToFocus) promote(login);
+        if (useSettings.getState().clickToFocus) promote(login, statuses[login]);
       }, 0);
+    };
     window.addEventListener('blur', onBlur);
     return () => window.removeEventListener('blur', onBlur);
   }, [promote]);

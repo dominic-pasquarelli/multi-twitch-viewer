@@ -117,7 +117,8 @@ test('focus auto lines the small streams up with the main one; clicking one prom
     expect(Math.abs(last.x + last.width - (main.x + main.width))).toBeLessThan(2);
   }
 
-  // Click the video area of a small stream: it becomes the main one.
+  // Click the video area of a small (playing) stream: it becomes the main one.
+  await expect(tile(page, 'cozycartographer')).toHaveAttribute('data-status', 'playing');
   await mockPlayer(page, 'cozycartographer').click();
   await expect.poll(async () => (await box('cozycartographer')).width).toBeCloseTo(main.width, 0);
   await expect(tile(page, 'cozycartographer')).toHaveAttribute('data-audible', 'true');
@@ -204,4 +205,26 @@ test('Watch all adds every live follow; Clear all empties the view (with Undo)',
   await expect(page.getByTestId('player-tile')).toHaveCount(0);
   await page.getByRole('button', { name: 'Undo' }).last().click();
   await expect(page.getByTestId('player-tile')).toHaveCount(live);
+});
+
+test('clicking a paused stream plays it where it is; clicking again makes it main', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/novastrike/cozycartographer/lunarlatte?layout=focus');
+  await expect(tile(page, 'lunarlatte')).toHaveAttribute('data-status', 'playing');
+  // You pause it (so it stays paused).
+  await mockPlayer(page, 'lunarlatte').dispatchEvent('pointerdown');
+  await page.evaluate(() =>
+    (window as unknown as { mtvMock: { pause(l: string): void } }).mtvMock.pause('lunarlatte'),
+  );
+  await expect(tile(page, 'lunarlatte')).toHaveAttribute('data-status', 'paused');
+
+  await mockPlayer(page, 'lunarlatte').click();
+  await page.waitForTimeout(300);
+  await expect(page).not.toHaveURL(/main=lunarlatte/);
+
+  await page.getByTestId('play-all').click();
+  await expect(tile(page, 'lunarlatte')).toHaveAttribute('data-status', 'playing');
+  await mockPlayer(page, 'lunarlatte').click();
+  await expect(page).toHaveURL(/main=lunarlatte/);
 });

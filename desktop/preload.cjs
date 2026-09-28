@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('mtvDesktop', {
   getUpdateStatus: () => ipcRenderer.invoke('mtv:update-status'),
   checkForUpdates: () => ipcRenderer.invoke('mtv:update-check'),
   installUpdate: () => ipcRenderer.send('mtv:update-install'),
+  playAll: () => ipcRenderer.send('mtv:play-all'),
   /** @param {{ hideStreamInfo: boolean, skipContentWarning: boolean }} options */
   setPlayerChrome: (options) =>
     ipcRenderer.send('mtv:player-chrome', {

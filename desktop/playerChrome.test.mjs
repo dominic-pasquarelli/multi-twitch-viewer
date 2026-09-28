@@ -6,6 +6,8 @@ import {
   normalizePlayerChrome,
   isPlayerFrameUrl,
   playerChromeScript,
+  playAllFrames,
+  pressPlay,
 } from './playerChrome.mjs';
 
 // A cut-down Twitch player: video, stream-info overlay on top, controls below.
@@ -34,7 +36,10 @@ const INFO = { hideStreamInfo: true, skipContentWarning: false };
 const OFF = { hideStreamInfo: false, skipContentWarning: false };
 const applyStreamInfoHiding = (on) => applyPlayerTweaks(on ? INFO : OFF);
 
-afterEach(() => applyPlayerTweaks(OFF));
+afterEach(() => {
+  applyPlayerTweaks(OFF);
+  delete window.__mtvGateStarted;
+});
 
 describe('hiding Twitch stream info', () => {
   it('hides the top info block and keeps the video and controls', () => {
@@ -120,6 +125,58 @@ describe('skipping the content notice', () => {
       hideStreamInfo: false,
       skipContentWarning: true,
     });
+  });
+});
+
+describe('the blurred "Intended for certain audiences" style', () => {
+  const BLURRED = `<div class="player"><video></video>
+    <button id="chip">Intended for certain audiences ⌄</button>
+    <button data-a-target="player-overlay-play-button" id="big-play">▶</button>
+    <div data-a-target="player-controls"><button data-a-target="player-play-pause-button">▶</button></div>
+  </div>`;
+  it('presses play once per load and hides the chip', async () => {
+    document.body.innerHTML = BLURRED;
+    const presses = [];
+    document.getElementById('big-play').onclick = () => presses.push('big');
+    new Function(playerChromeScript({ hideStreamInfo: false, skipContentWarning: true }))();
+    expect(presses).toEqual(['big']);
+    expect(hidden()).toEqual(['chip']);
+    document.body.insertAdjacentHTML('beforeend', '<i></i>'); // Twitch re-renders
+    await tick();
+    expect(presses).toEqual(['big']); // pausing it yourself later sticks
+  });
+
+  it('leaves it alone when turned off', () => {
+    document.body.innerHTML = BLURRED;
+    const presses = [];
+    document.getElementById('big-play').onclick = () => presses.push('big');
+    applyPlayerTweaks({ hideStreamInfo: true, skipContentWarning: false });
+    expect(presses).toEqual([]);
+    expect(hidden()).not.toContain('chip');
+  });
+});
+
+describe('pressing play (Play all)', () => {
+  it('uses Twitch’s play button, and never pauses a playing stream', () => {
+    document.body.innerHTML =
+      '<video></video><div><button data-a-target="player-play-pause-button">▶</button></div>';
+    let clicks = 0;
+    document.querySelector('button').onclick = () => clicks++;
+    expect(pressPlay()).toBe('clicked');
+    expect(clicks).toBe(1);
+    Object.defineProperty(document.querySelector('video'), 'paused', { value: false });
+    expect(pressPlay()).toBe('playing');
+    expect(clicks).toBe(1);
+  });
+
+  it('runs in player frames only, as a user gesture', () => {
+    const calls = [];
+    const frame = (url) => ({
+      url,
+      executeJavaScript: async (code, gesture) => void calls.push([url, gesture]),
+    });
+    playAllFrames([frame('https://player.twitch.tv/?channel=a'), frame('http://localhost:5757/')]);
+    expect(calls).toEqual([['https://player.twitch.tv/?channel=a', true]]);
   });
 });
 
