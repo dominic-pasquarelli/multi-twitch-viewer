@@ -20,7 +20,12 @@ import { Avatar } from '@/ui/Avatar';
 import { IconButton } from '@/ui/Button';
 import { LoginButton } from '../auth/LoginPrompt';
 import { CHANNEL_MIME, setDragging } from '../viewer/dnd';
-import { useFollowedChannels, useFollowedLive, type FollowedChannelInfo } from './queries';
+import {
+  useFollowedChannels,
+  useFollowedLive,
+  useLiveStatus,
+  type FollowedChannelInfo,
+} from './queries';
 import styles from './Sidebar.module.css';
 
 interface Row {
@@ -91,6 +96,20 @@ function useRows() {
   }, [live, follows, sort, favorites]);
 }
 
+/** Streams in the view that aren't in your follows, so they can be removed here too. */
+function useNotFollowedRows(inView: string[], follows: FollowedChannelInfo[] | undefined): Row[] {
+  const followed = useMemo(() => new Set(follows?.map((f) => f.login)), [follows]);
+  const logins = useMemo(
+    () => (follows ? inView.filter((l) => !followed.has(l)) : []),
+    [inView, follows, followed],
+  );
+  const { live } = useLiveStatus(logins);
+  return logins.map((login) => {
+    const stream = live.get(login);
+    return { login, displayName: stream?.displayName ?? login, avatar: '', stream };
+  });
+}
+
 function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
   const status = useAuth((s) => s.status);
   const { api } = useServices();
@@ -114,6 +133,7 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
   };
   const shownLive = liveRows.filter(match);
   const shownOffline = offlineRows.filter(match);
+  const others = useNotFollowedRows(inView, follows.isSuccess ? follows.data : undefined);
 
   return (
     <aside className={styles.sidebar} aria-label="Followed channels">
@@ -172,6 +192,16 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
             </select>
           </div>
           <div className={styles.list} onScroll={() => setPreview(null)}>
+            {others.length > 0 && (
+              <>
+                <div className={styles.section} title="Streams in this view you don't follow">
+                  <span>Also watching · {others.length}</span>
+                </div>
+                {others.map((row) => (
+                  <ChannelRow key={row.login} row={row} inView />
+                ))}
+              </>
+            )}
             <div className={styles.section}>
               <span>Live · {live.isLoading ? '…' : shownLive.length}</span>
             </div>

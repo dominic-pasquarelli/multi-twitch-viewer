@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
-import { SlidersHorizontal, Volume2, VolumeX } from 'lucide-react';
+import { SlidersHorizontal, Volume2, VolumeX, X } from 'lucide-react';
 import { audioLevel, slotOrder } from '@/lib/view/operations';
 import { useSettings } from '@/state/settingsStore';
+import { toast } from '@/state/toastStore';
 import { useViewStore } from '@/state/viewStore';
 import { IconButton } from '@/ui/Button';
 import { Checkbox } from '@/ui/Form';
@@ -12,7 +13,8 @@ import styles from './Mixer.module.css';
 
 /**
  * Every stream's level in one place (top-bar popover), for balancing the
- * streams you hear together in Mix mode. Also switches consistent volume.
+ * streams you hear together in Mix mode. Also switches consistent volume and
+ * removes streams (handy for ones you don't follow, which aren't in the sidebar).
  */
 export function Mixer() {
   const [open, setOpen] = useState(false);
@@ -96,6 +98,17 @@ export function Mixer() {
                 <span className={styles.percent} data-testid="mixer-volume">
                   {pct(volume)}%
                 </span>
+                <IconButton
+                  size="sm"
+                  label={`Remove ${name}`}
+                  icon={<X size={15} />}
+                  onClick={() => {
+                    useViewStore.getState().removeChannel(login);
+                    toast(`Removed ${name}`, {
+                      action: { label: 'Undo', run: () => useViewStore.getState().undo() },
+                    });
+                  }}
+                />
               </div>
             );
           })}

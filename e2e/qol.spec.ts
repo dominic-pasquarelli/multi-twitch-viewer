@@ -164,3 +164,26 @@ test('the mixer balances streams, and consistent volume keeps switching at one l
   await page.keyboard.press('2');
   await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-volume', '0.40');
 });
+
+test('Play all restarts streams you paused', async ({ page }) => {
+  await page.goto('/#/pixelpaladin/novastrike');
+  await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-status', 'playing');
+  await mockPlayer(page, 'pixelpaladin').click();
+  await page.evaluate(() =>
+    (window as unknown as { mtvMock: { pause(l: string): void } }).mtvMock.pause('pixelpaladin'),
+  );
+  await expect(page.getByTestId('play-all')).toHaveAttribute('aria-label', 'Play all (1 paused)');
+  await page.getByTestId('play-all').click();
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-paused', 'false');
+});
+
+test('streams you do not follow are listed in the sidebar so you can remove them', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/somestranger');
+  const row = page.locator('[data-testid=channel-row][data-channel=somestranger]');
+  await expect(page.getByText(/Also watching · 1/)).toBeVisible();
+  await row.click();
+  await expect(tile(page, 'somestranger')).toHaveCount(0);
+  await expect(row).toHaveCount(0);
+});

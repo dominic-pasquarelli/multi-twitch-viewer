@@ -6,6 +6,7 @@ import {
   Presentation,
   Settings,
   Keyboard,
+  Play,
   VolumeX,
   Volume2,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import { IconButton } from '@/ui/Button';
 import { LoginButton } from '../auth/LoginPrompt';
 import { Mixer } from '../mixer/Mixer';
 import { PresetsMenu } from '../presets/PresetsMenu';
+import { playAll } from '../viewer/playerRegistry';
 import { StreamControls } from '../viewer/StreamControls';
 import { AddChannelBox } from './AddChannelBox';
 import { toggleFullscreen } from './fullscreen';
@@ -43,6 +45,9 @@ export function TopBar() {
   const mode = view.layout.mode;
   const scale = view.layout.mainScale;
   const muted = view.audio.active.length === 0;
+  const stopped = useUi(
+    (s) => Object.values(s.playerStatus).filter((st) => st === 'paused' || st === 'blocked').length,
+  );
 
   return (
     <header className={styles.bar}>
@@ -114,6 +119,16 @@ export function TopBar() {
         />
         <Mixer />
       </div>
+
+      <IconButton
+        size="sm"
+        label={stopped ? `Play all (${stopped} paused)` : 'Play all'}
+        icon={<Play size={16} />}
+        active={stopped > 0}
+        onClick={playAll}
+        disabled={!view.channels.length}
+        data-testid="play-all"
+      />
 
       <StreamControls />
 

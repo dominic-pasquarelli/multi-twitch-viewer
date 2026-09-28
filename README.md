@@ -11,6 +11,8 @@ channels are live, and watch several streams at once with layouts that actually 
     2 large + 3 smaller instead of a 3×2 grid with a hole.
   - **Focus** makes one stream big and wraps the rest around it. Its automatic size keeps the
     others at or above Twitch's 400×300 autoplay minimum. Adjust it with the slider or `[` `]`.
+    With many streams, **Auto** fills a column down the right side, then a row along the bottom,
+    before adding a second column.
   - Hover a stream, then drag its name in the top bar onto another stream to swap them. Streams
     never reload when they move.
   - Offline channels step aside and give their space to live ones, then come back when they go live.
@@ -156,20 +158,22 @@ lack of a "Log in" prompt) is logged in.
 
 ## Using it
 
-| Do this                         | How                                                                                   |
-| ------------------------------- | ------------------------------------------------------------------------------------- |
-| Add a stream                    | Click it in the sidebar, drag it in, or type names or links in the top box (`/`)      |
-| Remove a stream                 | Click it again in the sidebar, or hover it and use ✕ in the top bar (then Undo)       |
-| Choose what you hear            | `1`–`9`, the speaker button in the top bar, or unmute it in the player                |
-| Hear the others quietly         | **Duck** in the top bar (background level in Settings)                                |
-| Change volume                   | `↑`/`↓`, or scroll over the stream controls in the top bar                            |
-| Get told when someone goes live | Star them in the sidebar; allow notifications in Settings → Go-live alerts            |
-| Hear several at once            | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                              |
-| Balance volumes                 | The Mixer (sliders button in the top bar); **Consistent volume** keeps switching even |
-| Make one stream big             | `L` or **Focus**; click a small stream (or ⤢ in the top bar) to make it main          |
-| Rearrange                       | Hover a stream, drag its name in the top bar onto another stream                      |
-| Save the current setup          | **Presets** → **Save current…**                                                       |
-| Keyboard shortcuts              | `?`                                                                                   |
+| Do this                          | How                                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------- |
+| Add a stream                     | Click it in the sidebar, drag it in, or type names or links in the top box (`/`)      |
+| Remove a stream                  | Click it again in the sidebar, or hover it and use ✕ in the top bar (then Undo)       |
+| Choose what you hear             | `1`–`9`, the speaker button in the top bar, or unmute it in the player                |
+| Hear the others quietly          | **Duck** in the top bar (background level in Settings)                                |
+| Change volume                    | `↑`/`↓`, or scroll over the stream controls in the top bar                            |
+| Get told when someone goes live  | Star them in the sidebar; allow notifications in Settings → Go-live alerts            |
+| Hear several at once             | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                              |
+| Balance volumes                  | The Mixer (sliders button in the top bar); **Consistent volume** keeps switching even |
+| Unpause everything               | **Play all** (▷ in the top bar)                                                       |
+| Remove a stream you don't follow | Click it under **Also watching** in the sidebar, or ✕ in the Mixer                    |
+| Make one stream big              | `L` or **Focus**; click a small stream (or ⤢ in the top bar) to make it main          |
+| Rearrange                        | Hover a stream, drag its name in the top bar onto another stream                      |
+| Save the current setup           | **Presets** → **Save current…**                                                       |
+| Keyboard shortcuts               | `?`                                                                                   |
 
 Shortcuts pause while a Twitch player has keyboard focus (after you click inside it). Moving the
 mouse off the player hands focus back.
