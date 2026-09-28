@@ -25,6 +25,7 @@ import {
   applyPlayerChrome,
   DEFAULT_PLAYER_CHROME,
   normalizePlayerChrome,
+  playAllFrames,
 } from './playerChrome.mjs';
 import { APP_URL, startServer } from './server.mjs';
 import { createTray } from './tray.mjs';
@@ -92,6 +93,9 @@ async function start() {
   ipcMain.handle('mtv:update-status', () => updateStatus);
   ipcMain.handle('mtv:update-check', () => runUpdateCheck());
   ipcMain.on('mtv:update-install', () => installUpdate());
+  ipcMain.on('mtv:play-all', () => {
+    playAllFrames(win?.webContents.mainFrame.framesInSubtree ?? []);
+  });
   ipcMain.on('mtv:player-chrome', (_e, options) => {
     playerChrome = normalizePlayerChrome(options);
     for (const frame of win?.webContents.mainFrame.framesInSubtree ?? []) {

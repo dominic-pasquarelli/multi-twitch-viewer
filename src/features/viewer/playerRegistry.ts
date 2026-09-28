@@ -1,3 +1,4 @@
+import { desktop } from '@/lib/desktop/bridge';
 import type { PlayerController } from '@/lib/player/PlayerController';
 import type { PlayerAdapter } from '@/lib/player/types';
 
@@ -33,4 +34,5 @@ export function playAll(): void {
     adapter.play();
     controller.reapply();
   });
+  desktop?.playAll?.();
 }

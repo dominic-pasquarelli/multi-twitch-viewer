@@ -44,7 +44,8 @@ export function normalizePlayerChrome(options) {
  *   buttons near the top and hides the largest block around them that holds
  *   neither the video nor the playback controls;
  * - content notice: clicks its "Start watching" button (by Twitch's test ids,
- *   or by the button text as a fallback).
+ *   or by the button text as a fallback); for the newer blurred-video style,
+ *   presses play once per load and hides the "Intended for…" chip.
  * A MutationObserver re-applies both as Twitch re-renders.
  * @param {PlayerChrome} options
  */
@@ -58,7 +59,7 @@ export function applyPlayerTweaks(options) {
   d.getElementById('mtv-stream-info-style')?.remove();
   if (!options.hideStreamInfo && !options.skipContentWarning) return;
 
-  if (options.hideStreamInfo) {
+  {
     const style = d.createElement('style');
     style.id = 'mtv-stream-info-style';
     style.textContent = `[${MARK}]{opacity:0!important;visibility:hidden!important;pointer-events:none!important}`;
@@ -117,7 +118,22 @@ export function applyPlayerTweaks(options) {
       if (!keeps(node)) node.setAttribute(MARK, '');
     }
   };
+  // Newer players blur the video behind an "Intended for certain audiences"
+  // chip until you press play. Start it once per load and hide the chip.
+  const GATE_CHIP = /intended for certain audiences|content classification/i;
+  const startGatedStream = () => {
+    const chip = [...d.querySelectorAll('button, [role="button"]')].find(
+      (b) => !b.matches(GATE_BUTTON) && GATE_CHIP.test(b.textContent ?? ''),
+    );
+    if (!chip) return;
+    if (!chip.hasAttribute(MARK)) chip.setAttribute(MARK, '');
+    if (!w.__mtvGateStarted) {
+      w.__mtvGateStarted = true;
+      pressPlay();
+    }
+  };
   const skipContentWarning = () => {
+    startGatedStream();
     const button =
       d.querySelector(GATE_BUTTON) ??
       [...d.querySelectorAll('button')].find((b) =>
@@ -147,9 +163,43 @@ export function applyPlayerTweaks(options) {
   run();
 }
 
+/**
+ * Runs inside a player frame: starts the stream if it isn't playing, the way
+ * you would (Twitch's own play button), which also gets past a
+ * content-classification blur that the embed API's play() can't.
+ * @returns {'playing' | 'clicked' | 'video' | 'none'}
+ */
+export function pressPlay() {
+  const video = document.querySelector('video');
+  if (video && !video.paused && !video.ended) return 'playing';
+  const button =
+    document.querySelector('[data-a-target="player-overlay-play-button"]') ??
+    document.querySelector('[data-a-target="player-play-pause-button"]');
+  if (button instanceof HTMLElement) {
+    button.click();
+    return 'clicked';
+  }
+  if (!video) return 'none';
+  video.play()?.catch(() => {});
+  return 'video';
+}
+
 /** @param {PlayerChrome} options */
 export function playerChromeScript(options) {
-  return `(${applyPlayerTweaks.toString()})(${JSON.stringify(normalizePlayerChrome(options))});`;
+  const opts = JSON.stringify(normalizePlayerChrome(options));
+  return `(() => { const pressPlay = ${pressPlay.toString()}; (${applyPlayerTweaks.toString()})(${opts}); })();`;
+}
+
+/**
+ * "Play all": presses play in every Twitch player frame that isn't playing.
+ * @param {Iterable<{ url: string, executeJavaScript(code: string, userGesture?: boolean): Promise<unknown> }>} frames
+ */
+export function playAllFrames(frames) {
+  for (const frame of frames) {
+    if (!isPlayerFrameUrl(frame.url)) continue;
+    // As a user gesture, so the player treats it like a real click.
+    frame.executeJavaScript(`(${pressPlay.toString()})()`, true).catch(() => {});
+  }
 }
 
 /**

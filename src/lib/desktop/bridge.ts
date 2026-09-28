@@ -30,6 +30,8 @@ export interface DesktopBridge {
   checkForUpdates(): Promise<UpdateStatus>;
   /** Rebuilds and reinstalls from the latest code on GitHub; the app closes and reopens. */
   installUpdate(): void;
+  /** Presses play inside every Twitch player (gets past content blurs the embed API can't). */
+  playAll?(): void;
   /** Tweaks Twitch's own UI inside the players (see desktop/playerChrome.mjs). */
   setPlayerChrome?(options: PlayerChrome): void;
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void;
