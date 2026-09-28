@@ -24,3 +24,13 @@ export function installAudioUnlock(): () => void {
   window.addEventListener('keydown', unlock, true);
   return unlock;
 }
+
+/** Starts every stream that is paused (or waiting for a click to autoplay). */
+export function playAll(): void {
+  // Keyboard focus left in a player would make its pause look like yours.
+  if (document.activeElement instanceof HTMLIFrameElement) document.activeElement.blur();
+  playerRegistry.forEach(({ adapter, controller }) => {
+    adapter.play();
+    controller.reapply();
+  });
+}

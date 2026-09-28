@@ -148,12 +148,44 @@ describe('computeFocusLayout', () => {
     expectNoOverlap(rects);
   });
 
-  it('auto uses more strip columns when there are many streams', () => {
-    const rects = computeFocusLayout(9, FHD, opts);
-    const xs = new Set(rects.slice(1).map((r) => Math.round(r.x)));
-    expect(xs.size).toBeGreaterThan(1);
-    expectInside(rects, FHD);
-    expectNoOverlap(rects);
+  it('auto wraps many streams down the right side, then along the bottom', () => {
+    const area = { width: 1868, height: 905 };
+    for (const count of [6, 7, 8, 10]) {
+      const rects = computeFocusLayout(count, area, opts);
+      const [main, ...small] = rects as [Rect, ...Rect[]];
+      const below = small.filter((r) => r.y >= main.y + main.height);
+      const right = small.filter((r) => r.x >= main.x + main.width && !below.includes(r));
+      // One column on the right (as tall as the main stream)…
+      expect(new Set(right.map((r) => Math.round(r.x))).size).toBe(1);
+      expect(right[0]!.y).toBeCloseTo(main.y, 3);
+      expect(right.at(-1)!.y + right.at(-1)!.height).toBeCloseTo(main.y + main.height, 3);
+      // …then one row below, joined to it at the corner.
+      expect(right.length + below.length).toBe(count - 1);
+      expect(new Set(below.map((r) => Math.round(r.y))).size).toBe(1);
+      expect(below.at(-1)!.x + below.at(-1)!.width).toBeCloseTo(right[0]!.x + right[0]!.width, 3);
+      // Same size small tiles, all inside, no overlaps.
+      expect(new Set(small.map((r) => Math.round(r.width))).size).toBe(1);
+      expectInside(rects, area);
+      expectNoOverlap(rects);
+    }
+  });
+
+  it('auto adds a second line only when the L is full', () => {
+    const one = computeFocusLayout(10, FHD, opts); // 9 others: one L
+    const two = computeFocusLayout(12, FHD, opts); // 11 others: two lines
+    const cols = (rects: Rect[]) => {
+      const main = rects[0]!;
+      return new Set(
+        rects
+          .slice(1)
+          .filter((r) => r.x >= main.x + main.width)
+          .map((r) => Math.round(r.x)),
+      ).size;
+    };
+    expect(cols(one)).toBe(1);
+    expect(cols(two)).toBe(2);
+    expectInside(two, FHD);
+    expectNoOverlap(two);
   });
 
   it('manual zoom wraps extra tiles under the main stream (L shape)', () => {

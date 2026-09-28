@@ -24,9 +24,10 @@ interface Region {
 /**
  * "Focus" layout: slot 0 is a large main stream, the others are smaller.
  *
- * - `scale: 'auto'`: the small streams form a strip beside or below the main
- *   stream whose edges line up exactly with it (a column as tall as the main
- *   stream, or a row as wide), sized so everything is as big as possible.
+ * - `scale: 'auto'`: up to 4 small streams form a strip beside or below the
+ *   main stream whose edges line up exactly with it (a column as tall as the
+ *   main stream, or a row as wide). More wrap around it: down the right side,
+ *   then along the bottom (see `wrappedL`), before a second line is added.
  * - a number (the zoom slider): the main stream gets that share of the space
  *   and the others fill the L-shape to its right and below it.
  *
@@ -49,7 +50,10 @@ export function computeFocusLayout(
 
   const others = count - 1;
   if (scale === 'auto') {
-    const aligned = alignedStrip(others, container, opts);
+    const aligned =
+      others > MAX_PER_LINE
+        ? (wrappedL(others, container, opts) ?? alignedStrip(others, container, opts))
+        : alignedStrip(others, container, opts);
     if (aligned) return aligned;
     return arrange(autoMainWidth(others, container, opts, maxMainWidth), others, container, opts)
       .rects;
@@ -131,6 +135,61 @@ export function alignedStrip(others: number, c: Size, opts: LayoutOptions): Rect
     }
   }
   return best && centerRects(best, c);
+}
+
+/**
+ * Main stream with the others wrapped around it in an L: a column down its
+ * right side (as tall as the main stream), then a row along the bottom
+ * (right-aligned under the corner, so the L stays joined). All small tiles are
+ * the same size and the main stream is n×n tiles. Up to 4 streams per side
+ * in one line (9 in total); more add a second line on both sides, and so on.
+ * Returns null if it doesn't fit.
+ */
+export function wrappedL(others: number, c: Size, opts: LayoutOptions): Rect[] | null {
+  const { gap: g, aspect: a } = opts;
+  // Lines around the main stream: one L of up to 4 + 5 streams, then deeper.
+  let depth = 1;
+  while (depth < 3 && depth * (2 * MAX_PER_LINE + depth) < others) depth++;
+  // Main stream n tiles wide: the smallest that holds everyone (at least 2).
+  let n = 2;
+  while (depth * (2 * n + depth) < others) n++;
+
+  const span = n + depth; // tiles across (and down) the whole composition
+  const tileW = Math.min(
+    (c.width - (span - 1) * g) / span,
+    (a * (c.height - (span - 1) * g)) / span,
+  );
+  const tileH = tileW / a;
+  if (tileW <= 0) return null;
+  const step = { x: tileW + g, y: tileH + g };
+  const mainW = n * tileW + (n - 1) * g;
+  const main = { x: 0, y: 0, width: mainW, height: mainW / a };
+  // The right column spans exactly the main stream's height (its gaps are a
+  // touch smaller than `g`, since the main stream keeps its exact 16:9).
+  const colStep = n > 1 ? (main.height - tileH) / (n - 1) : 0;
+
+  // Slots: the right block (column by column), then the bottom block (row by
+  // row), each line holding as many as it can.
+  const rects: Rect[] = [main];
+  let left = others;
+  for (let col = 0; col < depth && left > 0; col++) {
+    for (let row = 0; row < n && left > 0; row++, left--) {
+      rects.push({ x: (n + col) * step.x, y: row * colStep, width: tileW, height: tileH });
+    }
+  }
+  for (let row = 0; row < depth && left > 0; row++) {
+    const inRow = Math.min(left, span);
+    for (let i = 0; i < inRow; i++) {
+      rects.push({
+        x: (span - inRow + i) * step.x,
+        y: main.height + g + row * step.y,
+        width: tileW,
+        height: tileH,
+      });
+    }
+    left -= inRow;
+  }
+  return centerRects(rects, c);
 }
 
 function autoMainWidth(others: number, c: Size, opts: LayoutOptions, maxMain: number): number {
