@@ -95,7 +95,9 @@ involved.
   hidden so it doesn't get in the way; Twitch's play, volume and fullscreen buttons stay. The
   "intended for certain audiences" notice is clicked through for you (blurred streams start playing). Both can be turned off in
   **Settings → Players**.
-- It reopens at the same size, position and monitor, maximized or fullscreen included, and
+- Fullscreen: `F` (the app) or `F11` (the window); `F`, `F11` or `Esc` leaves it. It always opens
+  windowed, so it can be moved to another monitor.
+- It reopens at the same size, position and monitor, maximized included, and
   restores your last streams.
 - Its presets and settings are separate from the browser version (`npm start`). To move presets
   between them, use **Presets → Export / Import**.
