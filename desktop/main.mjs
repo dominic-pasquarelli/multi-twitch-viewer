@@ -188,8 +188,9 @@ function createWindow() {
     },
   });
   win.setMenu(null);
+  // Fullscreen is never restored: a window that starts fullscreen has no
+  // title bar to move it and no page fullscreen to leave.
   if (state.maximized) win.maximize();
-  if (state.fullscreen) win.setFullScreen(true);
   win.once('ready-to-show', () => win?.show());
 
   const wc = win.webContents;
@@ -214,9 +215,41 @@ function createWindow() {
     const channel = channelFromPlayerUrl(params.frame?.url ?? params.frameURL);
     if (channel) wc.send('mtv:player-context-menu', channel);
   });
-  wc.on('before-input-event', (_e, input) => {
+  // Leaving the page's fullscreen (F, Esc, or a player's fullscreen button)
+  // always leaves the window's too, so it can be moved again.
+  // Checked again shortly after, in case the window was still in the middle
+  // of a fullscreen transition when the page left.
+  let windowFullScreen = false; // F11, as opposed to the page's fullscreen
+  /** @type {ReturnType<typeof setTimeout>[]} */
+  let leaveChecks = [];
+  win.on('leave-html-full-screen', () => {
+    const leave = () => {
+      if (win && !win.isDestroyed() && !windowFullScreen && win.isFullScreen()) {
+        win.setFullScreen(false);
+      }
+    };
+    leave();
+    leaveChecks = [setTimeout(leave, 500), setTimeout(leave, 1500)];
+  });
+  wc.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
     const key = input.key.toLowerCase();
+    if (key === 'f11') {
+      event.preventDefault();
+      leaveChecks.forEach(clearTimeout);
+      windowFullScreen = !win?.isFullScreen();
+      win?.setFullScreen(windowFullScreen);
+      return;
+    }
+    // Esc leaves a window fullscreen the page didn't ask for (the page's own
+    // fullscreen handles Esc itself).
+    if (key === 'escape' && win?.isFullScreen()) {
+      void wc.executeJavaScript('!!document.fullscreenElement').then((html) => {
+        if (html) return;
+        windowFullScreen = false;
+        win?.setFullScreen(false);
+      });
+    }
     if (input.control && input.shift && key === 'i') wc.toggleDevTools();
     else if (key === 'f5' || (input.control && key === 'r')) wc.reload();
   });
@@ -310,12 +343,14 @@ function writeState(state) {
 function saveState() {
   if (!win || win.isDestroyed()) return;
   const current = readState();
+  // Fullscreen covers the whole monitor: keep the last windowed position.
+  if (win.isFullScreen()) return;
   writeState({
     ...current,
     // Normal (non-maximized) bounds, so un-maximizing later restores properly.
     bounds: win.getNormalBounds(),
     maximized: win.isMaximized(),
-    fullscreen: win.isFullScreen(),
+    fullscreen: false,
   });
 }
 

@@ -1,5 +1,6 @@
 // @ts-check
-// Remembers the window's size, position, maximized and fullscreen state.
+// Remembers the window's size, position and maximized state (not fullscreen:
+// a window restored into fullscreen could not be moved or left).
 
 /**
  * @typedef {{ x: number; y: number; width: number; height: number }} Bounds

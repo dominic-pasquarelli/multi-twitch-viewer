@@ -1,5 +1,5 @@
 import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -121,8 +121,13 @@ test("desktop app: hides Twitch's stream info and content notice in the players 
   await win.evaluate(() => (location.hash = '#/pixelpaladin/tpain'));
   await expect(win.locator('[data-testid=player-tile][data-channel=tpain]')).toHaveCount(1);
   const frameBox = (await win.locator('iframe[src*="player.twitch.tv"]').boundingBox())!;
-  await win.mouse.click(frameBox.x + 200, frameBox.y + 250, { button: 'right' });
-  await expect(win.locator('[data-testid=player-tile][data-channel=tpain]')).toHaveCount(0);
+  // Retried: a click that lands before the frame takes input is ignored.
+  await expect(async () => {
+    await win.mouse.click(frameBox.x + 200, frameBox.y + 250, { button: 'right' });
+    await expect(win.locator('[data-testid=player-tile][data-channel=tpain]')).toHaveCount(0, {
+      timeout: 1000,
+    });
+  }).toPass({ timeout: 10_000 });
 
   // Turning the setting off shows it again.
   await win.evaluate(() =>
@@ -132,4 +137,42 @@ test("desktop app: hides Twitch's stream info and content notice in the players 
   );
   await expect.poll(hiddenIds).toEqual([]);
   await app.close();
+});
+
+test('desktop app: fullscreen never gets stuck', async () => {
+  const userData = mkdtempSync(join(tmpdir(), 'mtv-desktop-'));
+  // An old saved state from a session that ended in fullscreen.
+  writeFileSync(
+    join(userData, 'window-state.json'),
+    JSON.stringify({ bounds: { x: 40, y: 50, width: 1100, height: 700 }, fullscreen: true }),
+  );
+  const app = await launch(userData);
+  const win = await app.firstWindow();
+  await win.waitForLoadState('domcontentloaded');
+  const isFullScreen = () =>
+    app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isFullScreen());
+  expect(await isFullScreen()).toBe(false); // not restored
+
+  // F (the app's fullscreen) and back out with F again.
+  await win.locator('body').click({ position: { x: 5, y: 300 } });
+  await win.keyboard.press('f');
+  await expect.poll(isFullScreen).toBe(true);
+  await expect.poll(() => win.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  await win.keyboard.press('f');
+  await expect.poll(isFullScreen).toBe(false);
+
+  // F11 toggles the window's own fullscreen; Esc leaves it.
+  // Real key presses (Playwright's synthetic keys skip the app's key handler).
+  const press = (keyCode: string) =>
+    app.evaluate(({ BrowserWindow }, k) => {
+      const wc = BrowserWindow.getAllWindows()[0]!.webContents;
+      wc.sendInputEvent({ type: 'keyDown', keyCode: k });
+      wc.sendInputEvent({ type: 'keyUp', keyCode: k });
+    }, keyCode);
+  await press('F11');
+  await expect.poll(isFullScreen).toBe(true);
+  await press('Escape');
+  await expect.poll(isFullScreen).toBe(false);
+  await app.evaluate(({ app: a }) => a.quit());
+  await app.close().catch(() => {});
 });
