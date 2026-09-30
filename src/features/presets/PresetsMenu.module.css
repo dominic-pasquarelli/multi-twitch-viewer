@@ -76,3 +76,9 @@
   border-radius: 4px;
   background: var(--bg);
 }
+/* Narrow window: icon only (the tooltip still says "Saved presets"). */
+@media (max-width: 1950px) {
+  .label {
+    display: none;
+  }
+}

@@ -33,7 +33,15 @@ export function StreamControls() {
   const live = useLiveStatus(view.channels).live;
   const flashN = useUi((s) => (s.volumeFlash?.login === selected ? s.volumeFlash.n : 0));
 
-  if (!selected || !view.channels.includes(selected)) return null;
+  if (!selected || !view.channels.includes(selected)) {
+    // Narrow windows give these controls their own row: keep it there (with a
+    // hint) so the streams don't jump when you first hover one.
+    return view.channels.length ? (
+      <div className={`${styles.controls} ${styles.placeholder}`}>
+        Hover a stream to see its controls here
+      </div>
+    ) : null;
+  }
   const login = selected;
   const store = useViewStore.getState();
   const stream = live.get(login);
@@ -101,18 +109,21 @@ export function StreamControls() {
       <IconButton
         size="sm"
         label="Show chat"
+        className={styles.extra}
         icon={<MessageSquare size={15} />}
         onClick={() => store.setChat({ open: true, channel: login })}
       />
       <IconButton
         size="sm"
         label="Reload player"
+        className={styles.extra}
         icon={<RotateCw size={15} />}
         onClick={() => useUi.getState().reloadPlayer(login)}
       />
       <IconButton
         size="sm"
         label="Open on Twitch"
+        className={styles.extra}
         icon={<ExternalLink size={15} />}
         onClick={() => window.open(`https://www.twitch.tv/${login}`, '_blank', 'noopener')}
       />

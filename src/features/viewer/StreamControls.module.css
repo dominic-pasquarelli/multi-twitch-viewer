@@ -1,5 +1,7 @@
 .controls {
   display: flex;
+  flex: 0 1 auto;
+  overflow: hidden; /* shrink rather than overlap its neighbours */
   align-items: center;
   gap: 2px;
   padding: 2px 4px 2px 2px;
@@ -54,5 +56,37 @@
   from {
     color: var(--text);
     font-weight: 700;
+  }
+}
+/* Between full width and half a monitor: a compact version in the one row. */
+@media (min-width: 1601px) and (max-width: 1800px) {
+  .extra {
+    display: none;
+  }
+  .volume {
+    width: 60px;
+  }
+}
+/* Half a monitor or less: the hovered stream's controls get their own row
+   (the top bar wraps) instead of squeezing over the other buttons. */
+@media (max-width: 1600px) {
+  .controls {
+    order: 99;
+    flex-basis: 100%;
+    background: none;
+    padding-left: 0;
+  }
+}
+/* Only shown when the controls have their own row (narrow windows). */
+.placeholder {
+  display: none;
+  height: 32px;
+  padding-left: 8px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+@media (max-width: 1600px) {
+  .placeholder {
+    display: flex;
   }
 }
