@@ -1,7 +1,7 @@
 .app {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr); /* the top bar can wrap onto 2 rows */
   grid-template-areas:
     'top top top'
     'side main chat';
@@ -43,7 +43,7 @@
   left: 0;
   right: 0;
   z-index: 30;
-  height: var(--topbar-h);
+  min-height: var(--topbar-h);
   visibility: hidden;
 }
 .fullscreen .top:hover,

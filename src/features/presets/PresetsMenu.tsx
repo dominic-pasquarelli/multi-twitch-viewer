@@ -50,7 +50,7 @@ export function PresetsMenu() {
         data-testid="presets-button"
         title="Saved presets (P)"
       >
-        <Bookmark size={16} /> Presets
+        <Bookmark size={16} /> <span className={styles.label}>Presets</span>
       </Button>
       <Popover
         open={open}

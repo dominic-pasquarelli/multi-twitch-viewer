@@ -122,29 +122,31 @@ export function TopBar() {
         <Mixer />
       </div>
 
-      <IconButton
-        size="sm"
-        label={stopped ? `Play all (${stopped} paused)` : 'Play all'}
-        icon={<Play size={16} />}
-        active={stopped > 0}
-        onClick={playAll}
-        disabled={!view.channels.length}
-        data-testid="play-all"
-      />
-      <IconButton
-        size="sm"
-        label="Clear all streams"
-        icon={<Trash2 size={16} />}
-        onClick={() => {
-          const n = view.channels.length;
-          store.clear();
-          toast(`Cleared ${n} stream${n === 1 ? '' : 's'}`, {
-            action: { label: 'Undo', run: () => useViewStore.getState().undo() },
-          });
-        }}
-        disabled={!view.channels.length}
-        data-testid="clear-all"
-      />
+      <div className={styles.actions}>
+        <IconButton
+          size="sm"
+          label={stopped ? `Play all (${stopped} paused)` : 'Play all'}
+          icon={<Play size={16} />}
+          active={stopped > 0}
+          onClick={playAll}
+          disabled={!view.channels.length}
+          data-testid="play-all"
+        />
+        <IconButton
+          size="sm"
+          label="Clear all streams"
+          icon={<Trash2 size={16} />}
+          onClick={() => {
+            const n = view.channels.length;
+            store.clear();
+            toast(`Cleared ${n} stream${n === 1 ? '' : 's'}`, {
+              action: { label: 'Undo', run: () => useViewStore.getState().undo() },
+            });
+          }}
+          disabled={!view.channels.length}
+          data-testid="clear-all"
+        />
+      </div>
 
       <StreamControls />
 
@@ -179,10 +181,10 @@ export function TopBar() {
         <button
           className={styles.seg}
           onClick={() => openDialog('settings')}
-          title="Account settings"
+          title={`Account: ${user.displayName}`}
+          aria-label={`Account: ${user.displayName}`}
         >
           <Avatar src={user.profileImageUrl} name={user.displayName} size={24} />
-          <span className={styles.segLabel}>{user.displayName}</span>
         </button>
       ) : (
         <div className={styles.user}>

@@ -3,6 +3,11 @@
   flex: 0 1 340px;
   min-width: 160px;
 }
+@media (max-width: 1700px) {
+  .wrap {
+    min-width: 110px;
+  }
+}
 .input {
   width: 100%;
   height: 32px;

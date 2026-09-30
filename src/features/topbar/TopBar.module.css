@@ -2,7 +2,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: var(--topbar-h);
+  min-height: var(--topbar-h);
+  flex-wrap: wrap;
+  row-gap: 4px;
   padding: 0 8px 0 12px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -71,9 +73,19 @@
   color: var(--danger);
   font-weight: 600;
 }
-@media (max-width: 1100px) {
+/* Narrower windows (e.g. half a monitor) drop the least useful bits first. */
+@media (max-width: 1700px) {
   .brandText,
   .segLabel {
     display: none;
   }
+  .scale input {
+    width: 60px;
+  }
+}
+/* Play all + Clear all stay together when the bar wraps. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
