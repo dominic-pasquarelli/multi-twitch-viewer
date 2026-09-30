@@ -141,6 +141,12 @@ function SettingsForm() {
             label="Hide offline channels"
             help="Their space goes to the live streams; they pop back in when they go live."
           />
+          <Checkbox
+            checked={s.dropOfflineStreams}
+            onChange={(v) => s.update({ dropOfflineStreams: v })}
+            label="Remove streams that go offline (temporary views)"
+            help="A view you put together is temporary: a stream that goes offline for about 1½ minutes is removed (with Undo). Views loaded or saved as a preset keep their streams. Switch per view in Presets."
+          />
         </TabPanel>
       )}
       {tab === 'players' && (

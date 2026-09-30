@@ -34,6 +34,12 @@ channels are live, and watch several streams at once with layouts that actually 
     one master volume. Mixer sliders then just even out a loud or quiet streamer.
   - `↑`/`↓` changes the volume of the stream you're hearing, or scroll over the stream controls
     in the top bar. Volume is remembered **per channel**, so loud streamers stay tamed. `M` mutes all and restores.
+- **Temporary views**: a view you put together drops streams once they go offline (after about
+  1½ minutes, with Undo). A view loaded from or saved as a preset keeps them (hidden until they're
+  live again). Switch it per view at the top of **Presets**, or turn it off in Settings → Layout.
+- **History and following**: channels you watch without following them are kept under
+  **History** in the sidebar, to bring back later. The ♡ button (top-bar controls, _Also watching_ and
+  History) opens the channel's Twitch page to follow it; Twitch doesn't let apps follow for you.
 - **Presets**: save the current streams, layout, audio and chat as a named preset and load it in
   one click, with a live count for each. Export and import them as a JSON file for backup.
 - **Bookmarkable links**: the address bar always matches what you're watching

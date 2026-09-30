@@ -1,6 +1,7 @@
 import {
   ExternalLink,
   GripVertical,
+  Heart,
   Maximize2,
   MessageSquare,
   RotateCw,
@@ -16,6 +17,7 @@ import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
 import { IconButton } from '@/ui/Button';
 import { useLiveStatus } from '../follows/queries';
+import { useFollowChannel } from '../follows/useFollowChannel';
 import { CHANNEL_MIME, setDragging } from './dnd';
 import { currentVolume, nudgeVolume, setStreamVolume, useVolumeModel, VOLUME_STEP } from './volume';
 import styles from './StreamControls.module.css';
@@ -31,6 +33,7 @@ export function StreamControls() {
   const duckLevel = useSettings((s) => s.duckLevel);
   const volumeModel = useVolumeModel();
   const live = useLiveStatus(view.channels).live;
+  const { canFollow, follow } = useFollowChannel();
   const flashN = useUi((s) => (s.volumeFlash?.login === selected ? s.volumeFlash.n : 0));
 
   if (!selected || !view.channels.includes(selected)) {
@@ -127,6 +130,15 @@ export function StreamControls() {
         icon={<ExternalLink size={15} />}
         onClick={() => window.open(`https://www.twitch.tv/${login}`, '_blank', 'noopener')}
       />
+      {canFollow(login) && (
+        <IconButton
+          size="sm"
+          label="Follow on Twitch"
+          icon={<Heart size={15} />}
+          onClick={() => void follow(login)}
+          data-testid="stream-follow"
+        />
+      )}
       <IconButton
         size="sm"
         label="Remove"

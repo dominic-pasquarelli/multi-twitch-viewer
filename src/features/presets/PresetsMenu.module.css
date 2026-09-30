@@ -82,3 +82,20 @@
     display: none;
   }
 }
+.keep {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.keep b {
+  color: var(--text);
+  font-weight: 600;
+}
+.keep input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}

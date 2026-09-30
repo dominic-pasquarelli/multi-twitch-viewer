@@ -3,6 +3,7 @@ import { Bookmark, Check, Download, Pencil, Save, Trash2, Upload } from 'lucide-
 import { exportPresets, parsePresetsFile, type Preset } from '@/lib/presets/presets';
 import { usePresets } from '@/state/presetsStore';
 import { useUi } from '@/state/uiStore';
+import { useSettings } from '@/state/settingsStore';
 import { useViewStore } from '@/state/viewStore';
 import { toast } from '@/state/toastStore';
 import { Button, IconButton } from '@/ui/Button';
@@ -58,6 +59,8 @@ export function PresetsMenu() {
         className={styles.panel}
         ignoreRefs={[buttonRef]}
       >
+        <KeepToggle />
+        <div className={styles.divider} />
         {presets.length === 0 && (
           <div className={styles.empty}>
             No saved presets yet. Set up some streams and a layout, then save them here to pull them
@@ -181,5 +184,29 @@ function PresetRow({
         />
       </div>
     </div>
+  );
+}
+
+/** Whether the current view drops streams that go offline (temporary) or keeps them. */
+function KeepToggle() {
+  const pinned = useViewStore((s) => s.pinned);
+  const hasChannels = useViewStore((s) => s.view.channels.length > 0);
+  const dropOffline = useSettings((s) => s.dropOfflineStreams);
+  if (!dropOffline || !hasChannels) return null;
+  return (
+    <label className={styles.keep} data-testid="keep-view">
+      <input
+        type="checkbox"
+        checked={pinned}
+        onChange={(e) => useViewStore.getState().setPinned(e.target.checked)}
+      />
+      <span>
+        <b>Keep offline streams in this view</b>
+        <br />
+        {pinned
+          ? 'They stay (hidden until live), like a saved preset.'
+          : 'Off: this is a temporary view, streams that go offline are removed.'}
+      </span>
+    </label>
   );
 }

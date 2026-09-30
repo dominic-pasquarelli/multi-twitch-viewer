@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('mtvDesktop', {
   version: process.argv.find((a) => a.startsWith('--mtv-version='))?.split('=')[1] ?? '',
   showWindow: () => ipcRenderer.send('mtv:show-window'),
   openTwitchSignIn: () => ipcRenderer.invoke('mtv:twitch-sign-in'),
+  /** @param {string} login */
+  openTwitchChannel: (login) => ipcRenderer.invoke('mtv:twitch-channel', String(login)),
   getUpdateStatus: () => ipcRenderer.invoke('mtv:update-status'),
   checkForUpdates: () => ipcRenderer.invoke('mtv:update-check'),
   installUpdate: () => ipcRenderer.send('mtv:update-install'),

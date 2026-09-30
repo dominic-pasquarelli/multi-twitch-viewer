@@ -24,6 +24,8 @@ export interface DesktopBridge {
   version: string;
   /** Brings the app window back from the tray. */
   showWindow(): void;
+  /** Opens a channel's twitch.tv page (to follow it); resolves when it's closed. */
+  openTwitchChannel?(login: string): Promise<void>;
   /** Opens a twitch.tv sign-in window so the players get Turbo/sub benefits. */
   openTwitchSignIn(): Promise<void>;
   getUpdateStatus(): Promise<UpdateStatus>;

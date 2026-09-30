@@ -238,3 +238,44 @@
 .sectionAction:hover {
   background: var(--surface-3);
 }
+/* Row buttons for channels you don't follow (Follow, Forget), on hover. */
+.withActions .row {
+  padding-right: 60px;
+}
+.actions {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  gap: 2px;
+}
+.rowWrap:hover .actions,
+.actions:focus-within {
+  display: flex;
+}
+.rowAction {
+  display: inline-flex;
+  padding: 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-faint);
+}
+.rowAction:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+.sectionToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}

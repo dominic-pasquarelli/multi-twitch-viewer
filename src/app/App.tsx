@@ -19,6 +19,8 @@ import { TopBar } from '@/features/topbar/TopBar';
 import { installAudioUnlock } from '@/features/viewer/playerRegistry';
 import { UpdateBanner } from '@/features/updates/UpdateBanner';
 import { useHashSync } from '@/features/viewer/useHashSync';
+import { useDropOfflineStreams } from '@/features/viewer/useDropOfflineStreams';
+import { useRecordWatchHistory } from '@/features/history/useRecordWatchHistory';
 import { Viewer } from '@/features/viewer/Viewer';
 import styles from './App.module.css';
 
@@ -28,6 +30,8 @@ export function App() {
   useHotkeys();
   useHashSync();
   useFullscreenSync();
+  useDropOfflineStreams();
+  useRecordWatchHistory();
   useGoLiveAlerts();
   useEffect(() => installAudioUnlock(), []);
   useEffect(

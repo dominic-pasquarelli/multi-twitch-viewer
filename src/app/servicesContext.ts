@@ -10,6 +10,11 @@ export interface Services {
   playerFactory: PlayerFactory;
   clientId: string;
   mock: boolean;
+  /**
+   * Opens a channel's Twitch page so you can follow it there; resolves when
+   * you're back (Twitch's API doesn't let apps follow channels).
+   */
+  openFollowPage(login: string): Promise<void>;
 }
 
 export const ServicesContext = createContext<Services | null>(null);

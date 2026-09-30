@@ -15,9 +15,16 @@ interface ViewStore {
   history: ViewState[];
   /** What was audible before "mute all", so M can bring it back. */
   mutedFrom: string[] | null;
+  /**
+   * Kept view (loaded from a preset): offline streams stay. Otherwise the view
+   * is temporary and streams that go offline are removed.
+   */
+  pinned: boolean;
 
   addChannels(logins: string[]): void;
   removeChannel(login: string): void;
+  removeChannels(logins: string[]): void;
+  setPinned(pinned: boolean): void;
   toggleChannel(login: string): void;
   watchOnly(logins: string[]): void;
   replaceChannel(target: string, replacement: string): void;
@@ -57,6 +64,8 @@ export const useViewStore = create<ViewStore>()(
           view: after,
           history: undoable ? [...get().history, before].slice(-HISTORY_LIMIT) : get().history,
           mutedFrom: after.audio.active.length ? null : get().mutedFrom,
+          // An empty view starts over as a temporary one.
+          pinned: after.channels.length ? get().pinned : false,
         });
       };
 
@@ -64,15 +73,22 @@ export const useViewStore = create<ViewStore>()(
         view: ops.emptyView(),
         history: [],
         mutedFrom: null,
+        pinned: false,
 
         addChannels: (logins) => apply((v) => ops.addChannels(v, logins), true),
         removeChannel: (login) => apply((v) => ops.removeChannel(v, login), true),
+        removeChannels: (logins) =>
+          apply((v) => logins.reduce((acc, l) => ops.removeChannel(acc, l), v), true),
+        setPinned: (pinned) => set({ pinned }),
         toggleChannel: (login) => apply((v) => ops.toggleChannel(v, login), true),
         watchOnly: (logins) => apply((v) => ops.watchOnly(v, logins), true),
         replaceChannel: (t, r) => apply((v) => ops.replaceChannel(v, t, r), true),
         swapChannels: (a, b) => apply((v) => ops.swapChannels(v, a, b), true),
         clear: () => apply((v) => ops.watchOnly(v, []), true),
-        loadView: (view) => apply(() => ops.normalize(structuredClone(view)), true),
+        loadView: (view) => {
+          apply(() => ops.normalize(structuredClone(view)), true);
+          set({ pinned: get().view.channels.length > 0 }); // a preset keeps its streams
+        },
         undo: () => {
           const history = get().history;
           const previous = history[history.length - 1];
@@ -122,10 +138,11 @@ export const useViewStore = create<ViewStore>()(
       name: 'session',
       version: 1,
       storage: zustandStorage(),
-      partialize: (s) => ({ view: s.view }),
+      partialize: (s) => ({ view: s.view, pinned: s.pinned }),
       merge: (persisted, current) => {
-        const view = sanitizeView((persisted as { view?: unknown } | undefined)?.view);
-        return view ? { ...current, view } : current;
+        const p = persisted as { view?: unknown; pinned?: unknown } | undefined;
+        const view = sanitizeView(p?.view);
+        return view ? { ...current, view, pinned: p?.pinned === true } : current;
       },
     },
   ),
