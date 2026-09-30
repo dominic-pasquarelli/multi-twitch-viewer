@@ -139,13 +139,35 @@ describe('computeFocusLayout', () => {
 
   it('auto puts the strip below the main stream in a tall area, as wide as the main stream', () => {
     const area = { width: 1000, height: 1100 };
-    const rects = computeFocusLayout(4, area, opts); // main + 3 in one row
-    const [main, ...row] = rects as [Rect, ...Rect[]];
-    for (const r of row) expect(r.y).toBeGreaterThan(main.y + main.height);
-    expect(row[0]!.x).toBeCloseTo(main.x, 3);
-    expect(row.at(-1)!.x + row.at(-1)!.width).toBeCloseTo(main.x + main.width, 3);
+    const rects = computeFocusLayout(4, area, opts);
+    const [main, ...small] = rects as [Rect, ...Rect[]];
+    for (const r of small) expect(r.y).toBeGreaterThan(main.y + main.height);
+    // The first (full) row spans exactly the main stream's width.
+    const firstRow = small.filter((r) => Math.abs(r.y - small[0]!.y) < 1);
+    expect(firstRow[0]!.x).toBeCloseTo(main.x, 3);
+    expect(firstRow.at(-1)!.x + firstRow.at(-1)!.width).toBeCloseTo(main.x + main.width, 3);
     expectInside(rects, area);
     expectNoOverlap(rects);
+  });
+
+  it('auto uses a tall window (half a monitor) instead of leaving it empty', () => {
+    const area = { width: 1010, height: 1290 };
+    // Two streams: the main one full width, the other clearly smaller below it.
+    const [main, other] = computeFocusLayout(2, area, opts) as [Rect, Rect];
+    expect(main.width).toBeCloseTo(1010, 0);
+    expect(other.y).toBeGreaterThan(main.y + main.height);
+    expect(other.width).toBeGreaterThan(main.width / 1.6);
+    expect(other.width).toBeLessThan(main.width);
+    // Centred under it.
+    expect(other.x + other.width / 2).toBeCloseTo(main.x + main.width / 2, 0);
+    // Five streams: two rows of small ones rather than one thin row.
+    const five = computeFocusLayout(5, area, opts);
+    expect(new Set(five.slice(1).map((r) => Math.round(r.y))).size).toBe(2);
+    for (const rects of [computeFocusLayout(2, area, opts), five]) {
+      expectInside(rects, area);
+      expectNoOverlap(rects);
+      expectAspect(rects);
+    }
   });
 
   it('auto wraps many streams down the right side, then along the bottom', () => {
