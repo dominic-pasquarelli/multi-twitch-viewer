@@ -55,8 +55,8 @@ export function computeFocusLayout(
         ? (wrappedL(others, container, opts) ?? alignedStrip(others, container, opts))
         : alignedStrip(others, container, opts);
     if (aligned) return aligned;
-    return arrange(autoMainWidth(others, container, opts, maxMainWidth), others, container, opts)
-      .rects;
+    const { mainWidth, maxTile } = autoMainWidth(others, container, opts, maxMainWidth);
+    return arrange(mainWidth, others, container, opts, maxTile).rects;
   }
   return arrange(
     manualMainWidth(others, container, opts, maxMainWidth, scale),
@@ -68,6 +68,8 @@ export function computeFocusLayout(
 
 /** The main stream stays at least this many times wider than the strip's tiles. */
 const ALIGNED_MIN_RATIO = 1.5;
+/** An extra strip line (or the other side) must give this much more video area. */
+const MORE_LINES_GAIN = 1.1;
 /** Streams per line along the main stream's edge before a second line is added. */
 const MAX_PER_LINE = 4;
 
@@ -110,16 +112,19 @@ export function alignedStrip(others: number, c: Size, opts: LayoutOptions): Rect
       for (let i = 0; i < others; i++) {
         const along = i % per; // position along the main stream's edge
         const line = Math.floor(i / per);
+        // A last, part-filled line is centred along the main stream's edge.
+        const inLine = Math.min(per, others - line * per);
+        const shift = ((per - inLine) * ((side === 'right' ? tileH : tileW) + g)) / 2;
         rects.push(
           side === 'right'
             ? {
                 x: mw + g + line * (tileW + g),
-                y: along * (tileH + g),
+                y: shift + along * (tileH + g),
                 width: tileW,
                 height: tileH,
               }
             : {
-                x: along * (tileW + g),
+                x: shift + along * (tileW + g),
                 y: mh + g + line * (tileH + g),
                 width: tileW,
                 height: tileH,
@@ -127,11 +132,12 @@ export function alignedStrip(others: number, c: Size, opts: LayoutOptions): Rect
         );
       }
       const area = rects.reduce((sum, r) => sum + r.width * r.height, 0);
-      if (area > bestArea) {
+      // Fewer lines look tidier: an extra line has to buy clearly bigger
+      // video (e.g. a tall, narrow window).
+      if (area > bestArea * MORE_LINES_GAIN || (best === null && area > 0)) {
         bestArea = area;
         best = rects;
       }
-      break; // the fewest lines that fit wins for this side
     }
   }
   return best && centerRects(best, c);
@@ -192,29 +198,35 @@ export function wrappedL(others: number, c: Size, opts: LayoutOptions): Rect[] |
   return centerRects(rects, c);
 }
 
-function autoMainWidth(others: number, c: Size, opts: LayoutOptions, maxMain: number): number {
+/**
+ * Auto main size when no aligned strip fits (e.g. one other stream in a tall
+ * window): the biggest main stream whose others still meet the autoplay
+ * minimum. The others are capped at 1/1.5 of the main width, so the main
+ * stream stays clearly the largest without everything shrinking.
+ */
+function autoMainWidth(
+  others: number,
+  c: Size,
+  opts: LayoutOptions,
+  maxMain: number,
+): { mainWidth: number; maxTile: number } {
   const minTile = minTileForAspect(opts.minTile, opts.aspect).width;
   const steps = 100;
-  // Largest main whose side tiles still meet the autoplay minimum.
   for (let i = steps; i >= 1; i--) {
     const mw = (maxMain * i) / steps;
-    const { tileWidth } = arrange(mw, others, c, opts);
-    if (tileWidth >= minTile - 0.5 && mw >= AUTO_MIN_RATIO * tileWidth) return mw;
+    const maxTile = mw / AUTO_MIN_RATIO;
+    const { tileWidth } = arrange(mw, others, c, opts, maxTile);
+    if (tileWidth >= minTile - 0.5) return { mainWidth: mw, maxTile };
   }
   // The area is too small for that: take the biggest main stream that stays
   // clearly the largest without shrinking the others to thumbnails.
   for (let i = steps; i >= 1; i--) {
     const mw = (maxMain * i) / steps;
-    const { tileWidth } = arrange(mw, others, c, opts);
-    if (
-      tileWidth > 0 &&
-      mw >= FALLBACK_MIN_RATIO * tileWidth &&
-      mw <= FALLBACK_MAX_RATIO * tileWidth
-    ) {
-      return mw;
-    }
+    const maxTile = mw / FALLBACK_MIN_RATIO;
+    const { tileWidth } = arrange(mw, others, c, opts, maxTile);
+    if (tileWidth > 0 && mw <= FALLBACK_MAX_RATIO * tileWidth) return { mainWidth: mw, maxTile };
   }
-  return maxMain * 0.6;
+  return { mainWidth: maxMain * 0.6, maxTile: (maxMain * 0.6) / FALLBACK_MIN_RATIO };
 }
 
 function manualMainWidth(
@@ -246,6 +258,7 @@ function arrange(
   others: number,
   c: Size,
   opts: LayoutOptions,
+  maxTileWidth = Infinity,
 ): { rects: Rect[]; tileWidth: number } {
   const { gap, aspect } = opts;
   const mainHeight = mainWidth / aspect;
@@ -264,10 +277,13 @@ function arrange(
 
   // Largest tile width that fits all the other streams (binary search).
   let lo = 0;
-  let hi = Math.max(
-    Math.min(right.width, right.height * aspect),
-    Math.min(below.width, below.height * aspect),
-    0,
+  let hi = Math.min(
+    maxTileWidth,
+    Math.max(
+      Math.min(right.width, right.height * aspect),
+      Math.min(below.width, below.height * aspect),
+      0,
+    ),
   );
   const fits = (w: number) => capacity(right, w, opts) + capacity(below, w, opts) >= others;
   if (hi <= 0 || !fits(Math.min(hi, 1))) {
@@ -290,8 +306,12 @@ function arrange(
     for (let i = 0; i < n; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
+      // Rows under the main stream are centred beneath it.
+      const inRow = Math.min(cols, n - row * cols);
+      const rowWidth = inRow * tileW + (inRow - 1) * gap;
+      const offset = region === below ? (region.width - rowWidth) / 2 : 0;
       rects.push({
-        x: region.x + col * (tileW + gap),
+        x: region.x + offset + col * (tileW + gap),
         y: region.y + row * (tileH + gap),
         width: tileW,
         height: tileH,
