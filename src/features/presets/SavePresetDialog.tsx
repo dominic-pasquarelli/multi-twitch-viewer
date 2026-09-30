@@ -26,6 +26,7 @@ function SaveForm({ onDone }: { onDone(): void }) {
   const save = () => {
     if (!name.trim()) return;
     usePresets.getState().save(name, view);
+    useViewStore.getState().setPinned(true); // a saved collection keeps its streams
     toast(`${exists ? 'Updated' : 'Saved'} “${name.trim()}”`);
     onDone();
   };

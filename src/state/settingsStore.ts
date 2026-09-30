@@ -12,6 +12,10 @@ export interface Settings {
   tileGap: number;
   /** Collapse tiles of channels that are offline; they come back when live. */
   hideOffline: boolean;
+  /** Temporary views (not loaded from a preset) drop streams that go offline. */
+  dropOfflineStreams: boolean;
+  /** Sidebar: show the history of channels watched without following them. */
+  showHistory: boolean;
   /** In focus mode, the main stream is the one you hear. */
   audioFollowsMain: boolean;
   /** The chat panel switches to whichever stream you are listening to. */
@@ -44,6 +48,8 @@ export const DEFAULT_SETTINGS: Settings = {
   clientId: '',
   tileGap: 4,
   hideOffline: true,
+  dropOfflineStreams: true,
+  showHistory: true,
   audioFollowsMain: true,
   chatFollowsAudio: true,
   mainQuality: 'source',

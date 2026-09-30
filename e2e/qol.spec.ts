@@ -186,7 +186,9 @@ test('streams you do not follow are listed in the sidebar so you can remove them
   await expect(page.getByText(/Also watching · 1/)).toBeVisible();
   await row.click();
   await expect(tile(page, 'somestranger')).toHaveCount(0);
-  await expect(row).toHaveCount(0);
+  // It moves from "Also watching" to History (to bring back later).
+  await expect(page.getByText(/Also watching/)).toHaveCount(0);
+  await expect(page.locator('[data-testid=history-row][data-channel=somestranger]')).toBeVisible();
 });
 
 test('Watch all adds every live follow; Clear all empties the view (with Undo)', async ({

@@ -70,6 +70,11 @@ export function setMockLive(login: string, live: boolean): void {
   if (channel) channel.live = live;
 }
 
+/** Simulates following a channel on Twitch (mock mode only). */
+export function mockFollow(login: string): void {
+  if (!MOCK_CHANNELS.some((c) => c.login === login)) MOCK_CHANNELS.push(lookup(login));
+}
+
 export const MOCK_ME: TwitchUser = {
   id: '42',
   login: 'you',

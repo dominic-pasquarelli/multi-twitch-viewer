@@ -1,11 +1,14 @@
-import { useMemo, useState, type DragEvent, type MouseEvent } from 'react';
+import { useMemo, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import {
   ChevronDown,
   ChevronRight,
+  Heart,
+  History,
   PanelLeftClose,
   PanelLeftOpen,
   RefreshCw,
   Star,
+  X,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useServices } from '@/app/servicesContext';
@@ -14,6 +17,7 @@ import type { LiveStream } from '@/lib/twitch/types';
 import { formatCount, formatUptime, sizedThumbnail } from '@/lib/utils/format';
 import { useAuth } from '@/state/authStore';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
+import { useWatchHistory } from '@/state/historyStore';
 import { useSettings, type SidebarSort } from '@/state/settingsStore';
 import { toast } from '@/state/toastStore';
 import { useViewStore } from '@/state/viewStore';
@@ -28,6 +32,7 @@ import {
   type FollowedChannelInfo,
 } from './queries';
 import styles from './Sidebar.module.css';
+import { useFollowChannel } from './useFollowChannel';
 
 interface Row {
   login: string;
@@ -209,7 +214,12 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
                   <span>Also watching · {others.length}</span>
                 </div>
                 {others.map((row) => (
-                  <ChannelRow key={row.login} row={row} inView />
+                  <ChannelRow
+                    key={row.login}
+                    row={row}
+                    inView
+                    actions={<FollowButton login={row.login} name={row.displayName} />}
+                  />
                 ))}
               </>
             )}
@@ -255,6 +265,8 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
               />
             ))}
 
+            <HistorySection inView={inView} filter={match} />
+
             <button
               className={styles.section}
               onClick={() => update({ showOfflineFollows: !showOfflineFollows })}
@@ -291,17 +303,22 @@ function ChannelRow({
   row,
   inView,
   onHover,
+  actions,
 }: {
   row: Row;
   inView: boolean;
   onHover?(el: HTMLElement | null): void;
+  /** Buttons shown on hover instead of the favorite star (e.g. Follow, Forget). */
+  actions?: ReactNode;
 }) {
   const handlers = useRowHandlers(row.login);
   const favorite = useChannelPrefs((p) => p.favorites.includes(row.login));
   const toggleFavorite = useChannelPrefs((p) => p.toggleFavorite);
   const s = row.stream;
   return (
-    <div className={`${styles.rowWrap} ${favorite ? styles.favorite : ''}`}>
+    <div
+      className={`${styles.rowWrap} ${favorite ? styles.favorite : ''} ${actions ? styles.withActions : ''}`}
+    >
       <button
         className={`${styles.row} ${inView ? styles.inView : ''} ${s ? '' : styles.offline}`}
         data-testid="channel-row"
@@ -332,18 +349,22 @@ function ChannelRow({
           </span>
         )}
       </button>
-      <button
-        className={styles.star}
-        aria-pressed={favorite}
-        aria-label={favorite ? `Unfavorite ${row.displayName}` : `Favorite ${row.displayName}`}
-        title={
-          favorite ? 'Remove from favorites' : 'Favorite: keep at the top and get go-live alerts'
-        }
-        data-testid="favorite-toggle"
-        onClick={() => toggleFavorite(row.login)}
-      >
-        <Star size={14} fill={favorite ? 'currentColor' : 'none'} />
-      </button>
+      {actions ? (
+        <div className={styles.actions}>{actions}</div>
+      ) : (
+        <button
+          className={styles.star}
+          aria-pressed={favorite}
+          aria-label={favorite ? `Unfavorite ${row.displayName}` : `Favorite ${row.displayName}`}
+          title={
+            favorite ? 'Remove from favorites' : 'Favorite: keep at the top and get go-live alerts'
+          }
+          data-testid="favorite-toggle"
+          onClick={() => toggleFavorite(row.login)}
+        >
+          <Star size={14} fill={favorite ? 'currentColor' : 'none'} />
+        </button>
+      )}
     </div>
   );
 }
@@ -377,5 +398,88 @@ function RailItem({ row, inView }: { row: Row; inView: boolean }) {
     >
       <Avatar src={row.avatar} name={row.displayName} size={34} live />
     </button>
+  );
+}
+
+/** Follow on Twitch (opens the channel's page; see useFollowChannel). */
+function FollowButton({ login, name }: { login: string; name: string }) {
+  const { canFollow, follow } = useFollowChannel();
+  if (!canFollow(login)) return null;
+  return (
+    <button
+      className={styles.rowAction}
+      title={`Follow ${name} on Twitch`}
+      aria-label={`Follow ${name}`}
+      data-testid="follow-button"
+      onClick={() => void follow(login)}
+    >
+      <Heart size={14} />
+    </button>
+  );
+}
+
+/** Channels you watched without following them, newest first. */
+function HistorySection({ inView, filter }: { inView: string[]; filter: (r: Row) => boolean }) {
+  const entries = useWatchHistory((h) => h.entries);
+  const { showHistory, update } = useSettings();
+  const follows = useFollowedChannels();
+  const followed = useMemo(() => new Set(follows.data?.map((f) => f.login)), [follows.data]);
+  const shown = entries.filter((e) => !inView.includes(e.login) && !followed.has(e.login));
+  const logins = useMemo(() => shown.map((e) => e.login), [shown]);
+  const { live } = useLiveStatus(showHistory ? logins : []);
+  const rows: Row[] = shown
+    .map((e) => ({
+      login: e.login,
+      displayName: live.get(e.login)?.displayName ?? e.displayName,
+      avatar: '',
+      stream: live.get(e.login),
+    }))
+    .filter(filter);
+  if (!shown.length) return null;
+  return (
+    <>
+      <div className={styles.section}>
+        <button
+          className={styles.sectionToggle}
+          onClick={() => update({ showHistory: !showHistory })}
+          aria-expanded={showHistory}
+          title="Channels you watched without following them"
+        >
+          <History size={12} /> History · {rows.length}
+          {showHistory ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
+        {showHistory && (
+          <button
+            className={styles.sectionAction}
+            onClick={() => useWatchHistory.getState().clear()}
+            data-testid="history-clear"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {showHistory &&
+        rows.map((row) => (
+          <div key={row.login} data-testid="history-row" data-channel={row.login}>
+            <ChannelRow
+              row={row}
+              inView={false}
+              actions={
+                <>
+                  <FollowButton login={row.login} name={row.displayName} />
+                  <button
+                    className={styles.rowAction}
+                    title="Remove from history"
+                    aria-label={`Remove ${row.displayName} from history`}
+                    onClick={() => useWatchHistory.getState().forget(row.login)}
+                  >
+                    <X size={14} />
+                  </button>
+                </>
+              }
+            />
+          </div>
+        ))}
+    </>
   );
 }

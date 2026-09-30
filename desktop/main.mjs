@@ -91,6 +91,7 @@ async function start() {
 
   ipcMain.on('mtv:show-window', () => showWindow());
   ipcMain.handle('mtv:twitch-sign-in', () => openTwitchSignIn());
+  ipcMain.handle('mtv:twitch-channel', (_e, login) => openTwitchChannel(login));
   ipcMain.handle('mtv:update-status', () => updateStatus);
   ipcMain.handle('mtv:update-check', () => runUpdateCheck());
   ipcMain.on('mtv:update-install', () => installUpdate());
@@ -319,6 +320,34 @@ function openTwitchSignIn() {
       resolve(undefined);
     });
     void child.loadURL('https://www.twitch.tv/login');
+  });
+}
+
+/**
+ * A channel's twitch.tv page in a window of its own (same Twitch sign-in as
+ * the players), so you can click Follow; resolves when it's closed.
+ * @param {unknown} login
+ */
+function openTwitchChannel(login) {
+  const name = String(login).toLowerCase();
+  if (!/^[a-z0-9_]{1,25}$/.test(name)) return Promise.resolve();
+  return new Promise((resolve) => {
+    const child = new BrowserWindow({
+      parent: win ?? undefined,
+      width: 1100,
+      height: 760,
+      title: `${name} on Twitch: click Follow, then close this window`,
+      autoHideMenuBar: true,
+      webPreferences: { contextIsolation: true, sandbox: true },
+    });
+    child.setMenu(null);
+    child.webContents.setWindowOpenHandler(({ url }) => {
+      if (isExternalWebLink(url)) void shell.openExternal(url);
+      return { action: 'deny' };
+    });
+    child.on('page-title-updated', (e) => e.preventDefault()); // keep the hint
+    child.on('closed', () => resolve(undefined));
+    void child.loadURL(`https://www.twitch.tv/${name}`);
   });
 }
 
