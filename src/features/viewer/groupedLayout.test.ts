@@ -67,4 +67,22 @@ describe('grouped viewer geometry', () => {
     expect(layout.tiles.size).toBe(5);
     expect(layout.order).toHaveLength(5);
   });
+
+  it('uses native video aspect ratios without reserving per-stream controls space', () => {
+    for (const mode of ['grid', 'focus'] as const) {
+      const layoutView = { ...view, layout: { ...view.layout, mode } };
+      const layout = computeGroupedLayout(
+        layoutView,
+        streamSections(layoutView),
+        { width: 1800, height: 1000 },
+        DEFAULT_LAYOUT_OPTIONS,
+      );
+      expect(layout.tiles.size).toBe(5);
+      for (const rect of layout.tiles.values()) {
+        expect(
+          Math.abs(rect.height - rect.width / DEFAULT_LAYOUT_OPTIONS.aspect),
+        ).toBeLessThanOrEqual(1);
+      }
+    }
+  });
 });

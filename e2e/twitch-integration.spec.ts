@@ -62,7 +62,7 @@ const FAKE_PLAYER_SCRIPT = `
   window.Twitch = { Player: Player };
 })();`;
 
-async function stubTwitch(page: Page, calls: string[]) {
+async function stubTwitch(page: Page, calls: string[], crossOriginPlayers = false) {
   await page.route('https://id.twitch.tv/oauth2/authorize?**', (route: Route) => {
     const url = new URL(route.request().url());
     calls.push(
@@ -122,8 +122,23 @@ async function stubTwitch(page: Page, calls: string[]) {
     }
   });
   await page.route('https://player.twitch.tv/js/embed/v1.js', (route) =>
-    route.fulfill({ contentType: 'application/javascript', body: FAKE_PLAYER_SCRIPT }),
+    route.fulfill({
+      contentType: 'application/javascript',
+      body: crossOriginPlayers
+        ? FAKE_PLAYER_SCRIPT.replace(
+            "frame.src = 'about:blank';",
+            "frame.src = 'https://player.twitch.tv/?channel=' + encodeURIComponent(opts.channel);",
+          )
+        : FAKE_PLAYER_SCRIPT,
+    }),
   );
+  if (crossOriginPlayers)
+    await page.route('https://player.twitch.tv/?**', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<!doctype html><html><body style="margin:0;height:100vh;background:#203040;color:white">Cross-origin player<button style="position:absolute;left:50%;top:70%" onclick="document.body.dataset.clicks=String(Number(document.body.dataset.clicks||0)+1)">Native player control</button></body></html>',
+      }),
+    );
   await page.route('https://static-cdn.jtvnw.net/**', (route) => route.fulfill({ status: 404 }));
 }
 
@@ -177,6 +192,8 @@ test('logs in with Twitch, lists live follows and plays them through the embed A
   const width = async (c: string) =>
     (await page.locator(`[data-testid=player-tile][data-channel=${c}]`).boundingBox())!.width;
   await expect.poll(() => width('alpha')).toBeGreaterThan(await width('bravo'));
+  // Reveal controls before the native iframe click that promotes the stream.
+  await page.locator('[data-testid=player-tile][data-channel=bravo]').hover();
   await page.locator('iframe[data-fake-twitch=bravo]').click();
   await expect.poll(async () => (await width('bravo')) > (await width('alpha'))).toBe(true);
 });
@@ -190,4 +207,84 @@ test('ignores a login redirect whose state does not match', async ({ page }) => 
   await expect(page.getByText(/did not come from this app/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeVisible();
   expect(calls.filter((c) => c.startsWith('/helix'))).toHaveLength(0);
+});
+
+test('controls follow the pointer into and out of cross-origin videos without intercepting native controls', async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'mtv:settings',
+      JSON.stringify({ version: 1, state: { clickToFocus: false } }),
+    ),
+  );
+  await stubTwitch(page, [], true);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  const rows = page.getByTestId('channel-row');
+  await rows.nth(0).click();
+  await rows.nth(1).click();
+  const stream = page.locator('[data-testid=player-tile][data-channel=bravo]');
+  const controls = stream.getByTestId('stream-controls');
+  const frame = stream.locator('iframe');
+  const video = page.frameLocator('iframe[data-fake-twitch=bravo]').locator('body');
+  await expect(video).toContainText('Cross-origin player');
+  const enterVideo = async () => {
+    const rect = (await frame.boundingBox())!;
+    await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  };
+
+  await page.getByTestId('add-channel').hover();
+  await expect(controls).toBeHidden();
+  await enterVideo();
+  await expect(controls).toBeVisible();
+  await expect(stream).toHaveAttribute('data-hovered', 'true');
+  await expect(stream).not.toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await expect(frame).toHaveCSS('pointer-events', 'auto');
+  // Arrange mode's global rule still disables iframe interception during a drag.
+  await page.locator('body').evaluate((body) => body.classList.add('mtv-dragging'));
+  await expect(frame).toHaveCSS('pointer-events', 'none');
+  await page.locator('body').evaluate((body) => body.classList.remove('mtv-dragging'));
+  await expect(frame).toHaveCSS('pointer-events', 'auto');
+  // A first click arriving from outside must reach the native player immediately.
+  await page.getByTestId('add-channel').hover();
+  await expect(controls).toBeHidden();
+  const nativeControl = (await video
+    .getByRole('button', { name: 'Native player control' })
+    .boundingBox())!;
+  // mouse.click() batches move/down/up concurrently; deliver actual input in order.
+  await page.mouse.move(
+    nativeControl.x + nativeControl.width / 2,
+    nativeControl.y + nativeControl.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(video).toHaveAttribute('data-clicks', '1');
+  await expect(controls).toBeVisible();
+  await controls.getByRole('button', { name: 'Reload player' }).click();
+  await expect(video).toContainText('Cross-origin player');
+  await page.getByTestId('add-channel').hover();
+  await page.getByTestId('add-channel').focus();
+  await expect(controls).toBeHidden();
+  await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+
+  // Jump directly from one video to the other, without entering parent UI.
+  const alphaRect = (await page.locator('iframe[data-fake-twitch=alpha]').boundingBox())!;
+  await page.mouse.move(alphaRect.x + alphaRect.width / 2, alphaRect.y + alphaRect.height / 2);
+  await expect(page.locator('[data-channel=alpha][data-testid=player-tile]')).toHaveAttribute(
+    'data-hovered',
+    'true',
+  );
+  await enterVideo();
+  await expect(stream).toHaveAttribute('data-hovered', 'true');
+  await expect(controls).toBeVisible();
+  await page.getByRole('heading', { name: 'Followed', exact: true }).hover();
+  await expect(controls).toBeHidden();
+  await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await enterVideo();
+  await expect(controls).toBeVisible();
+  await page.mouse.move(-10, -10);
+  await expect(stream).toHaveAttribute('data-hovered', 'false');
+  await expect(controls).toBeHidden();
+  await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
 });

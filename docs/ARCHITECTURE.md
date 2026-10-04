@@ -97,11 +97,20 @@ Behaviour notes:
 - **Streams never reload when the layout changes.** Tiles are absolutely positioned and rendered
   in a fixed (alphabetical) DOM order. Reordering, swapping or switching layouts only changes
   their `left/top/width/height`. Moving an iframe in the DOM would restart the stream.
-- **Nothing covers a player while it starts.** Twitch refuses to autoplay embeds that are smaller
-  than 400×300, covered by other elements, or transformed. So the audible-stream highlight is
-  an `outline` drawn in the gap _outside_ the player. Each tile reserves 64px above its iframe
-  for `StreamControls` (shown on hover/focus, always in Mix), tiles are positioned without CSS transforms,
-  and the layout engine avoids tiles below 400×300 when it can.
+- **Videos fill their 16:9 tiles.** The iframe uses the full tile rectangle; reserving a control
+  strip inside that rectangle changes its aspect ratio and adds Twitch letterboxing.
+  `StreamControls` temporarily overlays the top on hover or keyboard focus, including in Mix,
+  and becomes hidden and stops intercepting input when idle. Highlights use an `outline` in
+  the gap outside the player. Tiles are positioned without CSS transforms, and the layout
+  engine avoids Twitch's 400×300 autoplay minimum when it can. Twitch may restrict obscured
+  embeds, so controls should cover as little video as possible and never persist just because
+  the stream was previously hovered.
+- **Hover crosses iframe boundaries.** A transparent entry surface receives the first pointer
+  movement, then disappears immediately. The iframe stays interactive throughout, so native
+  player clicks still work. Transient hover uses boundary events
+  and parent pointer movement rather than the remembered keyboard target; viewport exit, hidden
+  groups and window focus loss clear it. This handles cross-origin players that swallow parent
+  hover events when the pointer moves between videos.
 - **Streams keep playing unless you paused them.** When a player reports `paused`, the tile
   resumes it after a moment unless you interacted with that player just before
   (`playerInteraction.ts`: click/focus inside it). `AutoResume` caps retries so a player that

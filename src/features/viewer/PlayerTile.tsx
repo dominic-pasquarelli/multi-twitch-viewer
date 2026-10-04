@@ -1,4 +1,5 @@
-import { memo, useEffect, useLayoutEffect, useRef } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Play } from 'lucide-react';
 import { useServices } from '@/app/servicesContext';
 import type { Rect } from '@/lib/layout';
@@ -15,9 +16,6 @@ import { playbackRecovery } from './playbackRecovery';
 import { StreamControls } from './StreamControls';
 import styles from './PlayerTile.module.css';
 
-/** Space reserved above every iframe, including when hover controls are hidden. */
-export const PLAYER_CONTROLS_HEIGHT = 64;
-
 export interface PlayerTileProps {
   login: string;
   rect: Rect;
@@ -33,12 +31,10 @@ export interface PlayerTileProps {
   quality: QualityChoice;
   belowMinimum: boolean;
   status: PlayerStatus | undefined;
-  /** Its controls are shown in the top bar. */
+  /** Last targeted stream, retained for keyboard volume adjustments. */
   selected: boolean;
   /** Paused and hidden while another group tab is selected. */
   hidden: boolean;
-  /** Mixer levels stay visible on every tile. */
-  mixing: boolean;
   arranging: boolean;
   dropTarget: boolean;
   onVolume(login: string, volume: number): void;
@@ -52,8 +48,8 @@ const effectiveVolume = (volume: number | null, scale: number): number | null =>
   volume === null ? (scale === 1 ? null : 0.5 * scale) : volume * scale;
 
 /**
- * One stream with a reserved controls bar above its iframe. Controls never
- * cover video; Arrange mode explicitly enables a drag surface over the player.
+ * One full-size video with compact hover controls. The player rectangle stays
+ * at its native aspect ratio, so controls do not create letterbox padding.
  *
  * The player is created once per mount and then only steered
  * (mute/volume/quality), never re-created, so streams don't restart.
@@ -64,10 +60,84 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<PlayerController | null>(null);
   const reloadKey = useUi((s) => s.reloadRequests[login] ?? 0);
+  const [adjustingVolume, setAdjustingVolume] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  // Group tabs keep players mounted. Clear transient hover before a hidden
+  // tile can be shown again with the pointer somewhere else.
+  if (props.hidden && hovered) setHovered(false);
   const latest = useRef(props);
   useLayoutEffect(() => {
     latest.current = props;
   });
+
+  // Cross-origin players can swallow their parent's pointer boundary events.
+  // A transparent entry surface takes the first movement, then is removed so
+  // the iframe stays interactive. Parent movement and viewport exits clear
+  // hover after the pointer leaves the frame.
+  useEffect(() => {
+    let blurTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearHover = () => {
+      setHovered(false);
+      const active = document.activeElement;
+      if (active instanceof HTMLIFrameElement && hostRef.current?.contains(active)) active.blur();
+    };
+    const isInside = (event: MouseEvent) => {
+      const box = hostRef.current?.getBoundingClientRect();
+      return (
+        !!box &&
+        event.clientX >= box.left &&
+        event.clientX < box.right &&
+        event.clientY >= box.top &&
+        event.clientY < box.bottom
+      );
+    };
+    const onParentMove = (event: PointerEvent) => {
+      if (!isInside(event)) clearHover();
+    };
+    const onViewportLeave = (event: MouseEvent) => {
+      // Crossing into the child browsing context can look like leaving the
+      // parent document even though the pointer is still over this video.
+      if (!isInside(event)) clearHover();
+    };
+    const onBlur = () => {
+      clearTimeout(blurTimer);
+      // Focus moving into the child iframe also blurs this window. Clear only
+      // when the containing document actually loses focus to another window.
+      blurTimer = setTimeout(() => {
+        if (!document.hasFocus()) clearHover();
+      }, 0);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') clearHover();
+    };
+    window.addEventListener('blur', onBlur);
+    document.documentElement.addEventListener('mouseleave', onViewportLeave);
+    document.addEventListener('pointermove', onParentMove, true);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearTimeout(blurTimer);
+      window.removeEventListener('blur', onBlur);
+      document.documentElement.removeEventListener('mouseleave', onViewportLeave);
+      document.removeEventListener('pointermove', onParentMove, true);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
+  // Keyboard volume shortcuts briefly reveal only the adjusted stream's bar.
+  // Subscribe to the event instead of keeping it open for a stored selection.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = useUi.subscribe((state, previous) => {
+      if (state.volumeFlash === previous.volumeFlash || state.volumeFlash?.login !== login) return;
+      clearTimeout(timer);
+      setAdjustingVolume(true);
+      timer = setTimeout(() => setAdjustingVolume(false), 1400);
+    });
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
+  }, [login]);
 
   // Create the player (and re-create on "reload").
   useEffect(() => {
@@ -158,7 +228,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       const q = pickQuality(
         entry.adapter.getQualities(),
         quality,
-        Math.max(0, rect.height - PLAYER_CONTROLS_HEIGHT),
+        rect.height,
         window.devicePixelRatio,
       );
       entry.controller.update({ quality: q });
@@ -168,14 +238,20 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
 
   const classes = [
     styles.tile,
-    props.selected && styles.selected,
+    hovered && styles.hovered,
     audible && styles.audible,
     props.dropTarget && styles.dropTarget,
-    props.mixing && styles.mixing,
     props.hidden && styles.hidden,
   ]
     .filter(Boolean)
     .join(' ');
+
+  const enterHover = (event: { buttons: number }) => {
+    // Remove the entry surface before the next pointer down. The iframe itself
+    // stays interactive, so its native hit-test surface is already registered.
+    flushSync(() => setHovered(true));
+    if (event.buttons === 0) props.onSelect(login);
+  };
 
   return (
     <div
@@ -184,6 +260,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       data-channel={login}
       data-audible={audible}
       data-selected={props.selected}
+      data-hovered={hovered}
       data-hidden={props.hidden}
       data-arranging={props.arranging}
       aria-hidden={props.hidden || undefined}
@@ -203,18 +280,30 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       onDragEnd={() => setDragging(false)}
       data-status={status ?? 'loading'}
       style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
-      onMouseEnter={(e) => {
-        // Not while a button is held: that's a drag from the top-bar controls.
-        if (e.buttons === 0) props.onSelect(login);
-      }}
-      onMouseLeave={() => {
+      onPointerEnter={enterHover}
+      onMouseEnter={enterHover}
+      onMouseLeave={(event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        if (
+          event.clientX >= box.left &&
+          event.clientX < box.right &&
+          event.clientY >= box.top &&
+          event.clientY < box.bottom
+        )
+          return;
+        setHovered(false);
         // Clicking inside a player gives it keyboard focus; hand focus back to
         // the app when the pointer leaves so the shortcuts keep working.
         const active = document.activeElement;
         if (active instanceof HTMLIFrameElement && hostRef.current?.contains(active)) active.blur();
       }}
     >
-      <div className={styles.toolbar} data-tile-toolbar>
+      <div
+        className={`${styles.toolbar} ${adjustingVolume ? styles.adjustingVolume : ''}`}
+        data-tile-toolbar
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <StreamControls login={login} />
       </div>
       <div
@@ -226,6 +315,10 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         // real Twitch players are iframes, detected via focus in the Viewer.
         onPointerDown={() => markInteraction(login)}
       />
+
+      {!hovered && !props.hidden && !props.arranging && (
+        <div className={styles.hoverEntry} data-player-entry aria-hidden="true" />
+      )}
 
       {props.arranging && !props.hidden && (
         <div

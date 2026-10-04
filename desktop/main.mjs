@@ -30,13 +30,28 @@ import {
   scanPlayerErrors,
 } from './playerChrome.mjs';
 import { APP_URL, PORT, startServer } from './server.mjs';
+import { APP_ID, desktopIcons, setWindowBranding } from './branding.mjs';
 import { createTray } from './tray.mjs';
 import { checkForUpdate, readBuildCommit, startUpdater } from './updates.mjs';
 import { parseState, restoreBounds } from './windowState.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const APP_ID = 'com.dominicpasquarelli.multitwitchviewer';
-const ICON = join(here, 'assets', 'icon.png');
+const { trayIcon: ICON, windowIcon: WINDOW_ICON } = desktopIcons({
+  platform: process.platform,
+  isPackaged: app.isPackaged,
+  resourcesPath: process.resourcesPath,
+  desktopDir: here,
+});
+/** @param {BrowserWindow} window */
+function brandWindow(window) {
+  setWindowBranding(window, {
+    platform: process.platform,
+    iconPath: WINDOW_ICON,
+    execPath: process.execPath,
+    appPath: app.getAppPath(),
+    isPackaged: app.isPackaged,
+  });
+}
 const WEB_ROOT = process.env.MTV_WEB_ROOT ?? join(here, '..', 'dist');
 // Tests run with a throwaway profile folder.
 if (process.env.MTV_USER_DATA) app.setPath('userData', process.env.MTV_USER_DATA);
@@ -176,7 +191,7 @@ function createWindow() {
     minWidth: 640,
     minHeight: 400,
     title: 'Multi Twitch Viewer',
-    icon: ICON,
+    icon: WINDOW_ICON,
     backgroundColor: '#0e0e10',
     autoHideMenuBar: true,
     show: false,
@@ -194,6 +209,7 @@ function createWindow() {
       additionalArguments: [`--mtv-version=${app.getVersion()}`],
     },
   });
+  brandWindow(win);
   win.setMenu(null);
   // Fullscreen is never restored: a window that starts fullscreen has no
   // title bar to move it and no page fullscreen to leave.
@@ -323,10 +339,14 @@ function openTwitchSignIn() {
       width: 520,
       height: 760,
       title: 'Sign in to Twitch',
+      icon: WINDOW_ICON,
+      show: false,
       autoHideMenuBar: true,
       webPreferences: { contextIsolation: true, sandbox: true },
     });
+    brandWindow(child);
     child.setMenu(null);
+    child.show();
     child.webContents.setWindowOpenHandler(({ url }) => {
       if (isExternalWebLink(url)) void shell.openExternal(url);
       return { action: 'deny' };
@@ -358,10 +378,14 @@ function openTwitchChannel(login) {
       width: 1100,
       height: 760,
       title: `${name} on Twitch: click Follow, then close this window`,
+      icon: WINDOW_ICON,
+      show: false,
       autoHideMenuBar: true,
       webPreferences: { contextIsolation: true, sandbox: true },
     });
+    brandWindow(child);
     child.setMenu(null);
+    child.show();
     child.webContents.setWindowOpenHandler(({ url }) => {
       if (isExternalWebLink(url)) void shell.openExternal(url);
       return { action: 'deny' };
