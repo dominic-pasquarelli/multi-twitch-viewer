@@ -123,8 +123,9 @@ Behaviour notes:
   pause reason; they do not alter saved audio state. Arrange mode alone intercepts video dragging.
 - **Watched metadata survives row moves.** History and Also watching share a profile/live-status
   lookup over their combined nonfollowed logins. Cached user/search photos bridge batch changes.
-  History separates Live, Offline and unresolved Checking entries in expanded and collapsed views,
-  preserving newest-watched order within each section.
+  Expanded history separates Live, Offline and unresolved Checking entries, preserving
+  newest-watched order within each section. The collapsed rail shows live history only;
+  background polling restores icons when those channels go live.
 - **Recovery is temporary state.** `PlaybackRecovery` combines sustained low buffer/frame rate,
   repeated unrequested pauses and offline events. It caps background quality, holds muted streams,
   and resumes one every eight seconds after fifteen stable seconds. Manual, group and bandwidth

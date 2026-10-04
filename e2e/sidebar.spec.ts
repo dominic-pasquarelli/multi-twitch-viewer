@@ -63,7 +63,7 @@ test('expanded and collapsed followed channels have the same live hover preview'
   await expect(preview(page)).toHaveCount(0);
 });
 
-test('history appears in the rail with live previews and a clear offline fallback', async ({
+test('live history appears in the rail while expanded history keeps its offline fallback', async ({
   page,
 }) => {
   await page.goto('/#/pastlive/pastoffline');
@@ -92,9 +92,9 @@ test('history appears in the rail with live previews and a clear offline fallbac
   await expect(rail(page, 'pastlive')).toHaveAttribute('data-history', 'true');
   await rail(page, 'pastlive').hover();
   await expect(preview(page).getByAltText('pastlive live stream preview')).toBeVisible();
-  await rail(page, 'pastoffline').hover();
-  await expect(preview(page)).toContainText('Offline · no live preview');
-  await expect(preview(page).getByAltText('pastoffline live stream preview')).toHaveCount(0);
+  await expect(rail(page, 'pastoffline')).toHaveCount(0);
+  await expect(historySection(page, 'offline')).toHaveCount(0);
+  await expect(historySection(page, 'checking')).toHaveCount(0);
 });
 
 test('history photos survive watching and rail transitions while live and offline stay separate', async ({
@@ -144,9 +144,9 @@ test('history photos survive watching and rail transitions while live and offlin
   await expect(watching.locator('[data-channel=pastlive]')).toHaveCount(1);
   await expect(rail(page, 'pastlive').locator('img')).toHaveAttribute('src', photo!);
   await expect(rail(page, 'pastlive')).toHaveAttribute('data-history', 'false');
-  await expect(historySection(page, 'offline').locator('[data-channel=pastoffline]')).toHaveCount(
-    1,
-  );
+  await expect(rail(page, 'pastoffline')).toHaveCount(0);
+  await expect(historySection(page, 'offline')).toHaveCount(0);
+  await expect(historySection(page, 'checking')).toHaveCount(0);
   await expect(
     page
       .getByRole('group', { name: 'Live followed channels', exact: true })
@@ -173,11 +173,16 @@ test('history photos survive watching and rail transitions while live and offlin
   await expect(historySection(page, 'offline')).toHaveCount(0);
   await rail(page, 'pastoffline').hover();
   await expect(preview(page).getByAltText('pastoffline live stream preview')).toBeVisible();
-  // The rail regroups after a background refresh without expanding the sidebar.
+  // The rail hides an offline history icon after a background refresh.
   await setLive(page, 'pastnew', false, false);
-  await expect(historySection(page, 'offline').locator('[data-channel=pastnew]')).toHaveCount(1);
+  await expect(rail(page, 'pastnew')).toHaveCount(0);
+  await expect(historySection(page, 'offline')).toHaveCount(0);
   await expect(historySection(page, 'live').locator('[data-channel=pastnew]')).toHaveCount(0);
-  await rail(page, 'pastnew').hover();
+  await page.getByRole('button', { name: 'Expand sidebar (B)' }).click();
+  await expect(
+    historySection(page, 'offline').locator('[data-channel=pastnew]').first(),
+  ).toBeVisible();
+  await row(page, 'pastnew').hover();
   await expect(preview(page)).toContainText('Offline · no live preview');
 });
 
@@ -211,7 +216,7 @@ test('split history keeps its toggle, filtering, forget, follow and clear action
   await expect(page.getByRole('button', { name: /^History ·/ })).toHaveCount(0);
 });
 
-test('history regrouping dismisses a disconnected preview without another hover', async ({
+test('history status polls hide and restore live rail icons and dismiss disconnected previews', async ({
   page,
 }) => {
   await seedHistory(page);
@@ -235,15 +240,22 @@ test('history regrouping dismisses a disconnected preview without another hover'
   ).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Collapse sidebar (B)' }).click();
-  await rail(page, 'pastnew').hover();
-  await expect(preview(page)).toContainText('Offline · no live preview');
+  await expect(rail(page, 'pastnew')).toHaveCount(0);
+  await expect(historySection(page, 'offline')).toHaveCount(0);
+  await expect(historySection(page, 'checking')).toHaveCount(0);
   await setLive(page, 'pastnew', true, false);
   await expect(historySection(page, 'live').locator('[data-channel=pastnew]')).toHaveCount(1);
-  await expect(
-    page
-      .locator('[data-testid=channel-preview][data-channel=pastnew]')
-      .getByText('Offline · no live preview', { exact: true }),
-  ).toHaveCount(0);
+  await expect(rail(page, 'pastnew')).toHaveAttribute('data-history', 'true');
+  const photo = await rail(page, 'pastnew').locator('img').getAttribute('src');
+  await rail(page, 'pastnew').hover();
+  await expect(preview(page).getByAltText('pastnew live stream preview')).toBeVisible();
+  await setLive(page, 'pastnew', false, false);
+  await expect(rail(page, 'pastnew')).toHaveCount(0);
+  await expect(page.locator('[data-testid=channel-preview][data-channel=pastnew]')).toHaveCount(0);
+  // Go-live polling restores the icon and its photo without expanding the rail.
+  await setLive(page, 'pastnew', true, false);
+  await expect(rail(page, 'pastnew')).toHaveAttribute('data-live', 'true');
+  await expect(rail(page, 'pastnew').locator('img')).toHaveAttribute('src', photo!);
 });
 
 test('followed filtering matches loaded titles and tags', async ({ page }) => {
