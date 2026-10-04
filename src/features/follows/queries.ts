@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useServices } from '@/app/servicesContext';
 import type { LiveStream, TwitchUser } from '@/lib/twitch/types';
@@ -73,6 +73,42 @@ export function useChannelSearch(query: string) {
     queryFn: () => api!.searchChannels(q),
     enabled: !!api && q.length >= 2,
     staleTime: 60 * 1000,
+  });
+}
+
+export function useCategorySearch(query: string) {
+  const { api } = useServices();
+  const q = query.trim();
+  return useQuery({
+    queryKey: ['category-search', q.toLowerCase()],
+    queryFn: () => api!.searchCategories(q),
+    enabled: !!api && q.length >= 2,
+    staleTime: 60 * 1000,
+  });
+}
+
+/** Explicit category browsing, with pages kept separate from followed streams. */
+export function useCategoryStreams(categoryId: string) {
+  const { api } = useServices();
+  return useInfiniteQuery({
+    queryKey: ['category-streams', categoryId],
+    queryFn: ({ pageParam }) => api!.getStreamsByCategory(categoryId, pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.cursor || undefined,
+    enabled: !!api && !!categoryId,
+    staleTime: 60 * 1000,
+  });
+}
+
+/** Profile images for history and category results, which aren't always followed. */
+export function useUsersFor(logins: string[]) {
+  const { api } = useServices();
+  const key = [...new Set(logins)].sort();
+  return useQuery({
+    queryKey: ['channel-users', key],
+    queryFn: () => api!.getUsersByLogins(key),
+    enabled: !!api && key.length > 0,
+    staleTime: 10 * 60 * 1000,
   });
 }
 

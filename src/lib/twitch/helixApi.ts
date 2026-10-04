@@ -4,6 +4,7 @@ import type {
   FollowedChannel,
   LiveStream,
   TwitchApi,
+  TwitchCategory,
   TwitchUser,
 } from './types';
 
@@ -24,6 +25,8 @@ interface HelixStream {
   started_at: string;
   thumbnail_url: string;
   type: string;
+  tags?: string[];
+  language?: string;
 }
 
 interface HelixFollowedChannel {
@@ -41,6 +44,14 @@ interface HelixSearchChannel {
   game_name: string;
   title: string;
   thumbnail_url: string;
+  tags?: string[];
+  broadcaster_language?: string;
+}
+
+interface HelixCategory {
+  id: string;
+  name: string;
+  box_art_url: string;
 }
 
 const toUser = (u: HelixUser): TwitchUser => ({
@@ -59,6 +70,8 @@ const toStream = (s: HelixStream): LiveStream => ({
   viewerCount: s.viewer_count,
   startedAt: s.started_at,
   thumbnailUrl: s.thumbnail_url,
+  tags: s.tags ?? [],
+  language: s.language ?? '',
 });
 
 /** The real Twitch API (https://dev.twitch.tv/docs/api/reference). */
@@ -119,7 +132,33 @@ export function createHelixApi(options: HelixClientOptions): TwitchApi {
         gameName: c.game_name,
         title: c.title,
         profileImageUrl: c.thumbnail_url,
+        tags: c.tags ?? [],
+        language: c.broadcaster_language ?? '',
       }));
+    },
+    async searchCategories(query) {
+      if (!query.trim()) return [];
+      const res = await client.get<HelixCategory>('/search/categories', {
+        query: query.trim(),
+        first: 20,
+      });
+      return res.data.map((c): TwitchCategory => ({
+        id: c.id,
+        name: c.name,
+        boxArtUrl: c.box_art_url,
+      }));
+    },
+    async getStreamsByCategory(categoryId, cursor) {
+      if (!categoryId) return { streams: [] };
+      const res = await client.get<HelixStream>('/streams', {
+        game_id: categoryId,
+        first: 30,
+        after: cursor,
+      });
+      return {
+        streams: res.data.filter((s) => s.type === 'live').map(toStream),
+        cursor: res.pagination?.cursor,
+      };
     },
   };
 }

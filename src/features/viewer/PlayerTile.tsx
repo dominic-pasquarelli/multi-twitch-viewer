@@ -8,9 +8,15 @@ import type { PlayerStatus } from '@/lib/player/types';
 import { useUi } from '@/state/uiStore';
 import { IconButton } from '@/ui/Button';
 import { AutoResume } from './autoResume';
+import { CHANNEL_MIME, setDragging } from './dnd';
 import { markInteraction, pausedByUser } from './playerInteraction';
 import { playerRegistry } from './playerRegistry';
+import { playbackRecovery } from './playbackRecovery';
+import { StreamControls } from './StreamControls';
 import styles from './PlayerTile.module.css';
+
+/** Space reserved above every iframe, including when hover controls are hidden. */
+export const PLAYER_CONTROLS_HEIGHT = 64;
 
 export interface PlayerTileProps {
   login: string;
@@ -29,6 +35,11 @@ export interface PlayerTileProps {
   status: PlayerStatus | undefined;
   /** Its controls are shown in the top bar. */
   selected: boolean;
+  /** Paused and hidden while another group tab is selected. */
+  hidden: boolean;
+  /** Mixer levels stay visible on every tile. */
+  mixing: boolean;
+  arranging: boolean;
   dropTarget: boolean;
   onVolume(login: string, volume: number): void;
   onExternalMute(login: string, muted: boolean): void;
@@ -41,9 +52,8 @@ const effectiveVolume = (volume: number | null, scale: number): number | null =>
   volume === null ? (scale === 1 ? null : 0.5 * scale) : volume * scale;
 
 /**
- * One stream: only the player, nothing drawn on top of it (Twitch players can
- * pause or refuse to play when covered). Highlights sit in the gap around it;
- * the stream's controls live in the top bar (StreamControls).
+ * One stream with a reserved controls bar above its iframe. Controls never
+ * cover video; Arrange mode explicitly enables a drag surface over the player.
  *
  * The player is created once per mount and then only steered
  * (mute/volume/quality), never re-created, so streams don't restart.
@@ -74,11 +84,23 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       {
         onStatus: (s) => {
           latest.current.onStatus(login, s);
+          playbackRecovery.observeStatus(login, s, pausedByUser(login));
           // Keep streams playing unless you paused them yourself.
           clearTimeout(resumeTimer);
-          if (s === 'paused' && autoResume.shouldResume(pausedByUser(login))) {
+          if (
+            s === 'paused' &&
+            !latest.current.hidden &&
+            !playbackRecovery.isManagedPause(login) &&
+            autoResume.shouldResume(pausedByUser(login))
+          ) {
             resumeTimer = setTimeout(() => {
-              if (controller.status === 'paused' && !pausedByUser(login)) adapter.play();
+              if (
+                controller.status === 'paused' &&
+                !latest.current.hidden &&
+                !pausedByUser(login) &&
+                !playbackRecovery.isManagedPause(login)
+              )
+                adapter.play();
             }, 600);
           }
         },
@@ -125,7 +147,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
   const { quality } = props;
   useEffect(() => {
     const entry = playerRegistry.get(login);
-    if (!entry) return;
+    if (!entry || props.hidden) return;
     if (quality === 'auto') {
       entry.controller.update({ quality: null });
       return;
@@ -136,19 +158,21 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       const q = pickQuality(
         entry.adapter.getQualities(),
         quality,
-        rect.height,
+        Math.max(0, rect.height - PLAYER_CONTROLS_HEIGHT),
         window.devicePixelRatio,
       );
       entry.controller.update({ quality: q });
     }, 800);
     return () => clearTimeout(t);
-  }, [login, quality, status, rect.height]);
+  }, [login, quality, status, rect.height, props.hidden]);
 
   const classes = [
     styles.tile,
     props.selected && styles.selected,
     audible && styles.audible,
     props.dropTarget && styles.dropTarget,
+    props.mixing && styles.mixing,
+    props.hidden && styles.hidden,
   ]
     .filter(Boolean)
     .join(' ');
@@ -160,6 +184,23 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       data-channel={login}
       data-audible={audible}
       data-selected={props.selected}
+      data-hidden={props.hidden}
+      data-arranging={props.arranging}
+      aria-hidden={props.hidden || undefined}
+      tabIndex={props.hidden ? -1 : 0}
+      aria-label={`${login} stream`}
+      onFocus={() => props.onSelect(login)}
+      draggable={props.arranging && !props.hidden}
+      onDragStart={(e) => {
+        if (!props.arranging || (e.target as Element).closest('button, input, a')) {
+          e.preventDefault();
+          return;
+        }
+        e.dataTransfer.setData(CHANNEL_MIME, login);
+        e.dataTransfer.effectAllowed = 'copy';
+        setDragging(true);
+      }}
+      onDragEnd={() => setDragging(false)}
       data-status={status ?? 'loading'}
       style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
       onMouseEnter={(e) => {
@@ -173,6 +214,9 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         if (active instanceof HTMLIFrameElement && hostRef.current?.contains(active)) active.blur();
       }}
     >
+      <div className={styles.toolbar} data-tile-toolbar>
+        <StreamControls login={login} />
+      </div>
       <div
         ref={hostRef}
         key={reloadKey}
@@ -183,12 +227,25 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         onPointerDown={() => markInteraction(login)}
       />
 
-      {status === 'blocked' && (
+      {props.arranging && !props.hidden && (
+        <div
+          className={styles.arrangeSurface}
+          draggable
+          data-testid="arrange-surface"
+          aria-label={`Drag ${login} onto another stream to swap places`}
+          title={`Drag ${login} onto another stream to swap places`}
+        >
+          <span>Drag to arrange</span>
+        </div>
+      )}
+
+      {status === 'blocked' && !props.hidden && !props.arranging && (
         <div className={styles.overlay}>
           <IconButton
             label="Play"
             icon={<Play size={28} />}
             onClick={() => {
+              playbackRecovery.allowManualPlay(login);
               const entry = playerRegistry.get(login);
               entry?.adapter.play();
               entry?.controller.reapply();

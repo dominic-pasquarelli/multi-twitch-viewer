@@ -7,12 +7,15 @@ import {
   Settings,
   Keyboard,
   Play,
+  Pause,
+  Move,
   Trash2,
   VolumeX,
   Volume2,
 } from 'lucide-react';
 import { MIN_MAIN_SCALE } from '@/lib/layout';
 import type { AudioMode } from '@/lib/view/types';
+import { displayedChannels } from '@/lib/view/groups';
 import { useAuth } from '@/state/authStore';
 import { toast } from '@/state/toastStore';
 import { useUi } from '@/state/uiStore';
@@ -22,8 +25,7 @@ import { IconButton } from '@/ui/Button';
 import { LoginButton } from '../auth/LoginPrompt';
 import { Mixer } from '../mixer/Mixer';
 import { PresetsMenu } from '../presets/PresetsMenu';
-import { playAll } from '../viewer/playerRegistry';
-import { StreamControls } from '../viewer/StreamControls';
+import { pauseAll, playAll } from '../viewer/playbackActions';
 import { AddChannelBox } from './AddChannelBox';
 import { toggleFullscreen } from './fullscreen';
 import styles from './TopBar.module.css';
@@ -42,13 +44,17 @@ export function TopBar() {
   const view = useViewStore((s) => s.view);
   const store = useViewStore.getState();
   const fullscreen = useUi((s) => s.fullscreen);
+  const arranging = useUi((s) => s.arranging);
   const openDialog = useUi((s) => s.openDialog);
   const { user, status } = useAuth();
   const mode = view.layout.mode;
   const scale = view.layout.mainScale;
   const muted = view.audio.active.length === 0;
   const stopped = useUi(
-    (s) => Object.values(s.playerStatus).filter((st) => st === 'paused' || st === 'blocked').length,
+    (s) =>
+      displayedChannels(view).filter(
+        (login) => s.playerStatus[login] === 'paused' || s.playerStatus[login] === 'blocked',
+      ).length,
   );
 
   return (
@@ -125,12 +131,29 @@ export function TopBar() {
       <div className={styles.actions}>
         <IconButton
           size="sm"
+          label={arranging ? 'Finish arranging streams' : 'Arrange streams: drag tiles to swap'}
+          icon={<Move size={16} />}
+          active={arranging}
+          onClick={() => useUi.getState().setArranging(!arranging)}
+          disabled={!view.channels.length}
+          data-testid="arrange-toggle"
+        />
+        <IconButton
+          size="sm"
           label={stopped ? `Play all (${stopped} paused)` : 'Play all'}
           icon={<Play size={16} />}
           active={stopped > 0}
           onClick={playAll}
           disabled={!view.channels.length}
           data-testid="play-all"
+        />
+        <IconButton
+          size="sm"
+          label="Pause all"
+          icon={<Pause size={16} />}
+          onClick={pauseAll}
+          disabled={!view.channels.length}
+          data-testid="pause-all"
         />
         <IconButton
           size="sm"
@@ -147,8 +170,6 @@ export function TopBar() {
           data-testid="clear-all"
         />
       </div>
-
-      <StreamControls />
 
       <div className={styles.spacer} />
 

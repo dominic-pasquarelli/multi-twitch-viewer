@@ -60,13 +60,14 @@ test('focus layout makes one stream big, and dragging swaps streams', async ({ p
   const other = await box(page, 'lunarlatte');
   expect(main.width).toBeGreaterThan(other.width * 1.5);
 
-  // Nothing is drawn on top of a stream; hovering it shows its controls in
-  // the top bar, and dragging its name there onto another stream swaps them.
+  // Controls live above the iframe. Arrange explicitly enables dragging the video surface.
   await tile(page, 'lunarlatte').hover();
-  await expect(tile(page, 'lunarlatte').locator('button')).toHaveCount(0);
-  const chip = page.getByTestId('stream-chip');
+  const chip = tile(page, 'lunarlatte').getByTestId('stream-chip');
   await expect(chip).toContainText('LunarLatte');
-  await chip.dragTo(tile(page, 'pixelpaladin'));
+  await page.getByTestId('arrange-toggle').click();
+  await tile(page, 'lunarlatte')
+    .getByTestId('arrange-surface')
+    .dragTo(tile(page, 'pixelpaladin').getByTestId('arrange-surface'));
 
   await expect.poll(async () => (await box(page, 'lunarlatte')).width).toBeCloseTo(main.width, 0);
   await expect(page).toHaveURL(
@@ -121,7 +122,7 @@ test('the top bar never overlaps itself in a narrow window (half a monitor)', as
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/#/pixelpaladin/novastrike?layout=focus');
     await tile(page, 'novastrike').hover();
-    await expect(page.getByTestId('stream-controls')).toBeVisible();
+    await expect(tile(page, 'novastrike').getByTestId('stream-controls')).toBeVisible();
     const boxes = await page.locator('header').evaluate((bar) =>
       [...bar.querySelectorAll('button, input, [data-testid=stream-chip]')]
         .filter((e) => (e as HTMLElement).offsetParent !== null)

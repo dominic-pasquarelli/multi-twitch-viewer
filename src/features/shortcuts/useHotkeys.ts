@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { MIN_MAIN_SCALE } from '@/lib/layout';
 import { slotOrder } from '@/lib/view/operations';
+import { displayedChannels, streamSections } from '@/lib/view/groups';
 import { useSettings } from '@/state/settingsStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
@@ -24,12 +25,14 @@ export function useHotkeys(): void {
         return;
       }
       if (e.ctrlKey || e.metaKey) return;
-      if (ui.dialog) return; // let dialogs handle their own keys
+      if (ui.dialog || document.querySelector('dialog[open]')) return; // let dialogs handle their own keys
 
       // Digits: e.code keeps working with Shift held (Shift+1 = "!").
       const digit = /^Digit([1-9])$/.exec(e.code)?.[1];
       if (digit) {
-        const login = slotOrder(view.view)[Number(digit) - 1];
+        const login = streamSections(view.view).flatMap((section) =>
+          slotOrder(view.view, section.channels),
+        )[Number(digit) - 1];
         if (!login) return;
         if (e.shiftKey) {
           if (view.view.audio.mode !== 'mix') view.setAudioMode('mix');
@@ -49,8 +52,10 @@ export function useHotkeys(): void {
       };
 
       const actions: Record<string, () => void> = {
-        arrowup: () => nudgeHeard(view.view.audio.active, VOLUME_STEP),
-        arrowdown: () => nudgeHeard(view.view.audio.active, -VOLUME_STEP),
+        arrowup: () =>
+          nudgeHeard(displayedChannels(view.view, view.view.audio.active), VOLUME_STEP),
+        arrowdown: () =>
+          nudgeHeard(displayedChannels(view.view, view.view.audio.active), -VOLUME_STEP),
         m: () => view.toggleMuteAll(),
         l: () => view.setLayoutMode(view.view.layout.mode === 'grid' ? 'focus' : 'grid'),
         '[': () => step(-0.05),

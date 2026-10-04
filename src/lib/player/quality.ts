@@ -44,6 +44,15 @@ export const QUALITY_CHOICES: readonly QualityChoice[] = [
 export const isQualityChoice = (v: unknown): v is QualityChoice =>
   QUALITY_CHOICES.includes(v as QualityChoice);
 
+/** Best available rendition at or below a bandwidth cap, else the lowest offered. */
+export function pickQualityAtMost(qualities: PlayerQuality[], height: number): string | null {
+  const options = qualities
+    .filter((q) => q.group !== 'auto' && q.height > 0)
+    .sort((a, b) => a.height - b.height);
+  if (!options.length) return null;
+  return (options.filter((q) => q.height <= height).at(-1) ?? options[0]!).group;
+}
+
 /**
  * The quality group to request for a choice, or null to let Twitch decide
  * (also when the stream's qualities aren't known yet).
@@ -62,6 +71,5 @@ export function pickQuality(
   if (!options.length) return null;
   if (choice === 'source') return options[options.length - 1]!.group;
   const cap = Number.parseInt(choice, 10);
-  const within = options.filter((q) => q.height <= cap);
-  return (within[within.length - 1] ?? options[0]!).group;
+  return pickQualityAtMost(qualities, cap);
 }

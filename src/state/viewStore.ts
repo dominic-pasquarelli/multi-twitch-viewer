@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { zustandStorage } from '@/lib/persistence/zustandStorage';
 import * as ops from '@/lib/view/operations';
+import * as groups from '@/lib/view/groups';
 import { sanitizeView } from '@/lib/view/validate';
 import type { AudioMode, ViewState } from '@/lib/view/types';
 import type { LayoutMode, MainScale } from '@/lib/layout';
@@ -36,6 +37,11 @@ interface ViewStore {
   setLayoutMode(mode: LayoutMode): void;
   setMain(login: string): void;
   setMainScale(scale: MainScale): void;
+  createGroup(name: string): string;
+  renameGroup(id: string, name: string): void;
+  removeGroup(id: string): void;
+  assignGroup(login: string, id: string | null): void;
+  setActiveGroup(id: string | null): void;
 
   toggleAudio(login: string): void;
   focusAudio(login: string): void;
@@ -52,7 +58,7 @@ export const useViewStore = create<ViewStore>()(
       /** Applies a change; `undoable` changes are recorded for undo. */
       const apply = (fn: (v: ViewState) => ViewState, undoable = false) => {
         const before = get().view;
-        let after = fn(before);
+        let after = groups.normalizeGroups(fn(before));
         if (after === before) return;
         const settings = useSettings.getState();
         // Chat follows the stream you're listening to.
@@ -75,16 +81,39 @@ export const useViewStore = create<ViewStore>()(
         mutedFrom: null,
         pinned: false,
 
-        addChannels: (logins) => apply((v) => ops.addChannels(v, logins), true),
+        addChannels: (logins) =>
+          apply((v) => {
+            let next = ops.addChannels(v, logins);
+            if (v.activeGroup)
+              for (const login of logins) {
+                next = groups.assignGroup(next, login, v.activeGroup);
+              }
+            return next;
+          }, true),
         removeChannel: (login) => apply((v) => ops.removeChannel(v, login), true),
         removeChannels: (logins) =>
           apply((v) => logins.reduce((acc, l) => ops.removeChannel(acc, l), v), true),
         setPinned: (pinned) => set({ pinned }),
-        toggleChannel: (login) => apply((v) => ops.toggleChannel(v, login), true),
-        watchOnly: (logins) => apply((v) => ops.watchOnly(v, logins), true),
-        replaceChannel: (t, r) => apply((v) => ops.replaceChannel(v, t, r), true),
-        swapChannels: (a, b) => apply((v) => ops.swapChannels(v, a, b), true),
-        clear: () => apply((v) => ops.watchOnly(v, []), true),
+        toggleChannel: (login) =>
+          apply((v) => {
+            const next = ops.toggleChannel(v, login);
+            return !v.channels.includes(login) && v.activeGroup
+              ? groups.assignGroup(next, login, v.activeGroup)
+              : next;
+          }, true),
+        watchOnly: (logins) =>
+          apply((v) => ({ ...ops.watchOnly(v, logins), groups: [], activeGroup: null }), true),
+        replaceChannel: (t, r) =>
+          apply((v) => {
+            const next = ops.replaceChannel(v, t, r);
+            return v.channels.includes(r)
+              ? groups.swapGroupChannels(next, t, r)
+              : groups.replaceGroupChannel(next, t, r);
+          }, true),
+        swapChannels: (a, b) =>
+          apply((v) => groups.swapGroupChannels(ops.swapChannels(v, a, b), a, b), true),
+        clear: () =>
+          apply((v) => ({ ...ops.watchOnly(v, []), groups: [], activeGroup: null }), true),
         loadView: (view) => {
           apply(() => ops.normalize(structuredClone(view)), true);
           set({ pinned: get().view.channels.length > 0 }); // a preset keeps its streams
@@ -100,17 +129,31 @@ export const useViewStore = create<ViewStore>()(
         setLayoutMode: (mode) =>
           apply((v) => {
             const next = ops.setLayoutMode(v, mode);
-            const main = ops.mainChannel(next);
-            return mode === 'focus' && main && useSettings.getState().audioFollowsMain
+            const main = ops.mainChannel(next, groups.displayedChannels(next));
+            return mode === 'focus' &&
+              main &&
+              ops.hasSingleFocus(next.audio.mode) &&
+              useSettings.getState().audioFollowsMain
               ? ops.focusAudio(next, main)
               : next;
           }),
         setMain: (login) =>
           apply((v) => {
             const next = ops.setMain(v, login);
-            return useSettings.getState().audioFollowsMain ? ops.focusAudio(next, login) : next;
+            return ops.hasSingleFocus(next.audio.mode) && useSettings.getState().audioFollowsMain
+              ? ops.focusAudio(next, login)
+              : next;
           }),
         setMainScale: (scale) => apply((v) => ops.setMainScale(v, scale)),
+        createGroup: (name) => {
+          const id = crypto.randomUUID();
+          apply((v) => groups.createGroup(v, name, id), true);
+          return id;
+        },
+        renameGroup: (id, name) => apply((v) => groups.renameGroup(v, id, name), true),
+        removeGroup: (id) => apply((v) => groups.removeGroup(v, id), true),
+        assignGroup: (login, id) => apply((v) => groups.assignGroup(v, login, id), true),
+        setActiveGroup: (id) => apply((v) => ({ ...v, activeGroup: id })),
 
         toggleAudio: (login) => apply((v) => ops.toggleAudio(v, login)),
         focusAudio: (login) => apply((v) => ops.focusAudio(v, login)),
@@ -121,7 +164,7 @@ export const useViewStore = create<ViewStore>()(
             return;
           }
           const restore = (mutedFrom ?? []).filter((c) => view.channels.includes(c));
-          const fallback = ops.mainChannel(view);
+          const fallback = ops.mainChannel(view, groups.displayedChannels(view));
           const active = restore.length ? restore : fallback ? [fallback] : [];
           set({
             view: ops.normalize({ ...view, audio: { ...view.audio, active } }),

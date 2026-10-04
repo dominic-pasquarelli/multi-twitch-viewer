@@ -19,7 +19,47 @@
 }
 .host {
   position: absolute;
-  inset: 0;
+  inset: 64px 0 0;
+}
+.toolbar {
+  height: 64px;
+  position: relative;
+  visibility: hidden;
+  z-index: 1;
+}
+.tile:hover .toolbar,
+.tile:focus-within .toolbar,
+.mixing .toolbar {
+  visibility: visible;
+}
+.tile[data-arranging='true'] .toolbar {
+  visibility: visible;
+  cursor: grab;
+}
+.hidden {
+  display: none;
+}
+.arrangeSurface {
+  position: absolute;
+  inset: 64px 0 0;
+  z-index: 2;
+  cursor: grab;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgb(0 0 0 / 0.12);
+}
+.arrangeSurface:active {
+  cursor: grabbing;
+}
+.arrangeSurface span {
+  padding: 5px 9px;
+  border: 1px dashed var(--text);
+  border-radius: var(--radius);
+  background: rgb(0 0 0 / 0.65);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
 }
 .host iframe {
   display: block;
@@ -28,7 +68,7 @@
 
 .overlay {
   position: absolute;
-  inset: 0;
+  inset: 64px 0 0;
   display: flex;
   align-items: center;
   justify-content: center;

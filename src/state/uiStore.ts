@@ -14,7 +14,10 @@ interface UiStore {
   /** Desktop app hidden in the tray: streams are stopped, alerts keep running. */
   backgrounded: boolean;
   setBackgrounded(v: boolean): void;
-  /** The stream whose controls the top bar shows (the last one hovered). */
+  /** Enables tile dragging without intercepting the Twitch player's controls. */
+  arranging: boolean;
+  setArranging(v: boolean): void;
+  /** The last hovered stream (keyboard shortcuts use it). */
   selected: string | null;
   setSelected(login: string | null): void;
   /** Bumped to reload a stream's player. */
@@ -38,6 +41,8 @@ export const useUi = create<UiStore>()((set) => ({
   playerStatus: {},
   backgrounded: false,
   setBackgrounded: (backgrounded) => set({ backgrounded }),
+  arranging: false,
+  setArranging: (arranging) => set({ arranging }),
   volumeFlash: null,
   selected: null,
   setSelected: (selected) => set((s) => (s.selected === selected ? s : { selected })),

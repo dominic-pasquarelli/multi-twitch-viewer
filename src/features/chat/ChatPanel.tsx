@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useServices } from '@/app/servicesContext';
 import { chatEmbedUrl } from '@/lib/twitch/embedUrls';
+import { displayedChannels } from '@/lib/view/groups';
 import { useViewStore } from '@/state/viewStore';
 import { IconButton } from '@/ui/Button';
 import styles from './ChatPanel.module.css';
@@ -14,8 +15,11 @@ const MAX_KEPT_ALIVE = 4;
  */
 export function ChatPanel() {
   const { mock } = useServices();
-  const channels = useViewStore((s) => s.view.channels);
-  const active = useViewStore((s) => s.view.chat.channel);
+  const view = useViewStore((s) => s.view);
+  const channels = displayedChannels(view);
+  const active = channels.includes(view.chat.channel ?? '')
+    ? view.chat.channel
+    : (displayedChannels(view, view.audio.active).at(-1) ?? channels[0] ?? null);
   const setChat = useViewStore((s) => s.setChat);
   const [recent, setRecent] = useState<string[]>([]);
 
@@ -23,7 +27,7 @@ export function ChatPanel() {
   if (active && recent[0] !== active) {
     setRecent([active, ...recent.filter((c) => c !== active)].slice(0, MAX_KEPT_ALIVE));
   }
-  const mounted = recent.filter((c) => channels.includes(c));
+  const mounted = recent.filter((c) => view.channels.includes(c));
 
   return (
     <aside className={styles.panel} aria-label="Chat" data-testid="chat-panel">

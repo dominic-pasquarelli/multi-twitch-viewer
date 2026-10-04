@@ -6,6 +6,14 @@ export interface PlayerQuality {
   height: number;
 }
 
+/** Documented Twitch playback telemetry; individual fields may be unavailable. */
+export interface PlayerPlaybackStats {
+  bufferSize?: number;
+  fps?: number;
+  skippedFrames?: number;
+  playbackRate?: number;
+}
+
 export type PlayerEvent =
   'ready' | 'playing' | 'pause' | 'offline' | 'online' | 'blocked' | 'ended';
 
@@ -25,6 +33,8 @@ export interface PlayerAdapter {
   setQuality(group: string): void;
   play(): void;
   pause(): void;
+  isPaused?(): boolean;
+  getPlaybackStats?(): PlayerPlaybackStats | null;
   on(event: PlayerEvent, handler: () => void): () => void;
   /** Removes the player from the page. */
   destroy(): void;

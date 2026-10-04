@@ -13,7 +13,8 @@ contextBridge.exposeInMainWorld('mtvDesktop', {
   getUpdateStatus: () => ipcRenderer.invoke('mtv:update-status'),
   checkForUpdates: () => ipcRenderer.invoke('mtv:update-check'),
   installUpdate: () => ipcRenderer.send('mtv:update-install'),
-  playAll: () => ipcRenderer.send('mtv:play-all'),
+  /** @param {readonly string[] | undefined} channels */
+  playAll: (channels) => ipcRenderer.send('mtv:play-all', channels),
   /** @param {{ hideStreamInfo: boolean, skipContentWarning: boolean }} options */
   setPlayerChrome: (options) =>
     ipcRenderer.send('mtv:player-chrome', {
@@ -33,6 +34,13 @@ contextBridge.exposeInMainWorld('mtvDesktop', {
     const listener = (_event, channel) => callback(String(channel));
     ipcRenderer.on('mtv:player-context-menu', listener);
     return () => ipcRenderer.removeListener('mtv:player-context-menu', listener);
+  },
+  /** @param {(error: {channel: string, code: 3000}) => void} callback */
+  onPlayerError: (callback) => {
+    /** @param {unknown} _event @param {{channel: string, code: 3000}} error */
+    const listener = (_event, error) => callback(error);
+    ipcRenderer.on('mtv:player-error', listener);
+    return () => ipcRenderer.removeListener('mtv:player-error', listener);
   },
   /** @param {(hidden: boolean) => void} callback */
   onBackgroundChange: (callback) => {

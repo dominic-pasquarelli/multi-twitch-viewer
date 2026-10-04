@@ -171,12 +171,108 @@
   position: fixed;
   z-index: 50;
   width: 300px;
+  max-width: calc(100vw - 16px);
   border-radius: var(--radius);
   background: var(--surface-2);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   overflow: hidden;
   pointer-events: none;
+}
+.previewFallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  aspect-ratio: 16 / 9;
+  color: var(--text-muted);
+  background: var(--bg);
+  font-size: 12px;
+}
+.railSection {
+  flex: none;
+  width: 34px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 4px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.modes {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px 8px;
+}
+.modes button {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.modes button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--text);
+  border-color: var(--accent);
+}
+.discoveryControls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 8px 8px;
+}
+.discoveryControls .modes {
+  padding: 0;
+}
+.discoveryHint {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.categoryBack {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  text-align: left;
+  font-size: 12px;
+}
+.categoryRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: none;
+  padding: 6px 12px;
+  background: none;
+  text-align: left;
+}
+.categoryRow:hover {
+  background: var(--surface-2);
+}
+.categoryRow img {
+  width: 36px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.categoryRow small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.loadMore {
+  display: block;
+  margin: 10px auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
 }
 .preview img {
   display: block;

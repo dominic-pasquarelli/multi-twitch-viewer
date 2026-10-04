@@ -12,6 +12,9 @@ export interface LiveStream {
   login: string;
   displayName: string;
   gameName: string;
+  /** Tags and language from Helix; available for filtering loaded streams. */
+  tags?: string[];
+  language?: string;
   title: string;
   viewerCount: number;
   /** ISO timestamp. */
@@ -35,6 +38,19 @@ export interface ChannelSearchResult {
   gameName: string;
   title: string;
   profileImageUrl: string;
+  tags?: string[];
+  language?: string;
+}
+
+export interface TwitchCategory {
+  id: string;
+  name: string;
+  boxArtUrl: string;
+}
+
+export interface CategoryStreamsPage {
+  streams: LiveStream[];
+  cursor?: string;
 }
 
 /**
@@ -49,6 +65,8 @@ export interface TwitchApi {
   getUsersByLogins(logins: string[]): Promise<TwitchUser[]>;
   getStreamsByLogins(logins: string[]): Promise<LiveStream[]>;
   searchChannels(query: string): Promise<ChannelSearchResult[]>;
+  searchCategories(query: string): Promise<TwitchCategory[]>;
+  getStreamsByCategory(categoryId: string, cursor?: string): Promise<CategoryStreamsPage>;
 }
 
 export class TwitchApiError extends Error {

@@ -7,6 +7,12 @@ import type { LayoutMode, MainScale } from '../layout';
  */
 export type AudioMode = 'solo' | 'duck' | 'mix';
 
+export interface StreamGroup {
+  id: string;
+  name: string;
+  channels: string[];
+}
+
 /**
  * Everything that describes "what I'm watching": the channels in display
  * order, the layout, which streams are audible and the chat panel.
@@ -14,6 +20,10 @@ export type AudioMode = 'solo' | 'duck' | 'mix';
  */
 export interface ViewState {
   channels: string[];
+  /** Optional for compatibility with existing sessions and presets. */
+  groups?: StreamGroup[];
+  /** null shows all groups as clusters; a group id isolates its streams. */
+  activeGroup?: string | null;
   layout: {
     mode: LayoutMode;
     /** Channel shown big in focus mode (defaults to the first channel). */

@@ -3,6 +3,7 @@ import type {
   FollowedChannel,
   LiveStream,
   TwitchApi,
+  TwitchCategory,
   TwitchUser,
 } from './types';
 
@@ -64,10 +65,13 @@ export const MOCK_CHANNELS: MockChannel[] = NAMES.map((displayName, i) => ({
   hue: HUES[i % HUES.length]!,
 }));
 
+const extraChannels = new Map<string, MockChannel>();
+
 /** Simulates a channel going live/offline (mock mode only; exposed as window.mtvMock). */
 export function setMockLive(login: string, live: boolean): void {
   const channel = MOCK_CHANNELS.find((c) => c.login === login);
   if (channel) channel.live = live;
+  else extraChannels.set(login, { ...lookup(login), live });
 }
 
 /** Simulates following a channel on Twitch (mock mode only). */
@@ -108,7 +112,7 @@ const toUser = (c: MockChannel): TwitchUser => ({
 });
 
 const startedAt = (c: MockChannel) =>
-  new Date(Date.now() - (Number(c.id) % 7) * 47 * 60_000 - 5 * 60_000).toISOString();
+  new Date(Date.now() - ((Number(c.id) || c.hue) % 7) * 47 * 60_000 - 5 * 60_000).toISOString();
 
 const toStream = (c: MockChannel): LiveStream => ({
   userId: c.id,
@@ -119,12 +123,15 @@ const toStream = (c: MockChannel): LiveStream => ({
   viewerCount: c.viewers,
   startedAt: startedAt(c),
   thumbnailUrl: thumbnail(c.displayName, c.hue),
+  tags: ['English', c.gameName === 'Just Chatting' ? 'Community' : 'Gaming'],
+  language: 'en',
 });
 
 /** Channels not in MOCK_CHANNELS are treated as live, so typed names show a player. */
 function lookup(login: string): MockChannel {
   return (
-    MOCK_CHANNELS.find((c) => c.login === login) ?? {
+    MOCK_CHANNELS.find((c) => c.login === login) ??
+    extraChannels.get(login) ?? {
       id: `x-${login}`,
       login,
       displayName: login,
@@ -178,8 +185,27 @@ export function createMockApi(): TwitchApi {
         gameName: c.gameName,
         title: c.title,
         profileImageUrl: avatar(c.displayName, c.hue),
+        tags: ['English', c.gameName === 'Just Chatting' ? 'Community' : 'Gaming'],
+        language: 'en',
       }));
       return delay(results.slice(0, 12));
     },
+    searchCategories: (query) => {
+      const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      if (!words.length) return delay([]);
+      return delay(
+        GAMES.map((name, i): TwitchCategory => ({
+          id: String(i + 1),
+          name,
+          boxArtUrl: thumbnail(name, HUES[i]!),
+        })).filter((c) => words.every((w) => c.name.toLowerCase().includes(w))),
+      );
+    },
+    getStreamsByCategory: (categoryId) =>
+      delay({
+        streams: MOCK_CHANNELS.filter((c) => c.live && c.gameName === GAMES[Number(categoryId) - 1])
+          .sort((a, b) => b.viewers - a.viewers)
+          .map(toStream),
+      }),
   };
 }
