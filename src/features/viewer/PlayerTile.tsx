@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useRef } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Play } from 'lucide-react';
 import { useServices } from '@/app/servicesContext';
 import type { Rect } from '@/lib/layout';
@@ -15,9 +15,6 @@ import { playbackRecovery } from './playbackRecovery';
 import { StreamControls } from './StreamControls';
 import styles from './PlayerTile.module.css';
 
-/** Space reserved above every iframe, including when hover controls are hidden. */
-export const PLAYER_CONTROLS_HEIGHT = 64;
-
 export interface PlayerTileProps {
   login: string;
   rect: Rect;
@@ -33,12 +30,10 @@ export interface PlayerTileProps {
   quality: QualityChoice;
   belowMinimum: boolean;
   status: PlayerStatus | undefined;
-  /** Its controls are shown in the top bar. */
+  /** Last targeted stream, retained for keyboard volume adjustments. */
   selected: boolean;
   /** Paused and hidden while another group tab is selected. */
   hidden: boolean;
-  /** Mixer levels stay visible on every tile. */
-  mixing: boolean;
   arranging: boolean;
   dropTarget: boolean;
   onVolume(login: string, volume: number): void;
@@ -52,8 +47,8 @@ const effectiveVolume = (volume: number | null, scale: number): number | null =>
   volume === null ? (scale === 1 ? null : 0.5 * scale) : volume * scale;
 
 /**
- * One stream with a reserved controls bar above its iframe. Controls never
- * cover video; Arrange mode explicitly enables a drag surface over the player.
+ * One full-size video with compact hover controls. The player rectangle stays
+ * at its native aspect ratio, so controls do not create letterbox padding.
  *
  * The player is created once per mount and then only steered
  * (mute/volume/quality), never re-created, so streams don't restart.
@@ -64,10 +59,27 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<PlayerController | null>(null);
   const reloadKey = useUi((s) => s.reloadRequests[login] ?? 0);
+  const [adjustingVolume, setAdjustingVolume] = useState(false);
   const latest = useRef(props);
   useLayoutEffect(() => {
     latest.current = props;
   });
+
+  // Keyboard volume shortcuts briefly reveal only the adjusted stream's bar.
+  // Subscribe to the event instead of keeping it open for a stored selection.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = useUi.subscribe((state, previous) => {
+      if (state.volumeFlash === previous.volumeFlash || state.volumeFlash?.login !== login) return;
+      clearTimeout(timer);
+      setAdjustingVolume(true);
+      timer = setTimeout(() => setAdjustingVolume(false), 1400);
+    });
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
+  }, [login]);
 
   // Create the player (and re-create on "reload").
   useEffect(() => {
@@ -158,7 +170,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       const q = pickQuality(
         entry.adapter.getQualities(),
         quality,
-        Math.max(0, rect.height - PLAYER_CONTROLS_HEIGHT),
+        rect.height,
         window.devicePixelRatio,
       );
       entry.controller.update({ quality: q });
@@ -168,10 +180,8 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
 
   const classes = [
     styles.tile,
-    props.selected && styles.selected,
     audible && styles.audible,
     props.dropTarget && styles.dropTarget,
-    props.mixing && styles.mixing,
     props.hidden && styles.hidden,
   ]
     .filter(Boolean)
@@ -214,7 +224,12 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         if (active instanceof HTMLIFrameElement && hostRef.current?.contains(active)) active.blur();
       }}
     >
-      <div className={styles.toolbar} data-tile-toolbar>
+      <div
+        className={`${styles.toolbar} ${adjustingVolume ? styles.adjustingVolume : ''}`}
+        data-tile-toolbar
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <StreamControls login={login} />
       </div>
       <div

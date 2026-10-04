@@ -60,7 +60,7 @@ test('focus layout makes one stream big, and dragging swaps streams', async ({ p
   const other = await box(page, 'lunarlatte');
   expect(main.width).toBeGreaterThan(other.width * 1.5);
 
-  // Controls live above the iframe. Arrange explicitly enables dragging the video surface.
+  // Controls appear on hover. Arrange explicitly enables dragging the video surface.
   await tile(page, 'lunarlatte').hover();
   const chip = tile(page, 'lunarlatte').getByTestId('stream-chip');
   await expect(chip).toContainText('LunarLatte');

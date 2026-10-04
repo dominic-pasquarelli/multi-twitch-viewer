@@ -22,8 +22,8 @@ import { currentVolume, setStreamMix, useVolumeModel, VOLUME_STEP } from './volu
 import styles from './StreamControls.module.css';
 
 /**
- * Tile controls occupy their own reserved space above the video, so they never
- * cover the Twitch iframe. Mix sliders adjust just this channel's balance.
+ * Compact hover controls at the top of the stream. Mix sliders adjust just
+ * this channel's balance without changing the other streams' levels.
  */
 export function StreamControls({ login }: { login: string }) {
   const view = useViewStore((s) => s.view);
@@ -79,7 +79,10 @@ export function StreamControls({ login }: { login: string }) {
           value={Math.round(volume * 100)}
           aria-label={`${stream?.displayName ?? login} volume`}
           title="This stream's mix volume (scroll to adjust)"
-          onChange={(e) => setStreamMix(login, Number(e.target.value) / 100)}
+          onChange={(e) => {
+            setStreamMix(login, Number(e.target.value) / 100);
+            useUi.getState().flashVolume(login);
+          }}
         />
         <span
           key={flashN} // replays the highlight animation on every change

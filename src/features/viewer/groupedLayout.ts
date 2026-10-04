@@ -4,7 +4,6 @@ import { slotOrder } from '@/lib/view/operations';
 import type { ViewState } from '@/lib/view/types';
 
 export const SECTION_LABEL_HEIGHT = 24;
-const CONTROLS_HEIGHT = 64;
 
 export interface PositionedSection extends StreamSection {
   rect: Rect;
@@ -93,7 +92,7 @@ export function computeGroupedLayout(
     return { sections: positioned, tiles, order, rects: order.map((login) => tiles.get(login)!) };
   };
   const score = (layout: GroupedLayout) => {
-    const areas = layout.rects.map((r) => r.width * Math.max(0, r.height - CONTROLS_HEIGHT));
+    const areas = layout.rects.map((r) => r.width * r.height);
     return {
       count: areas.length,
       min: Math.min(...areas),

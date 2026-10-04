@@ -27,7 +27,7 @@ import { playbackRecovery } from './playbackRecovery';
 import { usePlaybackRecovery } from './usePlaybackRecovery';
 import { computeGroupedLayout } from './groupedLayout';
 import { EmptyState } from './EmptyState';
-import { PlayerTile, PLAYER_CONTROLS_HEIGHT } from './PlayerTile';
+import { PlayerTile } from './PlayerTile';
 import { useElementSize } from './useElementSize';
 import { setStreamVolume, useVolumeModel } from './volume';
 import styles from './Viewer.module.css';
@@ -109,10 +109,6 @@ export function Viewer() {
     () => ({
       ...DEFAULT_LAYOUT_OPTIONS,
       gap: tileGap,
-      minTile: {
-        ...DEFAULT_LAYOUT_OPTIONS.minTile,
-        height: DEFAULT_LAYOUT_OPTIONS.minTile.height + PLAYER_CONTROLS_HEIGHT,
-      },
     }),
     [tileGap],
   );
@@ -290,7 +286,7 @@ export function Viewer() {
 
       {renderOrder.map((login) => {
         if (!hidden.has(login) && !geometry.tiles.has(login)) return null;
-        const rect = geometry.tiles.get(login) ?? { x: 0, y: 0, width: 400, height: 364 };
+        const rect = geometry.tiles.get(login) ?? { x: 0, y: 0, width: 534, height: 300 };
         const sectionChannels =
           sections.find((section) => section.channels.includes(login))?.channels ?? shown;
         const level = audioLevel(view, login, duckLevel);
@@ -304,14 +300,10 @@ export function Viewer() {
             volumeScale={level.scale}
             volume={streamVolume(volumeModel, login)}
             quality={isPrimary(view, login, sectionChannels) ? mainQuality : otherQuality}
-            belowMinimum={isBelowMinimum(
-              { ...rect, height: Math.max(0, rect.height - PLAYER_CONTROLS_HEIGHT) },
-              DEFAULT_LAYOUT_OPTIONS.minTile,
-            )}
+            belowMinimum={isBelowMinimum(rect, DEFAULT_LAYOUT_OPTIONS.minTile)}
             status={playerStatus[login]}
             selected={selected === login}
             hidden={hidden.has(login)}
-            mixing={view.audio.mode === 'mix'}
             arranging={arranging}
             dropTarget={sidebarDrop?.target === login}
             onVolume={setStreamVolume}

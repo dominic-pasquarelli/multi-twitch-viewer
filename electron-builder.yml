@@ -11,13 +11,19 @@ files:
   - desktop/**
   - '!desktop/**/*.test.mjs'
   - package.json
+# Windows Shell reads this path directly for running taskbar buttons.
+extraResources:
+  - from: desktop/assets/icon.ico
+    to: app-icon.ico
 win:
   target:
     - target: nsis
       arch: [x64]
-  icon: desktop/assets/icon.png
+  icon: desktop/assets/icon.ico
   artifactName: MultiTwitchViewer-Setup-${version}.${ext}
 nsis:
+  installerIcon: desktop/assets/icon.ico
+  uninstallerIcon: desktop/assets/icon.ico
   oneClick: true
   perMachine: false
   createDesktopShortcut: always

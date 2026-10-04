@@ -43,12 +43,13 @@ test('keyboard focus and chat use the isolated group', async ({ page }) => {
   await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-paused', 'true');
 });
 
-test('tile controls remain above videos and focus changes preserve an adjusted mix', async ({
+test('hover controls overlay full-size videos and focus changes preserve an adjusted mix', async ({
   page,
 }) => {
   await page.goto('/#/pixelpaladin/novastrike?layout=focus');
   await expect(player(page, 'novastrike')).toHaveAttribute('data-paused', 'false');
   await page.getByRole('button', { name: 'Mix', exact: true }).click();
+  await tile(page, 'novastrike').hover();
   const controls = tile(page, 'novastrike').getByTestId('stream-controls');
   await controls.getByRole('button', { name: 'Listen to this stream', exact: true }).click();
   await controls.getByRole('slider').fill('25');
@@ -58,10 +59,75 @@ test('tile controls remain above videos and focus changes preserve an adjusted m
   await expect(player(page, 'novastrike')).toHaveAttribute('data-muted', 'false');
   await expect(player(page, 'novastrike')).toHaveAttribute('data-volume', '0.25');
   for (const login of ['pixelpaladin', 'novastrike']) {
+    await tile(page, login).hover();
     const bar = (await tile(page, login).getByTestId('stream-controls').boundingBox())!;
     const video = (await player(page, login).boundingBox())!;
-    expect(bar.y + bar.height).toBeLessThanOrEqual(video.y + 1);
+    const outer = (await tile(page, login).boundingBox())!;
+    expect(video.y).toBeCloseTo(outer.y, 0);
+    expect(video.x).toBeCloseTo(outer.x, 0);
+    expect(video.width).toBeCloseTo(outer.width, 0);
+    expect(video.height).toBeCloseTo(outer.height, 0);
+    // Layout rectangles snap to whole pixels; allow that rounding, not a control strip.
+    expect(Math.abs(video.height - (video.width * 9) / 16)).toBeLessThanOrEqual(2);
+    expect(bar.y).toBeCloseTo(video.y, 0);
+    expect(bar.y + bar.height).toBeLessThan(video.y + video.height);
     await expect(tile(page, login).getByRole('button', { name: 'Reload player' })).toBeVisible();
+  }
+  await page.getByTestId('add-channel').focus();
+  await page.getByTestId('add-channel').hover();
+  for (const login of ['pixelpaladin', 'novastrike'])
+    await expect(tile(page, login).getByTestId('stream-controls')).toBeHidden();
+});
+
+test('hover outlines clear outside the viewer and volume controls remain usable while focused', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/novastrike/cozycartographer?layout=focus');
+  const stream = tile(page, 'novastrike');
+  const controls = stream.getByTestId('stream-controls');
+  await stream.hover();
+  await expect(controls).toBeVisible();
+  await expect(stream).toHaveAttribute('data-audible', 'false');
+  await expect(stream).not.toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await page.getByTestId('add-channel').hover();
+  await expect(controls).toBeHidden();
+  await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+
+  await stream.hover();
+  await stream.getByRole('slider').focus();
+  await page.getByTestId('add-channel').hover();
+  await expect(controls).toBeVisible();
+  await stream.getByRole('slider').fill('35');
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-volume', '0.35');
+  await page.getByTestId('add-channel').focus();
+  await expect(controls).toBeHidden();
+});
+
+test('five-stream focus and grid layouts keep full 16:9 video areas without idle control strips', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 2558, height: 1381 });
+  const fiveChannels = [...channels, 'quickscopequeen'];
+  for (const mode of ['focus', 'grid']) {
+    await page.goto(`/#/${fiveChannels.join('/')}?layout=${mode}`);
+    await expect(page.getByTestId('player-tile')).toHaveCount(5);
+    await page.getByTestId('add-channel').hover();
+    for (const login of fiveChannels) {
+      await expect(player(page, login)).toHaveAttribute('data-paused', 'false');
+      await expect(tile(page, login).getByTestId('stream-controls')).toBeHidden();
+      const video = (await player(page, login).boundingBox())!;
+      const outer = (await tile(page, login).boundingBox())!;
+      expect(video.x).toBeCloseTo(outer.x, 0);
+      expect(video.y).toBeCloseTo(outer.y, 0);
+      expect(video.width).toBeCloseTo(outer.width, 0);
+      expect(video.height).toBeCloseTo(outer.height, 0);
+      expect(Math.abs(video.height - (video.width * 9) / 16)).toBeLessThanOrEqual(2);
+    }
+    if (mode === 'focus') {
+      await page.screenshot({ path: 'test-results/fixed-stream-borders.png' });
+      await tile(page, 'novastrike').hover();
+      await page.screenshot({ path: 'test-results/fixed-stream-hover.png' });
+    }
   }
 });
 
@@ -85,6 +151,7 @@ test('groups cluster, isolate, preserve mounts and audio, and keep manual pauses
   await page.goto(`/#/${channels.join('/')}?layout=focus`);
   await expect(player(page, 'lunarlatte')).toHaveAttribute('data-paused', 'false');
   await page.getByRole('button', { name: 'Mix', exact: true }).click();
+  await tile(page, 'cozycartographer').hover();
   await tile(page, 'cozycartographer')
     .getByRole('button', { name: 'Listen to this stream', exact: true })
     .click();

@@ -20,8 +20,8 @@ channels are live, and watch several streams at once with layouts that actually 
   top. When a favorite goes live you get a Windows notification; click it to start watching.
   Settings can switch this to everyone you follow, or off.
 - **Controls on each stream**: hovering a stream shows its controls (listen, volume, make main,
-  chat, reload, open on Twitch, remove) in a reserved bar above its video, because Twitch players can pause
-  when something is drawn over them. If a stream pauses on its own it resumes automatically; one
+  chat, reload, open on Twitch, remove) in a compact overlay at the top of its video. The controls
+  disappear when you leave the stream, and stay open while you edit its volume. If a stream pauses on its own it resumes automatically; one
   you paused yourself (clicked inside the player) stays paused.
 - **Stream groups**: **Create group / Manage groups** names related perspectives and assigns streams.
   **All groups** clusters them together; group tabs isolate one group and pause hidden streams.
@@ -35,7 +35,7 @@ channels are live, and watch several streams at once with layouts that actually 
   - **Solo**: the others are muted. Unmuting inside a Twitch player also mutes the rest.
   - **Duck**: the others keep playing quietly (20% by default) so you notice when something happens.
   - **Mix** (`Shift+1`–`9`): several streams at full volume.
-    Changing the main video keeps your mix. Each stream's volume slider stays visible in Mix mode.
+    Changing the main video keeps your mix. Hover a stream to adjust its volume directly on the video.
   - **Mixer** (sliders button next to them): every stream's volume in one list, to balance the
     streams you hear together.
   - **Consistent volume** (in the Mixer or Settings → Audio): every stream you switch to plays at

@@ -2,38 +2,41 @@
   position: absolute;
   background: #000;
   border-radius: 2px;
-  /* Highlights are drawn in the gap *outside* the player: Twitch refuses to
-     autoplay players that are covered by anything. */
+  /* Highlights stay outside the player and follow actual hover/focus. */
   outline: 2px solid transparent;
   outline-offset: 1px;
   transition: outline-color 0.15s;
 }
-.selected {
+.tile:hover,
+.tile:focus-visible,
+.tile:has(.toolbar :focus-visible) {
   outline-color: var(--text-faint);
 }
-.audible {
+.tile.audible {
   outline-color: var(--accent);
 }
-.dropTarget {
+.tile.dropTarget {
   outline: 2px dashed var(--text);
 }
 .host {
   position: absolute;
-  inset: 64px 0 0;
+  inset: 0;
 }
 .toolbar {
-  height: 64px;
-  position: relative;
+  position: absolute;
+  inset: 0 0 auto;
   visibility: hidden;
-  z-index: 1;
+  pointer-events: none;
+  z-index: 3;
 }
 .tile:hover .toolbar,
-.tile:focus-within .toolbar,
-.mixing .toolbar {
+.tile:focus-visible .toolbar,
+.tile:has(.toolbar :focus-visible) .toolbar,
+.toolbar.adjustingVolume {
   visibility: visible;
+  pointer-events: auto;
 }
 .tile[data-arranging='true'] .toolbar {
-  visibility: visible;
   cursor: grab;
 }
 .hidden {
@@ -41,7 +44,7 @@
 }
 .arrangeSurface {
   position: absolute;
-  inset: 64px 0 0;
+  inset: 0;
   z-index: 2;
   cursor: grab;
   display: flex;
@@ -68,7 +71,7 @@
 
 .overlay {
   position: absolute;
-  inset: 64px 0 0;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
