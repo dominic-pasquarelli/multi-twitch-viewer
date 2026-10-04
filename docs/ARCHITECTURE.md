@@ -105,6 +105,12 @@ Behaviour notes:
   engine avoids Twitch's 400×300 autoplay minimum when it can. Twitch may restrict obscured
   embeds, so controls should cover as little video as possible and never persist just because
   the stream was previously hovered.
+- **Hover crosses iframe boundaries.** A transparent entry surface receives the first pointer
+  movement, then disappears immediately. The iframe stays interactive throughout, so native
+  player clicks still work. Transient hover uses boundary events
+  and parent pointer movement rather than the remembered keyboard target; viewport exit, hidden
+  groups and window focus loss clear it. This handles cross-origin players that swallow parent
+  hover events when the pointer moves between videos.
 - **Streams keep playing unless you paused them.** When a player reports `paused`, the tile
   resumes it after a moment unless you interacted with that player just before
   (`playerInteraction.ts`: click/focus inside it). `AutoResume` caps retries so a player that

@@ -1,4 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Play } from 'lucide-react';
 import { useServices } from '@/app/servicesContext';
 import type { Rect } from '@/lib/layout';
@@ -60,10 +61,67 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
   const controllerRef = useRef<PlayerController | null>(null);
   const reloadKey = useUi((s) => s.reloadRequests[login] ?? 0);
   const [adjustingVolume, setAdjustingVolume] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  // Group tabs keep players mounted. Clear transient hover before a hidden
+  // tile can be shown again with the pointer somewhere else.
+  if (props.hidden && hovered) setHovered(false);
   const latest = useRef(props);
   useLayoutEffect(() => {
     latest.current = props;
   });
+
+  // Cross-origin players can swallow their parent's pointer boundary events.
+  // A transparent entry surface takes the first movement, then is removed so
+  // the iframe stays interactive. Parent movement and viewport exits clear
+  // hover after the pointer leaves the frame.
+  useEffect(() => {
+    let blurTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearHover = () => {
+      setHovered(false);
+      const active = document.activeElement;
+      if (active instanceof HTMLIFrameElement && hostRef.current?.contains(active)) active.blur();
+    };
+    const isInside = (event: MouseEvent) => {
+      const box = hostRef.current?.getBoundingClientRect();
+      return (
+        !!box &&
+        event.clientX >= box.left &&
+        event.clientX < box.right &&
+        event.clientY >= box.top &&
+        event.clientY < box.bottom
+      );
+    };
+    const onParentMove = (event: PointerEvent) => {
+      if (!isInside(event)) clearHover();
+    };
+    const onViewportLeave = (event: MouseEvent) => {
+      // Crossing into the child browsing context can look like leaving the
+      // parent document even though the pointer is still over this video.
+      if (!isInside(event)) clearHover();
+    };
+    const onBlur = () => {
+      clearTimeout(blurTimer);
+      // Focus moving into the child iframe also blurs this window. Clear only
+      // when the containing document actually loses focus to another window.
+      blurTimer = setTimeout(() => {
+        if (!document.hasFocus()) clearHover();
+      }, 0);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') clearHover();
+    };
+    window.addEventListener('blur', onBlur);
+    document.documentElement.addEventListener('mouseleave', onViewportLeave);
+    document.addEventListener('pointermove', onParentMove, true);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearTimeout(blurTimer);
+      window.removeEventListener('blur', onBlur);
+      document.documentElement.removeEventListener('mouseleave', onViewportLeave);
+      document.removeEventListener('pointermove', onParentMove, true);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
 
   // Keyboard volume shortcuts briefly reveal only the adjusted stream's bar.
   // Subscribe to the event instead of keeping it open for a stored selection.
@@ -180,12 +238,20 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
 
   const classes = [
     styles.tile,
+    hovered && styles.hovered,
     audible && styles.audible,
     props.dropTarget && styles.dropTarget,
     props.hidden && styles.hidden,
   ]
     .filter(Boolean)
     .join(' ');
+
+  const enterHover = (event: { buttons: number }) => {
+    // Remove the entry surface before the next pointer down. The iframe itself
+    // stays interactive, so its native hit-test surface is already registered.
+    flushSync(() => setHovered(true));
+    if (event.buttons === 0) props.onSelect(login);
+  };
 
   return (
     <div
@@ -194,6 +260,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       data-channel={login}
       data-audible={audible}
       data-selected={props.selected}
+      data-hovered={hovered}
       data-hidden={props.hidden}
       data-arranging={props.arranging}
       aria-hidden={props.hidden || undefined}
@@ -213,11 +280,18 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       onDragEnd={() => setDragging(false)}
       data-status={status ?? 'loading'}
       style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
-      onMouseEnter={(e) => {
-        // Not while a button is held: that's a drag from the top-bar controls.
-        if (e.buttons === 0) props.onSelect(login);
-      }}
-      onMouseLeave={() => {
+      onPointerEnter={enterHover}
+      onMouseEnter={enterHover}
+      onMouseLeave={(event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        if (
+          event.clientX >= box.left &&
+          event.clientX < box.right &&
+          event.clientY >= box.top &&
+          event.clientY < box.bottom
+        )
+          return;
+        setHovered(false);
         // Clicking inside a player gives it keyboard focus; hand focus back to
         // the app when the pointer leaves so the shortcuts keep working.
         const active = document.activeElement;
@@ -241,6 +315,10 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         // real Twitch players are iframes, detected via focus in the Viewer.
         onPointerDown={() => markInteraction(login)}
       />
+
+      {!hovered && !props.hidden && !props.arranging && (
+        <div className={styles.hoverEntry} data-player-entry aria-hidden="true" />
+      )}
 
       {props.arranging && !props.hidden && (
         <div

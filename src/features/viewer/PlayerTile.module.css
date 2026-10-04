@@ -7,7 +7,7 @@
   outline-offset: 1px;
   transition: outline-color 0.15s;
 }
-.tile:hover,
+.tile.hovered,
 .tile:focus-visible,
 .tile:has(.toolbar :focus-visible) {
   outline-color: var(--text-faint);
@@ -29,7 +29,7 @@
   pointer-events: none;
   z-index: 3;
 }
-.tile:hover .toolbar,
+.tile.hovered .toolbar,
 .tile:focus-visible .toolbar,
 .tile:has(.toolbar :focus-visible) .toolbar,
 .toolbar.adjustingVolume {
@@ -67,6 +67,16 @@
 .host iframe {
   display: block;
   border: 0;
+  pointer-events: auto;
+}
+.hoverEntry {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.host:has(iframe) + .hoverEntry {
+  display: block;
 }
 
 .overlay {
