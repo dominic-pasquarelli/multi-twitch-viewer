@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { MIN_MAIN_SCALE } from '@/lib/layout';
-import { slotOrder } from '@/lib/view/operations';
-import { displayedChannels, streamSections } from '@/lib/view/groups';
+import { displayedChannels, groupedSlotOrder } from '@/lib/view/groups';
 import { useSettings } from '@/state/settingsStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
@@ -11,6 +10,29 @@ import { nudgeHeard, VOLUME_STEP } from '../viewer/volume';
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
   (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
+
+/** Numbered slots follow the viewer's current visibility, including offline overrides. */
+export function useStreamHotkeys(visible: string[]): void {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || isTyping(e.target) || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (useUi.getState().dialog || document.querySelector('dialog[open]')) return;
+      // e.code keeps working with Shift held (Shift+1 = "!").
+      const digit = /^Digit([1-9])$/.exec(e.code)?.[1];
+      if (!digit) return;
+      const store = useViewStore.getState();
+      const login = groupedSlotOrder(store.view, visible)[Number(digit) - 1];
+      if (!login) return;
+      if (e.shiftKey) {
+        if (store.view.audio.mode !== 'mix') store.setAudioMode('mix');
+        useViewStore.getState().toggleAudio(login);
+      } else store.focusAudio(login);
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [visible]);
+}
 
 /** Global keyboard shortcuts (see shortcuts.ts for the list). */
 export function useHotkeys(): void {
@@ -26,21 +48,6 @@ export function useHotkeys(): void {
       }
       if (e.ctrlKey || e.metaKey) return;
       if (ui.dialog || document.querySelector('dialog[open]')) return; // let dialogs handle their own keys
-
-      // Digits: e.code keeps working with Shift held (Shift+1 = "!").
-      const digit = /^Digit([1-9])$/.exec(e.code)?.[1];
-      if (digit) {
-        const login = streamSections(view.view).flatMap((section) =>
-          slotOrder(view.view, section.channels),
-        )[Number(digit) - 1];
-        if (!login) return;
-        if (e.shiftKey) {
-          if (view.view.audio.mode !== 'mix') view.setAudioMode('mix');
-          useViewStore.getState().toggleAudio(login);
-        } else view.focusAudio(login);
-        e.preventDefault();
-        return;
-      }
 
       const scale = view.view.layout.mainScale;
       const step = (delta: number) => {

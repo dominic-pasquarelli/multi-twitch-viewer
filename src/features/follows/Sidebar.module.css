@@ -61,6 +61,11 @@
   letter-spacing: 0.04em;
   text-align: left;
 }
+.historyStatus {
+  padding-top: 6px;
+  font-size: 10px;
+  color: var(--text-faint);
+}
 .row {
   position: relative;
   display: flex;
@@ -165,6 +170,18 @@
 }
 .railItem.inView {
   background: var(--accent);
+}
+.railGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.railStatus {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
 }
 
 .preview {

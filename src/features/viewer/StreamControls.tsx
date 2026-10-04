@@ -8,8 +8,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react';
-import { audioLevel, mainChannel } from '@/lib/view/operations';
-import { streamSections } from '@/lib/view/groups';
+import { audioLevel } from '@/lib/view/operations';
 import { formatCount } from '@/lib/utils/format';
 import { useSettings } from '@/state/settingsStore';
 import { toast } from '@/state/toastStore';
@@ -25,7 +24,7 @@ import styles from './StreamControls.module.css';
  * Compact hover controls at the top of the stream. Mix sliders adjust just
  * this channel's balance without changing the other streams' levels.
  */
-export function StreamControls({ login }: { login: string }) {
+export function StreamControls({ login, main }: { login: string; main: boolean }) {
   const view = useViewStore((s) => s.view);
   const duckLevel = useSettings((s) => s.duckLevel);
   const volumeModel = useVolumeModel();
@@ -36,10 +35,6 @@ export function StreamControls({ login }: { login: string }) {
   const stream = live.get(login);
   const level = audioLevel(view, login, duckLevel);
   const volume = currentVolume(login, volumeModel);
-  const peers =
-    streamSections(view).find((section) => section.channels.includes(login))?.channels ??
-    view.channels;
-  const isMain = view.layout.mode === 'focus' && mainChannel(view, peers) === login;
 
   return (
     <div
@@ -93,7 +88,7 @@ export function StreamControls({ login }: { login: string }) {
         </span>
       </div>
       <div className={styles.actions}>
-        {view.channels.length > 1 && !isMain && (
+        {view.channels.length > 1 && !main && (
           <IconButton
             size="sm"
             label="Make this the main stream"

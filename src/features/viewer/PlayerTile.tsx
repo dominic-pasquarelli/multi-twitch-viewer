@@ -21,6 +21,8 @@ export interface PlayerTileProps {
   rect: Rect;
   /** The stream you're focused on (full volume, highlighted). */
   audible: boolean;
+  /** The one large visible video in focus mode. */
+  main: boolean;
   /** Muted entirely (solo mode, or everything muted). */
   muted: boolean;
   /** Volume multiplier, e.g. 0.2 for background streams in duck mode. */
@@ -259,6 +261,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       data-testid="player-tile"
       data-channel={login}
       data-audible={audible}
+      data-main={props.main}
       data-selected={props.selected}
       data-hovered={hovered}
       data-hidden={props.hidden}
@@ -304,7 +307,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        <StreamControls login={login} />
+        <StreamControls login={login} main={props.main} />
       </div>
       <div
         ref={hostRef}

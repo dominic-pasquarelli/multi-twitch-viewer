@@ -20,6 +20,7 @@ import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
 import { Button } from '@/ui/Button';
 import { useLiveStatus } from '../follows/queries';
+import { useStreamHotkeys } from '../shortcuts/useHotkeys';
 import { CHANNEL_MIME, setDragging } from './dnd';
 import { markInteraction } from './playerInteraction';
 import { playerRegistry } from './playerRegistry';
@@ -84,6 +85,7 @@ export function Viewer() {
     () => (hiding ? view.channels.filter((c) => !offline.includes(c)) : view.channels),
     [hiding, view.channels, offline],
   );
+  useStreamHotkeys(visible);
   const groupChannels = useMemo(() => displayedChannels(view), [view]);
   const shown = useMemo(() => displayedChannels(view, visible), [view, visible]);
   const sections = useMemo(() => streamSections(view, visible), [view, visible]);
@@ -129,6 +131,12 @@ export function Viewer() {
       options,
     );
     if (recoveryBannerHeight) {
+      if (result.focused) {
+        result.focused.rect = {
+          ...result.focused.rect,
+          y: result.focused.rect.y + recoveryBannerHeight,
+        };
+      }
       result.sections.forEach((section) => {
         section.rect = { ...section.rect, y: section.rect.y + recoveryBannerHeight };
       });
@@ -292,11 +300,26 @@ export function Viewer() {
           </div>
         ))}
 
+      {geometry.focused && (
+        <div
+          className={styles.sectionLabel}
+          style={{
+            left: geometry.focused.rect.x,
+            top: geometry.focused.rect.y,
+            width: geometry.focused.rect.width,
+          }}
+          data-testid="focused-section"
+          data-group={geometry.focused.groupId}
+          data-channel={geometry.focused.channel}
+        >
+          Focused · {geometry.focused.groupName} ·{' '}
+          {liveStatus.live.get(geometry.focused.channel)?.displayName ?? geometry.focused.channel}
+        </div>
+      )}
+
       {renderOrder.map((login) => {
         if (!hidden.has(login) && !geometry.tiles.has(login)) return null;
         const rect = geometry.tiles.get(login) ?? { x: 0, y: 0, width: 534, height: 300 };
-        const sectionChannels =
-          sections.find((section) => section.channels.includes(login))?.channels ?? shown;
         const level = audioLevel(view, login, duckLevel);
         return (
           <PlayerTile
@@ -304,10 +327,11 @@ export function Viewer() {
             login={login}
             rect={rect}
             audible={level.focused}
+            main={view.layout.mode === 'focus' && login === focused}
             muted={level.muted}
             volumeScale={level.scale}
             volume={streamVolume(volumeModel, login)}
-            quality={isPrimary(view, login, sectionChannels) ? mainQuality : otherQuality}
+            quality={isPrimary(view, login, shown) ? mainQuality : otherQuality}
             belowMinimum={isBelowMinimum(rect, DEFAULT_LAYOUT_OPTIONS.minTile)}
             status={playerStatus[login]}
             selected={selected === login}
