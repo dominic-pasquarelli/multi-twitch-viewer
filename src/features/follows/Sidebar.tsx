@@ -9,6 +9,7 @@ import {
 import {
   ChevronDown,
   ChevronRight,
+  Eye,
   Heart,
   History,
   PanelLeftClose,
@@ -20,7 +21,12 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useServices } from '@/app/servicesContext';
 import { favoritesFirst } from '@/lib/alerts/goLive';
-import type { LiveStream, TwitchCategory } from '@/lib/twitch/types';
+import type {
+  ChannelSearchResult,
+  LiveStream,
+  TwitchCategory,
+  TwitchUser,
+} from '@/lib/twitch/types';
 import { formatCount, sizedThumbnail } from '@/lib/utils/format';
 import { useAuth } from '@/state/authStore';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
@@ -35,7 +41,6 @@ import { CHANNEL_MIME, setDragging } from '../viewer/dnd';
 import {
   useFollowedChannels,
   useFollowedLive,
-  useLiveStatus,
   useCategorySearch,
   useCategoryStreams,
   useChannelSearch,
@@ -47,7 +52,71 @@ import styles from './Sidebar.module.css';
 import { useFollowChannel } from './useFollowChannel';
 import { ChannelPreview } from './ChannelPreview';
 import { useChannelPreview, useRowPreview } from './useChannelPreview';
-import { matchesChannel, type ChannelRowInfo as Row } from './channelRows';
+import {
+  matchesChannel,
+  partitionChannelRows,
+  type ChannelRowInfo as Row,
+  type ChannelRowStatus,
+} from './channelRows';
+
+const HISTORY_GROUPS: { status: ChannelRowStatus; label: string }[] = [
+  { status: 'live', label: 'Live' },
+  { status: 'offline', label: 'Offline' },
+  { status: 'checking', label: 'Checking' },
+];
+
+type ChannelProfile = Pick<TwitchUser, 'login' | 'displayName' | 'profileImageUrl'>;
+
+/** A shared batch keeps photos and stream metadata stable when a row moves. */
+function useWatchedMetadata(
+  inView: string[],
+  follows: FollowedChannelInfo[] | undefined,
+  historyEnabled: boolean,
+) {
+  const entries = useWatchHistory((h) => h.entries);
+  const followed = useMemo(() => new Set(follows?.map((f) => f.login)), [follows]);
+  const logins = useMemo(
+    () =>
+      [...new Set([...inView, ...(historyEnabled ? entries.map((e) => e.login) : [])])].filter(
+        (login) => !followed.has(login),
+      ),
+    [inView, entries, followed, historyEnabled],
+  );
+  const users = useUsersFor(logins);
+  const streams = useStreamsFor(logins);
+  const queryClient = useQueryClient();
+  const wanted = new Set(logins);
+  const profiles = new Map<string, ChannelProfile>(
+    (users.data ?? [])
+      .filter((profile) => wanted.has(profile.login))
+      .map((profile) => [profile.login, profile]),
+  );
+  // Cached searches/history batches bridge changes in the watched login set.
+  // Newer metadata wins, while an empty image never erases a loaded photo.
+  const cached = [
+    ...queryClient.getQueryCache().findAll({ queryKey: ['search'] }),
+    ...queryClient.getQueryCache().findAll({ queryKey: ['channel-users'] }),
+  ].sort((a, b) => a.state.dataUpdatedAt - b.state.dataUpdatedAt);
+  for (const query of cached) {
+    for (const profile of (query.state.data as (TwitchUser | ChannelSearchResult)[] | undefined) ??
+      []) {
+      if (!wanted.has(profile.login)) continue;
+      const previous = profiles.get(profile.login);
+      profiles.set(profile.login, {
+        login: profile.login,
+        displayName: profile.displayName || previous?.displayName || profile.login,
+        profileImageUrl: profile.profileImageUrl || previous?.profileImageUrl || '',
+      });
+    }
+  }
+  return {
+    entries,
+    followed,
+    profiles,
+    live: new Map(streams.data?.map((stream) => [stream.login, stream])),
+    known: streams.isSuccess && !streams.isPlaceholderData,
+  };
+}
 
 function sortLive(streams: LiveStream[], sort: SidebarSort): LiveStream[] {
   const copy = [...streams];
@@ -122,18 +191,24 @@ function watchAll(logins: string[]) {
 
 /** Streams in the view that aren't in your follows, so they can be removed here too. */
 function useNotFollowedRows(inView: string[], follows: FollowedChannelInfo[] | undefined): Row[] {
-  const followed = useMemo(() => new Set(follows?.map((f) => f.login)), [follows]);
-  const logins = useMemo(
-    () => (follows ? inView.filter((l) => !followed.has(l)) : []),
-    [inView, follows, followed],
+  const showHistory = useSettings((s) => s.showHistory);
+  const { followed, entries, profiles, live, known } = useWatchedMetadata(
+    inView,
+    follows,
+    showHistory,
   );
-  const { live, known } = useLiveStatus(logins);
+  const logins = follows ? inView.filter((l) => !followed.has(l)) : [];
   return logins.map((login) => {
     const stream = live.get(login);
+    const profile = profiles.get(login);
     return {
       login,
-      displayName: stream?.displayName ?? login,
-      avatar: '',
+      displayName:
+        stream?.displayName ??
+        profile?.displayName ??
+        entries.find((entry) => entry.login === login)?.displayName ??
+        login,
+      avatar: profile?.profileImageUrl ?? '',
       stream,
       liveKnown: known,
     };
@@ -407,6 +482,7 @@ function CollapsedRail({ onExpand }: { onExpand(): void }) {
   const showHistory = useSettings((s) => s.showHistory);
   const others = useNotFollowedRows(inView, follows.isSuccess ? follows.data : undefined);
   const { rows: history } = useHistoryRows(inView, follows.data, showHistory);
+  const groups = partitionChannelRows(history);
   const { preview, showPreview, onPreviewScroll } = useChannelPreview();
   return (
     <nav
@@ -419,33 +495,53 @@ function CollapsedRail({ onExpand }: { onExpand(): void }) {
         icon={<PanelLeftOpen size={18} />}
         onClick={onExpand}
       />
-      {liveRows.map((row) => (
-        <RailItem
-          key={row.login}
-          row={row}
-          inView={inView.includes(row.login)}
-          onHover={(el) => showPreview(row, el)}
-        />
-      ))}
-      {others.map((row) => (
-        <RailItem key={row.login} row={row} inView onHover={(el) => showPreview(row, el)} />
-      ))}
-      {showHistory && history.length > 0 && (
-        <>
-          <div className={styles.railSection} title="Watch history" aria-label="Watch history">
-            <History size={14} />
+      <div className={styles.railGroup} role="group" aria-label="Live followed channels">
+        {liveRows.map((row) => (
+          <RailItem
+            key={row.login}
+            row={row}
+            inView={inView.includes(row.login)}
+            onHover={(el) => showPreview(row, el)}
+          />
+        ))}
+      </div>
+      {others.length > 0 && (
+        <div className={styles.railGroup} role="group" aria-label="Also watching">
+          <div className={styles.railSection} title="Also watching" aria-label="Also watching">
+            <Eye size={14} />
           </div>
-          {history.map((row) => (
-            <RailItem
-              key={row.login}
-              row={row}
-              inView={false}
-              history
-              onHover={(el) => showPreview(row, el)}
-            />
+          {others.map((row) => (
+            <RailItem key={row.login} row={row} inView onHover={(el) => showPreview(row, el)} />
           ))}
-        </>
+        </div>
       )}
+      {showHistory &&
+        HISTORY_GROUPS.filter(({ status }) => groups[status].length > 0).map(
+          ({ status, label }) => (
+            <div
+              key={status}
+              className={styles.railGroup}
+              role="group"
+              aria-label={`${label} watch history`}
+              data-testid="history-section"
+              data-status={status}
+            >
+              <div className={styles.railSection} title={`History · ${label}`}>
+                <History size={14} />
+                <span className={styles.railStatus}>{label}</span>
+              </div>
+              {groups[status].map((row) => (
+                <RailItem
+                  key={row.login}
+                  row={row}
+                  inView={false}
+                  history
+                  onHover={(el) => showPreview(row, el)}
+                />
+              ))}
+            </div>
+          ),
+        )}
       <ChannelPreview preview={preview} />
     </nav>
   );
@@ -512,16 +608,11 @@ function useHistoryRows(
   follows: FollowedChannelInfo[] | undefined,
   enabled: boolean,
 ) {
-  const entries = useWatchHistory((h) => h.entries);
-  const followed = useMemo(() => new Set(follows?.map((f) => f.login)), [follows]);
+  const { entries, followed, profiles, live, known } = useWatchedMetadata(inView, follows, enabled);
   const shown = useMemo(
     () => entries.filter((e) => !inView.includes(e.login) && !followed.has(e.login)),
     [entries, inView, followed],
   );
-  const logins = useMemo(() => (enabled ? shown.map((e) => e.login) : []), [shown, enabled]);
-  const { live, known } = useLiveStatus(logins);
-  const users = useUsersFor(logins);
-  const profiles = new Map(users.data?.map((u) => [u.login, u]));
   const rows: Row[] = shown.map((e) => ({
     login: e.login,
     displayName:
@@ -546,6 +637,7 @@ function HistorySection({
   const follows = useFollowedChannels();
   const { rows: history, count } = useHistoryRows(inView, follows.data, showHistory);
   const rows = history.filter(filter);
+  const groups = partitionChannelRows(rows);
   if (!count) return null;
   return (
     <>
@@ -570,28 +662,44 @@ function HistorySection({
         )}
       </div>
       {showHistory &&
-        rows.map((row) => (
-          <div key={row.login} data-testid="history-row" data-channel={row.login}>
-            <ChannelRow
-              row={row}
-              inView={false}
-              onHover={(el) => onHover(row, el)}
-              actions={
-                <>
-                  <FollowButton login={row.login} name={row.displayName} />
-                  <button
-                    className={styles.rowAction}
-                    title="Remove from history"
-                    aria-label={`Remove ${row.displayName} from history`}
-                    onClick={() => useWatchHistory.getState().forget(row.login)}
-                  >
-                    <X size={14} />
-                  </button>
-                </>
-              }
-            />
-          </div>
-        ))}
+        HISTORY_GROUPS.filter(({ status }) => status !== 'checking' || groups.checking.length).map(
+          ({ status, label }) => (
+            <section
+              key={status}
+              aria-label={`${label} watch history`}
+              data-testid="history-section"
+              data-status={status}
+            >
+              <div className={`${styles.section} ${styles.historyStatus}`}>
+                <span>
+                  {label} · {groups[status].length}
+                </span>
+              </div>
+              {groups[status].map((row) => (
+                <div key={row.login} data-testid="history-row" data-channel={row.login}>
+                  <ChannelRow
+                    row={row}
+                    inView={false}
+                    onHover={(el) => onHover(row, el)}
+                    actions={
+                      <>
+                        <FollowButton login={row.login} name={row.displayName} />
+                        <button
+                          className={styles.rowAction}
+                          title="Remove from history"
+                          aria-label={`Remove ${row.displayName} from history`}
+                          onClick={() => useWatchHistory.getState().forget(row.login)}
+                        >
+                          <X size={14} />
+                        </button>
+                      </>
+                    }
+                  />
+                </div>
+              ))}
+            </section>
+          ),
+        )}
     </>
   );
 }

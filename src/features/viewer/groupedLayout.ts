@@ -1,6 +1,13 @@
-import { computeLayout, type LayoutOptions, type Rect, type Size } from '@/lib/layout';
+import {
+  computeLayout,
+  MIN_MAIN_SCALE,
+  roundRects,
+  type LayoutOptions,
+  type Rect,
+  type Size,
+} from '@/lib/layout';
 import type { StreamSection } from '@/lib/view/groups';
-import { slotOrder } from '@/lib/view/operations';
+import { mainChannel, slotOrder } from '@/lib/view/operations';
 import type { ViewState } from '@/lib/view/types';
 
 export const SECTION_LABEL_HEIGHT = 24;
@@ -11,12 +18,19 @@ export interface PositionedSection extends StreamSection {
 
 export interface GroupedLayout {
   sections: PositionedSection[];
+  focused?: {
+    channel: string;
+    groupId: string;
+    groupName: string;
+    /** Contains the separate focus label and the main video below it. */
+    rect: Rect;
+  };
   tiles: Map<string, Rect>;
   order: string[];
   rects: Rect[];
 }
 
-/** Fit each group independently, keeping the tiles in a single stable DOM list. */
+/** Keep a global focus or grouped grids in a single stable DOM list. */
 export function computeGroupedLayout(
   view: ViewState,
   sections: StreamSection[],
@@ -29,6 +43,8 @@ export function computeGroupedLayout(
   if (!sections.length || size.width <= 0 || size.height <= 0) {
     return { sections: [], tiles: new Map(), order: [], rects: [] };
   }
+  if (view.layout.mode === 'focus' && sections.length > 1)
+    return computeGlobalFocus(view, sections, size, options);
   const candidates: Rect[][] = [];
   const count = sections.length;
   // Equal section grids handle many groups; weighted bands give larger groups
@@ -115,4 +131,136 @@ export function computeGroupedLayout(
     }
   }
   return best;
+}
+
+/** One main video, with intact labeled group grids beside or beneath it. */
+function computeGlobalFocus(
+  view: ViewState,
+  sections: StreamSection[],
+  size: Size,
+  options: LayoutOptions,
+): GroupedLayout {
+  const shown = new Set(sections.flatMap((section) => section.channels));
+  const main = mainChannel(
+    view,
+    view.channels.filter((channel) => shown.has(channel)),
+  )!;
+  const mainGroup = sections.find((section) => section.channels.includes(main))!;
+  const remaining = sections
+    .map((section) => ({
+      ...section,
+      channels: section.channels.filter((channel) => channel !== main),
+    }))
+    .filter((section) => section.channels.length);
+  const gridView = { ...view, layout: { ...view.layout, mode: 'grid' as const } };
+  const labelHeight = view.groups?.length ? SECTION_LABEL_HEIGHT : 0;
+  const maxMainWidth = Math.min(
+    size.width,
+    Math.max(0, size.height - labelHeight) * options.aspect,
+  );
+  const manual = view.layout.mainScale !== 'auto';
+  const scale = manual ? Math.max(MIN_MAIN_SCALE, Math.min(1, view.layout.mainScale as number)) : 1;
+  const requestedWidth = maxMainWidth * scale;
+  const steps = manual ? 26 : 13;
+  let best: GroupedLayout | null = null;
+  let bestScore = { usable: false, mainWidth: 0, utility: -Infinity };
+
+  // Evaluate both orientations as the main size changes. Group-label space is
+  // part of the fit, so many singleton groups also stay reachable in a narrow
+  // window rather than disappearing into a focus layout's thin side strip.
+  for (let step = 0; step <= steps; step++) {
+    const width = requestedWidth * (1 - (step * (1 - MIN_MAIN_SCALE)) / steps);
+    for (const below of [false, true]) {
+      const hero = {
+        x: below ? (size.width - width) / 2 : 0,
+        y: below ? 0 : (size.height - labelHeight - width / options.aspect) / 2,
+        width,
+        height: labelHeight + width / options.aspect,
+      };
+      const region = below
+        ? {
+            x: 0,
+            y: hero.height + options.gap,
+            width: size.width,
+            height: size.height - hero.height - options.gap,
+          }
+        : {
+            x: width + options.gap,
+            y: 0,
+            width: size.width - width - options.gap,
+            height: size.height,
+          };
+      if (region.width <= 0 || region.height <= labelHeight) continue;
+      const clusters = computeGroupedLayout(gridView, remaining, region, options);
+      if (
+        clusters.tiles.size !== shown.size - 1 ||
+        clusters.rects.some((rect) => rect.width <= 0 || rect.height <= 0)
+      )
+        continue;
+      const mainRect = roundRects([
+        { x: hero.x, y: hero.y + labelHeight, width, height: width / options.aspect },
+      ])[0]!;
+      if (mainRect.width <= 0 || mainRect.height <= 0) continue;
+      const tiles = new Map<string, Rect>([[main, mainRect]]);
+      for (const [channel, rect] of clusters.tiles) {
+        // Manual zoom can leave a roomy cluster containing only one stream.
+        // Keep that stream smaller than the main rather than creating another
+        // apparent focus; shrinking inside its slot preserves group geometry.
+        const shrink = Math.min(1, mainRect.width / (1.5 * rect.width));
+        const tileWidth = shrink < 1 ? Math.floor(rect.width * shrink) : rect.width;
+        const tileHeight = shrink < 1 ? Math.floor(tileWidth / options.aspect) : rect.height;
+        const tile = {
+          x: region.x + rect.x + (rect.width - tileWidth) / 2,
+          y: region.y + rect.y + (rect.height - tileHeight) / 2,
+          width: tileWidth,
+          height: tileHeight,
+        };
+        tiles.set(channel, tile);
+      }
+      if ([...tiles.values()].some((rect) => rect.width <= 0 || rect.height <= 0)) continue;
+      const small = [...tiles.values()].slice(1);
+      const mainArea = mainRect.width * mainRect.height;
+      const minArea = Math.min(...small.map((rect) => rect.width * rect.height));
+      const next = {
+        usable: small.every((rect) => rect.width >= 159),
+        mainWidth: mainRect.width,
+        // Focus carries more weight than any group while the smallest stream
+        // still limits the score, preventing a huge main with tiny leftovers.
+        utility: mainArea * mainArea * minArea,
+      };
+      const better = manual
+        ? (next.usable && !bestScore.usable) ||
+          (next.usable === bestScore.usable &&
+            (next.mainWidth > bestScore.mainWidth ||
+              (next.mainWidth === bestScore.mainWidth && next.utility > bestScore.utility)))
+        : next.utility > bestScore.utility;
+      if (!better) continue;
+      const order = [main, ...clusters.order];
+      best = {
+        focused: {
+          channel: main,
+          groupId: mainGroup.id,
+          groupName: mainGroup.name,
+          rect: {
+            x: mainRect.x,
+            y: mainRect.y - labelHeight,
+            width: mainRect.width,
+            height: mainRect.height + labelHeight,
+          },
+        },
+        sections: clusters.sections.map((section) => ({
+          ...section,
+          rect: { ...section.rect, x: section.rect.x + region.x, y: section.rect.y + region.y },
+        })),
+        tiles,
+        order,
+        rects: order.map((channel) => tiles.get(channel)!),
+      };
+      bestScore = next;
+    }
+    // Once a manual size fits usable peers, a smaller main cannot improve its
+    // requested size. Both orientations have already been compared above.
+    if (manual && bestScore.usable) break;
+  }
+  return best ?? { sections: [], tiles: new Map(), order: [], rects: [] };
 }

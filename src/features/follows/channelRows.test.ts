@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchesChannel, type ChannelRowInfo } from './channelRows';
+import { matchesChannel, partitionChannelRows, type ChannelRowInfo } from './channelRows';
 
 const row: ChannelRowInfo = {
   login: 'sample',
@@ -31,5 +31,28 @@ describe('loaded channel metadata filter', () => {
     const offline = { ...row, stream: undefined };
     expect(matchesChannel(offline, 'Sample Channel')).toBe(true);
     expect(matchesChannel(offline, 'programming')).toBe(false);
+  });
+});
+
+describe('history status sections', () => {
+  it('keeps unresolved lookups in Checking and preserves newest-first order per status', () => {
+    const rows: ChannelRowInfo[] = [
+      { ...row, login: 'new-live' },
+      { ...row, login: 'new-offline', stream: undefined, liveKnown: true },
+      { ...row, login: 'unknown', stream: undefined, liveKnown: false },
+      { ...row, login: 'old-live' },
+      { ...row, login: 'old-offline', stream: undefined },
+    ];
+    const groups = partitionChannelRows(rows);
+    expect(groups.live.map((r) => r.login)).toEqual(['new-live', 'old-live']);
+    expect(groups.offline.map((r) => r.login)).toEqual(['new-offline', 'old-offline']);
+    expect(groups.checking.map((r) => r.login)).toEqual(['unknown']);
+    expect(rows.map((r) => r.login)).toEqual([
+      'new-live',
+      'new-offline',
+      'unknown',
+      'old-live',
+      'old-offline',
+    ]);
   });
 });

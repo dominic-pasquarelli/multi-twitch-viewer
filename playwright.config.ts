@@ -31,6 +31,7 @@ export default defineConfig({
         'qol.spec.ts',
         'temporary.spec.ts',
         'sweep1.spec.ts',
+        'sweep2.spec.ts',
         'sidebar.spec.ts',
       ],
       use: { ...chromium, baseURL: `http://localhost:${PORT}` },

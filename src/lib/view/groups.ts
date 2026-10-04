@@ -1,4 +1,5 @@
 import type { StreamGroup, ViewState } from './types';
+import { mainChannel } from './operations';
 
 const MAX_GROUPS = 16;
 const isObject = (v: unknown): v is Record<string, unknown> =>
@@ -130,4 +131,12 @@ export function streamSections(view: ViewState, visible = view.channels): Stream
       sections.push({ id: 'ungrouped', name: 'Ungrouped', channels: ungrouped });
   }
   return sections;
+}
+
+/** Match grouped slots, with one global main before the remaining clusters in Focus. */
+export function groupedSlotOrder(view: ViewState, visible = view.channels): string[] {
+  const clustered = streamSections(view, visible).flatMap((section) => section.channels);
+  if (view.layout.mode !== 'focus') return clustered;
+  const main = mainChannel(view, displayedChannels(view, visible));
+  return main ? [main, ...clustered.filter((login) => login !== main)] : clustered;
 }

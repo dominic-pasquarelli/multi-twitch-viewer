@@ -116,9 +116,15 @@ Behaviour notes:
   (`playerInteraction.ts`: click/focus inside it). `AutoResume` caps retries so a player that
   keeps pausing isn't fought forever.
 - **Groups keep player DOM stable.** Optional groups and the selected tab are part of `ViewState`
-  and validated when sessions/presets load. `groupedLayout` computes separate sections, while all
-  tiles retain alphabetical DOM order. Isolated tabs hide mounted tiles and add a separate group
+  and validated when sessions/presets load. Grid computes separate group sections. Focus places
+  one global main video ahead of the remaining labeled clusters; isolated tabs focus within their
+  members. Quality, hover controls and keyboard slots use that same main. All tiles retain
+  alphabetical DOM order. Isolated tabs hide mounted tiles and add a separate group
   pause reason; they do not alter saved audio state. Arrange mode alone intercepts video dragging.
+- **Watched metadata survives row moves.** History and Also watching share a profile/live-status
+  lookup over their combined nonfollowed logins. Cached user/search photos bridge batch changes.
+  History separates Live, Offline and unresolved Checking entries in expanded and collapsed views,
+  preserving newest-watched order within each section.
 - **Recovery is temporary state.** `PlaybackRecovery` combines sustained low buffer/frame rate,
   repeated unrequested pauses and offline events. It caps background quality, holds muted streams,
   and resumes one every eight seconds after fifteen stable seconds. Manual, group and bandwidth

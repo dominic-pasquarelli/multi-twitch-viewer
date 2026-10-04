@@ -24,7 +24,8 @@ channels are live, and watch several streams at once with layouts that actually 
   disappear when you leave the stream, and stay open while you edit its volume. If a stream pauses on its own it resumes automatically; one
   you paused yourself (clicked inside the player) stays paused.
 - **Stream groups**: **Create group / Manage groups** names related perspectives and assigns streams.
-  **All groups** clusters them together; group tabs isolate one group and pause hidden streams.
+  **All groups** clusters them together; in Focus, one chosen stream stays large across the whole
+  view while the others remain clustered by group. Group tabs isolate one group and pause hidden streams.
   Returning restores the same mix and volumes, keeping manual pauses. Groups save with sessions and presets.
 - **Connection recovery**: sustained playback starvation reduces background quality to 360p (or
   the lowest available rendition) and temporarily pauses muted streams. After the connection settles,
@@ -48,7 +49,8 @@ channels are live, and watch several streams at once with layouts that actually 
   1½ minutes, with Undo). A view loaded from or saved as a preset keeps them (hidden until they're
   live again). Switch it per view at the top of **Presets**, or turn it off in Settings → Layout.
 - **History and following**: channels you watch without following them are kept under
-  **History** in the sidebar, to bring back later. The ♡ button (top-bar controls, _Also watching_ and
+  **History** in the sidebar, split into Live and Offline, to bring back later. History stays newest
+  first within each section, and channels keep their profile pictures when added to Also watching. The ♡ button (top-bar controls, _Also watching_ and
   History) opens the channel's Twitch page to follow it; Twitch doesn't let apps follow for you.
   Collapsed followed and history icons show the same hover preview as the expanded sidebar.
 - **Discovery**: the sidebar's **Discover** tab searches channel names or Twitch categories.

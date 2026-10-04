@@ -4,6 +4,7 @@ import {
   assignGroup,
   createGroup,
   displayedChannels,
+  groupedSlotOrder,
   normalizeGroups,
   removeGroup,
   replaceGroupChannel,
@@ -32,6 +33,31 @@ describe('stream groups', () => {
     expect(displayedChannels(view)).toEqual(['gta1', 'gta2']);
     expect(streamSections(view).map((s) => s.name)).toEqual(['GTA RP']);
     expect(view.audio.active).toEqual(['gta1', 'minecraft1']);
+  });
+
+  it('orders Focus around one main across groups, with a visible fallback in isolated tabs', () => {
+    const view = {
+      ...base(),
+      layout: { mode: 'focus' as const, main: 'minecraft1', mainScale: 'auto' as const },
+      groups: [
+        { id: 'gta', name: 'GTA', channels: ['gta1', 'gta2'] },
+        { id: 'mc', name: 'Minecraft', channels: ['minecraft1'] },
+      ],
+    };
+    expect(groupedSlotOrder(view)).toEqual(['minecraft1', 'gta1', 'gta2', 'other']);
+    expect(groupedSlotOrder({ ...view, layout: { ...view.layout, main: 'other' } })).toEqual([
+      'other',
+      'gta1',
+      'gta2',
+      'minecraft1',
+    ]);
+    expect(groupedSlotOrder({ ...view, activeGroup: 'gta' })).toEqual(['gta1', 'gta2']);
+    expect(groupedSlotOrder({ ...view, layout: { ...view.layout, mode: 'grid' } })).toEqual([
+      'gta1',
+      'gta2',
+      'minecraft1',
+      'other',
+    ]);
   });
 
   it('moves membership, preserves replacement slots, and removes stale channels', () => {

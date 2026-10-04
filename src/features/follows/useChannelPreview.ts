@@ -11,12 +11,32 @@ export interface PreviewPosition {
 export function useChannelPreview() {
   const [preview, setPreview] = useState<PreviewPosition | null>(null);
   const anchor = useRef<{ row: ChannelRowInfo; el: HTMLElement } | null>(null);
+  useEffect(() => {
+    const el = anchor.current?.el;
+    if (!preview || !el) return;
+    let active = true;
+    const dismissDisconnected = () => {
+      // A row can move between status sections without a pointer leave. Only
+      // dismiss this anchor; a newer hover must survive the old row's removal.
+      if (active && anchor.current?.el === el && !el.isConnected) {
+        anchor.current = null;
+        setPreview(null);
+      }
+    };
+    const observer = new MutationObserver(dismissDisconnected);
+    observer.observe(document.body, { childList: true, subtree: true });
+    queueMicrotask(dismissDisconnected);
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
+  }, [preview]);
   const hidePreview = () => {
     anchor.current = null;
     setPreview(null);
   };
   const showPreview = (row: ChannelRowInfo, el: HTMLElement | null) => {
-    if (!el) return hidePreview();
+    if (!el || !el.isConnected) return hidePreview();
     anchor.current = { row, el };
     const box = el.getBoundingClientRect();
     const width = Math.min(300, window.innerWidth - 16);
