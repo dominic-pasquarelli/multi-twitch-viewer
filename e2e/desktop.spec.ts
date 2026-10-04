@@ -2,18 +2,38 @@ import { _electron as electron, expect, test, type ElectronApplication } from '@
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createServer } from 'node:net';
 
 /**
  * The real Electron app, showing the mock build (see playwright.config.ts).
  * Needs a display: run under xvfb-run on Linux CI.
  */
 
-const launch = (userData: string) =>
-  electron.launch({
+let testPort: number;
+const launch = async (userData: string) => {
+  if (!testPort) {
+    testPort = await new Promise<number>((resolve, reject) => {
+      const server = createServer();
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        if (!address || typeof address === 'string') return reject(new Error('No test port'));
+        const port = address.port;
+        server.close((error) => (error ? reject(error) : resolve(port)));
+      });
+    });
+  }
+  return electron.launch({
     // Test-only: CI runners and root shells can't use Chromium's sandbox helper.
     args: ['.', ...(process.env.CI || process.getuid?.() === 0 ? ['--no-sandbox'] : [])],
-    env: { ...process.env, MTV_USER_DATA: userData },
+    env: {
+      ...process.env,
+      MTV_USER_DATA: userData,
+      MTV_TEST_PORT: String(testPort),
+      MTV_WEB_ROOT: join(process.cwd(), 'dist-e2e', 'mock'),
+    },
   });
+};
 
 const mainWindow = (app: ElectronApplication) =>
   app.evaluate(({ BrowserWindow }) => {
@@ -33,6 +53,7 @@ test('desktop app: plays streams, hides to the tray, remembers its window', asyn
   expect(await win.evaluate(() => navigator.userAgent.includes('Electron'))).toBe(false);
   await win.evaluate(() => (location.hash = '#/pixelpaladin/novastrike'));
   await expect(win.getByTestId('player-tile')).toHaveCount(2);
+  await expect.poll(async () => (await mainWindow(app)).visible).toBe(true);
 
   // Closing the window keeps the app in the tray, with the streams stopped.
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.close());
@@ -49,7 +70,7 @@ test('desktop app: plays streams, hides to the tray, remembers its window', asyn
   // Links elsewhere never take over the app window.
   await win.evaluate(() => (location.href = 'https://example.com/'));
   await win.waitForTimeout(300);
-  expect(win.url()).toContain('http://localhost:5757/');
+  expect(win.url()).toContain(`http://localhost:${testPort}/`);
 
   // Window position is remembered across restarts.
   await app.evaluate(({ BrowserWindow }) =>
@@ -175,4 +196,37 @@ test('desktop app: fullscreen never gets stuck', async () => {
   await expect.poll(isFullScreen).toBe(false);
   await app.evaluate(({ app: a }) => a.quit());
   await app.close().catch(() => {});
+});
+
+test('desktop app: decoding error 3000 reloads only the failed stream', async () => {
+  const app = await launch(mkdtempSync(join(tmpdir(), 'mtv-desktop-')));
+  try {
+    const win = await app.firstWindow();
+    await win.evaluate(() => (location.hash = '#/pixelpaladin/novastrike'));
+    const mock = (login: string) => win.locator(`[data-channel=${login}] .mock-player`);
+    for (const login of ['pixelpaladin', 'novastrike']) {
+      await expect(mock(login)).toHaveAttribute('data-paused', 'false');
+      await mock(login).evaluate((el) => el.setAttribute('data-mount-sentinel', 'original'));
+    }
+    await app.context().route('https://player.twitch.tv/**', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: '<div role="alert">Your browser encountered an error while decoding the video. (Error #3000)</div>',
+      }),
+    );
+    // A verified Twitch frame exercises the main-process scanner and secure bridge.
+    await win.evaluate(() => {
+      const iframe = document.createElement('iframe');
+      iframe.src = 'https://player.twitch.tv/?channel=pixelpaladin&parent=localhost';
+      iframe.hidden = true;
+      document.body.append(iframe);
+    });
+    await expect(mock('pixelpaladin')).not.toHaveAttribute('data-mount-sentinel', 'original', {
+      timeout: 8000,
+    });
+    await expect(mock('pixelpaladin')).toHaveAttribute('data-paused', 'false');
+    await expect(mock('novastrike')).toHaveAttribute('data-mount-sentinel', 'original');
+  } finally {
+    await app.close();
+  }
 });

@@ -1,4 +1,5 @@
 import type { PlayerAdapter, PlayerStatus } from './types';
+import { pickQualityAtMost } from './quality';
 
 export interface DesiredPlayerState {
   muted: boolean;
@@ -37,6 +38,8 @@ export class PlayerController {
   private readonly now: () => number;
   private readonly adapter: PlayerAdapter;
   private readonly callbacks: PlayerControllerCallbacks;
+  private recoveryQualityCap: number | null = null;
+  private appliedQuality: string | undefined;
   status: PlayerStatus = 'loading';
 
   constructor(
@@ -89,7 +92,28 @@ export class PlayerController {
     this.lastCommandAt = this.now();
     if (state.volume !== undefined && state.volume !== null) this.adapter.setVolume(state.volume);
     if (state.muted !== undefined) this.adapter.setMuted(state.muted);
-    if (state.quality !== undefined) this.adapter.setQuality(state.quality ?? 'auto');
+    if (state.quality !== undefined || this.recoveryQualityCap !== null) this.applyQuality();
+  }
+
+  /** Temporarily limits bandwidth without replacing the user's quality preference. */
+  setRecoveryQualityCap(height: number | null) {
+    if (height === this.recoveryQualityCap && height === null) return;
+    this.recoveryQualityCap = height;
+    if (this.ready) this.applyQuality();
+  }
+
+  private applyQuality() {
+    let quality = this.desired.quality ?? 'auto';
+    if (this.recoveryQualityCap !== null) {
+      const qualities = this.adapter.getQualities();
+      const desiredHeight = qualities.find((q) => q.group === quality)?.height;
+      const cap = Math.min(this.recoveryQualityCap, desiredHeight || Infinity);
+      quality = pickQualityAtMost(qualities, cap) ?? 'auto';
+    }
+    if (quality === this.appliedQuality) return;
+    this.lastCommandAt = this.now();
+    this.appliedQuality = quality;
+    this.adapter.setQuality(quality);
   }
 
   /** Compares the player with the desired state and reports external changes. */
@@ -110,7 +134,10 @@ export class PlayerController {
 
   /** Re-applies the desired state (e.g. after the user clicked to allow audio). */
   reapply() {
-    if (this.ready) this.apply(this.desired);
+    if (this.ready) {
+      this.appliedQuality = undefined;
+      this.apply(this.desired);
+    }
   }
 
   dispose() {

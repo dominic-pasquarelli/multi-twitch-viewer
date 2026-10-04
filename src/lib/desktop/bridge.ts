@@ -33,12 +33,14 @@ export interface DesktopBridge {
   /** Rebuilds and reinstalls from the latest code on GitHub; the app closes and reopens. */
   installUpdate(): void;
   /** Presses play inside every Twitch player (gets past content blurs the embed API can't). */
-  playAll?(): void;
+  playAll?(channels?: readonly string[]): void;
   /** Tweaks Twitch's own UI inside the players (see desktop/playerChrome.mjs). */
   setPlayerChrome?(options: PlayerChrome): void;
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void;
   /** Called with the channel when a player is right-clicked. */
   onPlayerContextMenu?(callback: (channel: string) => void): () => void;
+  /** Exact decode-error notifications are available only in the desktop app. */
+  onPlayerError?(callback: (error: { channel: string; code: 3000 }) => void): () => void;
   /** Called with true when the window is hidden to the tray, false when shown. */
   onBackgroundChange(callback: (hidden: boolean) => void): () => void;
 }

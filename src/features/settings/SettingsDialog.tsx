@@ -133,7 +133,7 @@ function SettingsForm() {
             checked={s.rightClickCloses}
             onChange={(v) => s.update({ rightClickCloses: v })}
             label="Right-click a stream to close it"
-            help="Not the main one in focus layout. Undo brings it back."
+            help="Any stream, including the main one. Right-click its bar, or its video in the desktop app. Undo brings it back."
           />
           <Checkbox
             checked={s.hideOffline}

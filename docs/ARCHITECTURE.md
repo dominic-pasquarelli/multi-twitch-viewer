@@ -99,13 +99,23 @@ Behaviour notes:
   their `left/top/width/height`. Moving an iframe in the DOM would restart the stream.
 - **Nothing covers a player while it starts.** Twitch refuses to autoplay embeds that are smaller
   than 400×300, covered by other elements, or transformed. So the audible-stream highlight is
-  an `outline` drawn in the gap _outside_ the player, a stream's controls live in the top bar
-  (`StreamControls`, for the last hovered stream), tiles are positioned without CSS transforms,
+  an `outline` drawn in the gap _outside_ the player. Each tile reserves 64px above its iframe
+  for `StreamControls` (shown on hover/focus, always in Mix), tiles are positioned without CSS transforms,
   and the layout engine avoids tiles below 400×300 when it can.
 - **Streams keep playing unless you paused them.** When a player reports `paused`, the tile
   resumes it after a moment unless you interacted with that player just before
   (`playerInteraction.ts`: click/focus inside it). `AutoResume` caps retries so a player that
   keeps pausing isn't fought forever.
+- **Groups keep player DOM stable.** Optional groups and the selected tab are part of `ViewState`
+  and validated when sessions/presets load. `groupedLayout` computes separate sections, while all
+  tiles retain alphabetical DOM order. Isolated tabs hide mounted tiles and add a separate group
+  pause reason; they do not alter saved audio state. Arrange mode alone intercepts video dragging.
+- **Recovery is temporary state.** `PlaybackRecovery` combines sustained low buffer/frame rate,
+  repeated unrequested pauses and offline events. It caps background quality, holds muted streams,
+  and resumes one every eight seconds after fifteen stable seconds. Manual, group and bandwidth
+  pause reasons are independent. A shared reload budget limits reloads across embed remounts.
+  Exact decoding errors are observed only in verified HTTPS Twitch player frames in Electron;
+  browser recovery uses sustained playback starvation.
 - **`PlayerController` reconciles desired vs actual player state.** The app says what it wants
   (muted, volume, quality). The controller applies it once the player is ready, and polls
   cheaply once a second to notice changes made with Twitch's own controls, which feed back into

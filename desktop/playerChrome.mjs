@@ -8,7 +8,8 @@
 /** @param {string} url */
 export function isPlayerFrameUrl(url) {
   try {
-    return new URL(url).hostname === 'player.twitch.tv';
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && parsed.hostname === 'player.twitch.tv';
   } catch {
     return false;
   }
@@ -22,7 +23,7 @@ export function isPlayerFrameUrl(url) {
 export function channelFromPlayerUrl(url) {
   if (!isPlayerFrameUrl(url)) return null;
   const channel = new URL(url).searchParams.get('channel');
-  return channel ? channel.toLowerCase() : null;
+  return channel && /^[a-z0-9_]{1,25}$/i.test(channel) ? channel.toLowerCase() : null;
 }
 
 /**
@@ -204,13 +205,54 @@ export function playerChromeScript(options) {
 /**
  * "Play all": presses play in every Twitch player frame that isn't playing.
  * @param {Iterable<{ url: string, executeJavaScript(code: string, userGesture?: boolean): Promise<unknown> }>} frames
+ * @param {readonly string[] | undefined} [channels] Optional allowlist: hidden/recovery-paused groups stay paused.
  */
-export function playAllFrames(frames) {
+export function playAllFrames(frames, channels) {
   for (const frame of frames) {
     if (!isPlayerFrameUrl(frame.url)) continue;
+    const channel = channelFromPlayerUrl(frame.url);
+    if (channels && (!channel || !channels.includes(channel))) continue;
     // As a user gesture, so the player treats it like a real click.
     frame.executeJavaScript(`(${pressPlay.toString()})()`, true).catch(() => {});
   }
+}
+
+/** Runs inside a trusted player frame; a browser page cannot inspect this DOM. */
+export function inspectPlayerError() {
+  const video = document.querySelector('video');
+  // MEDIA_ERR_DECODE is the underlying HTML video error behind Twitch #3000.
+  if (video?.error?.code === 3) return 3000;
+  const errors = document.querySelectorAll(
+    '[data-a-target*="error"], [data-test-selector*="error"], [role="alert"]',
+  );
+  if ([...errors].some((element) => /\berror\s*#?\s*3000\b/i.test(element.textContent ?? '')))
+    return 3000;
+  const text = document.body?.textContent ?? '';
+  return /browser encountered an error while decoding the video/i.test(text) &&
+    /\berror\s*#?\s*3000\b/i.test(text)
+    ? 3000
+    : null;
+}
+
+/**
+ * Reads errors only from HTTPS Twitch frames belonging to this window. The
+ * channel comes from the verified frame URL, never from page-supplied payloads.
+ * @param {Iterable<{url: string, executeJavaScript(code: string): Promise<unknown>}>} frames
+ * @param {(error: {channel: string, code: 3000}) => void} report
+ */
+export async function scanPlayerErrors(frames, report) {
+  await Promise.all(
+    [...frames].map(async (frame) => {
+      const channel = channelFromPlayerUrl(frame.url);
+      if (!channel) return;
+      try {
+        const code = await frame.executeJavaScript(`(${inspectPlayerError.toString()})()`);
+        if (code === 3000 && channelFromPlayerUrl(frame.url) === channel) report({ channel, code });
+      } catch {
+        // Frames can disappear or navigate during a scan; retry on the next tick.
+      }
+    }),
+  );
 }
 
 /**

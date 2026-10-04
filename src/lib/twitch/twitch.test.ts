@@ -141,6 +141,61 @@ describe('Helix API', () => {
     expect(fetchMock.mock.calls[0]![0]).toContain('user_login=a&user_login=b');
   });
 
+  it('searches category names and maps category artwork', async () => {
+    const { api, fetchMock } = setup([
+      json({ data: [{ id: '42', name: 'Just Chatting', box_art_url: 'box-art' }] }),
+    ]);
+    await expect(api.searchCategories(' Just Chatting ')).resolves.toEqual([
+      { id: '42', name: 'Just Chatting', boxArtUrl: 'box-art' },
+    ]);
+    const url = new URL(fetchMock.mock.calls[0]![0]);
+    expect(url.pathname).toBe('/helix/search/categories');
+    expect(url.searchParams.get('query')).toBe('Just Chatting');
+    await expect(api.searchCategories(' ')).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('browses category streams with pagination and supported metadata', async () => {
+    const { api, fetchMock } = setup([
+      json({
+        data: [
+          {
+            user_id: '1',
+            user_login: 'sample',
+            user_name: 'Sample',
+            game_name: 'Chess',
+            title: 'Rapid games',
+            viewer_count: 22,
+            started_at: '2026-10-04T12:00:00Z',
+            thumbnail_url: 'live-{width}x{height}',
+            type: 'live',
+            tags: ['English', 'Strategy'],
+            language: 'en',
+          },
+        ],
+        pagination: { cursor: 'next page' },
+      }),
+      json({ data: [], pagination: {} }),
+    ]);
+    const first = await api.getStreamsByCategory('743');
+    expect(first.cursor).toBe('next page');
+    expect(first.streams[0]).toMatchObject({
+      login: 'sample',
+      title: 'Rapid games',
+      thumbnailUrl: 'live-{width}x{height}',
+      tags: ['English', 'Strategy'],
+      language: 'en',
+    });
+    await expect(api.getStreamsByCategory('743', first.cursor)).resolves.toEqual({
+      streams: [],
+      cursor: undefined,
+    });
+    const url = new URL(fetchMock.mock.calls[1]![0]);
+    expect(url.pathname).toBe('/helix/streams');
+    expect(url.searchParams.get('game_id')).toBe('743');
+    expect(url.searchParams.get('after')).toBe('next page');
+  });
+
   it('reports 401 and throws', async () => {
     const { api, onUnauthorized } = setup([json({ message: 'Invalid OAuth token' }, 401)]);
     await expect(api.getMe()).rejects.toBeInstanceOf(TwitchApiError);

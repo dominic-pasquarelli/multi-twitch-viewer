@@ -63,15 +63,15 @@ test('arrow keys and the mouse wheel change volume', async ({ page }) => {
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('ArrowUp');
   await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.60');
-  // The top-bar controls show the stream whose volume changed.
-  await expect(page.getByTestId('stream-volume')).toHaveText('60%');
+  await tile(page, 'pixelpaladin').hover();
+  await expect(tile(page, 'pixelpaladin').getByTestId('stream-volume')).toHaveText('60%');
 
-  // Hover another stream, then scroll over its controls in the top bar.
+  // Hover another stream, then scroll over its volume slider above the video.
   await tile(page, 'novastrike').hover();
-  await expect(page.getByTestId('stream-chip')).toContainText('NovaStrike');
-  await page.getByTestId('stream-controls').hover();
+  await expect(tile(page, 'novastrike').getByTestId('stream-chip')).toContainText('NovaStrike');
+  await tile(page, 'novastrike').getByRole('slider').hover();
   await page.mouse.wheel(0, 100); // scroll down = quieter
-  await expect(page.getByTestId('stream-volume')).toHaveText('45%');
+  await expect(tile(page, 'novastrike').getByTestId('stream-volume')).toHaveText('45%');
 });
 
 test('streams that pause on their own resume; ones you pause stay paused', async ({ page }) => {
@@ -253,10 +253,13 @@ test('the main stream plays at source quality, the smaller ones match their size
   await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-quality', 'chunked');
 });
 
-test('right-clicking a small stream closes it (not the main one), with Undo', async ({ page }) => {
+test('right-clicking any stream closes it, including the main one, with Undo', async ({ page }) => {
   await page.goto('/#/pixelpaladin/novastrike/lunarlatte?layout=focus');
   await expect(tile(page, 'lunarlatte')).toBeVisible();
-  await mockPlayer(page, 'pixelpaladin').click({ button: 'right' }); // main: stays
+  await mockPlayer(page, 'pixelpaladin').click({ button: 'right' });
+  await expect(tile(page, 'pixelpaladin')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(tile(page, 'pixelpaladin')).toBeVisible();
   await mockPlayer(page, 'lunarlatte').click({ button: 'right' });
   await expect(tile(page, 'lunarlatte')).toHaveCount(0);
   await expect(tile(page, 'pixelpaladin')).toBeVisible();

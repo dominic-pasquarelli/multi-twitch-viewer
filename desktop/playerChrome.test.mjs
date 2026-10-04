@@ -9,6 +9,8 @@ import {
   playerChromeScript,
   playAllFrames,
   pressPlay,
+  inspectPlayerError,
+  scanPlayerErrors,
 } from './playerChrome.mjs';
 
 // A cut-down Twitch player: video, stream-info overlay on top, controls below.
@@ -178,6 +180,61 @@ describe('pressing play (Play all)', () => {
     });
     playAllFrames([frame('https://player.twitch.tv/?channel=a'), frame('http://localhost:5757/')]);
     expect(calls).toEqual([['https://player.twitch.tv/?channel=a', true]]);
+  });
+
+  it('respects the currently playable channel allowlist', () => {
+    const calls = [];
+    const frame = (channel) => ({
+      url: `https://player.twitch.tv/?channel=${channel}`,
+      executeJavaScript: async () => void calls.push(channel),
+    });
+    playAllFrames([frame('shown'), frame('hidden')], ['shown']);
+    expect(calls).toEqual(['shown']);
+  });
+});
+
+describe('decode error detection', () => {
+  it('detects the HTML video decode error and the Twitch error overlay', () => {
+    document.body.innerHTML = '<video></video>';
+    expect(inspectPlayerError()).toBeNull();
+    Object.defineProperty(document.querySelector('video'), 'error', { value: { code: 3 } });
+    expect(inspectPlayerError()).toBe(3000);
+    document.body.innerHTML = '<div data-a-target="player-overlay-error">Error #3000</div>';
+    expect(inspectPlayerError()).toBe(3000);
+    document.body.innerHTML = '<div role="alert">Error #30000</div>';
+    expect(inspectPlayerError()).toBeNull();
+    document.body.innerHTML =
+      '<p>Your browser encountered an error while decoding the video. (Error #3000)</p>';
+    expect(inspectPlayerError()).toBe(3000);
+  });
+
+  it('reports only valid HTTPS Twitch frames, excluding frames that navigate during inspection', async () => {
+    const calls = [];
+    const errors = [];
+    const frame = (url) => ({
+      url,
+      executeJavaScript: async () => {
+        calls.push(url);
+        return 3000;
+      },
+    });
+    const navigated = frame('https://player.twitch.tv/?channel=moving');
+    navigated.executeJavaScript = async () => {
+      navigated.url = 'https://evil.example/';
+      return 3000;
+    };
+    await scanPlayerErrors(
+      [
+        frame('https://player.twitch.tv/?channel=real'),
+        frame('https://evil.example/?channel=bad'),
+        frame('http://player.twitch.tv/?channel=insecure'),
+        frame('https://player.twitch.tv/?channel=bad%22'),
+        navigated,
+      ],
+      (error) => errors.push(error),
+    );
+    expect(calls).toEqual(['https://player.twitch.tv/?channel=real']);
+    expect(errors).toEqual([{ channel: 'real', code: 3000 }]);
   });
 });
 

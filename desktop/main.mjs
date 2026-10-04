@@ -27,8 +27,9 @@ import {
   DEFAULT_PLAYER_CHROME,
   normalizePlayerChrome,
   playAllFrames,
+  scanPlayerErrors,
 } from './playerChrome.mjs';
-import { APP_URL, startServer } from './server.mjs';
+import { APP_URL, PORT, startServer } from './server.mjs';
 import { createTray } from './tray.mjs';
 import { checkForUpdate, readBuildCommit, startUpdater } from './updates.mjs';
 import { parseState, restoreBounds } from './windowState.mjs';
@@ -63,7 +64,7 @@ async function start() {
   } catch {
     dialog.showErrorBox(
       'Multi Twitch Viewer',
-      'Port 5757 is already in use, so the app can’t start.\n\nIs the web version (npm start) still running? Close it and try again.',
+      `Port ${PORT} is already in use, so the app can’t start.\n\nIs the web version (npm start) still running? Close it and try again.`,
     );
     app.quit();
     return;
@@ -95,8 +96,13 @@ async function start() {
   ipcMain.handle('mtv:update-status', () => updateStatus);
   ipcMain.handle('mtv:update-check', () => runUpdateCheck());
   ipcMain.on('mtv:update-install', () => installUpdate());
-  ipcMain.on('mtv:play-all', () => {
-    playAllFrames(win?.webContents.mainFrame.framesInSubtree ?? []);
+  ipcMain.on('mtv:play-all', (_event, channels) => {
+    const allowed = Array.isArray(channels)
+      ? channels.filter(
+          (channel) => typeof channel === 'string' && /^[a-z0-9_]{1,25}$/.test(channel),
+        )
+      : undefined;
+    playAllFrames(win?.webContents.mainFrame.framesInSubtree ?? [], allowed);
   });
   ipcMain.on('mtv:player-chrome', (_e, options) => {
     playerChrome = normalizePlayerChrome(options);
@@ -210,6 +216,19 @@ function createWindow() {
   wc.on('did-frame-finish-load', (_e, isMainFrame, processId, routingId) => {
     if (!isMainFrame) applyPlayerChrome(webFrameMain.fromId(processId, routingId), playerChrome);
   });
+  let scanningErrors = false;
+  const errorScan = setInterval(async () => {
+    if (wc.isDestroyed() || scanningErrors) return;
+    scanningErrors = true;
+    try {
+      await scanPlayerErrors(wc.mainFrame.framesInSubtree, (error) => {
+        if (!wc.isDestroyed()) wc.send('mtv:player-error', error);
+      });
+    } finally {
+      scanningErrors = false;
+    }
+  }, 2000);
+  win.once('closed', () => clearInterval(errorScan));
   // Right-clicks inside a player (an iframe the page can't see into) are
   // reported here; the page decides what to do (close a small stream).
   wc.on('context-menu', (_e, params) => {
@@ -287,7 +306,9 @@ function createWindow() {
 
 function showWindow() {
   if (!win) return;
-  if (!win.isVisible()) win.webContents.send('mtv:background', false);
+  // Visibility can change before the renderer handles a tray-hide event.
+  // Showing the app always clears its background state, even if already visible.
+  win.webContents.send('mtv:background', false);
   if (win.isMinimized()) win.restore();
   win.show();
   win.focus();

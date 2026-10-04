@@ -1,4 +1,10 @@
-import type { PlayerAdapter, PlayerEvent, PlayerFactory, PlayerQuality } from './types';
+import type {
+  PlayerAdapter,
+  PlayerEvent,
+  PlayerFactory,
+  PlayerPlaybackStats,
+  PlayerQuality,
+} from './types';
 
 const SCRIPT_URL = 'https://player.twitch.tv/js/embed/v1.js';
 
@@ -15,6 +21,8 @@ interface TwitchPlayerInstance {
   setQuality(q: string): void;
   play(): void;
   pause(): void;
+  isPaused(): boolean;
+  getPlaybackStats(): PlayerPlaybackStats;
 }
 
 interface TwitchPlayerConstructor {
@@ -145,6 +153,8 @@ class TwitchEmbedAdapter implements PlayerAdapter {
   setQuality = (q: string) => this.call((p) => p.setQuality(q));
   play = () => this.call((p) => p.play());
   pause = () => this.call((p) => p.pause());
+  isPaused = () => this.read((p) => p.isPaused(), false);
+  getPlaybackStats = () => this.read((p) => p.getPlaybackStats(), null);
 
   on(event: PlayerEvent, handler: () => void) {
     let set = this.listeners.get(event);

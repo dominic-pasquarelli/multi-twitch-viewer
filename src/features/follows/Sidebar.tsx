@@ -1,4 +1,11 @@
-import { useMemo, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -13,8 +20,8 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useServices } from '@/app/servicesContext';
 import { favoritesFirst } from '@/lib/alerts/goLive';
-import type { LiveStream } from '@/lib/twitch/types';
-import { formatCount, formatUptime, sizedThumbnail } from '@/lib/utils/format';
+import type { LiveStream, TwitchCategory } from '@/lib/twitch/types';
+import { formatCount, sizedThumbnail } from '@/lib/utils/format';
 import { useAuth } from '@/state/authStore';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useWatchHistory } from '@/state/historyStore';
@@ -29,17 +36,18 @@ import {
   useFollowedChannels,
   useFollowedLive,
   useLiveStatus,
+  useCategorySearch,
+  useCategoryStreams,
+  useChannelSearch,
+  useStreamsFor,
+  useUsersFor,
   type FollowedChannelInfo,
 } from './queries';
 import styles from './Sidebar.module.css';
 import { useFollowChannel } from './useFollowChannel';
-
-interface Row {
-  login: string;
-  displayName: string;
-  avatar: string;
-  stream?: LiveStream;
-}
+import { ChannelPreview } from './ChannelPreview';
+import { useChannelPreview, useRowPreview } from './useChannelPreview';
+import { matchesChannel, type ChannelRowInfo as Row } from './channelRows';
 
 function sortLive(streams: LiveStream[], sort: SidebarSort): LiveStream[] {
   const copy = [...streams];
@@ -119,10 +127,16 @@ function useNotFollowedRows(inView: string[], follows: FollowedChannelInfo[] | u
     () => (follows ? inView.filter((l) => !followed.has(l)) : []),
     [inView, follows, followed],
   );
-  const { live } = useLiveStatus(logins);
+  const { live, known } = useLiveStatus(logins);
   return logins.map((login) => {
     const stream = live.get(login);
-    return { login, displayName: stream?.displayName ?? login, avatar: '', stream };
+    return {
+      login,
+      displayName: stream?.displayName ?? login,
+      avatar: '',
+      stream,
+      liveKnown: known,
+    };
   });
 }
 
@@ -133,34 +147,32 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
   const inView = useViewStore((s) => s.view.channels);
   const { sidebarSort, showOfflineFollows, update } = useSettings();
   const [filter, setFilter] = useState('');
-  const [preview, setPreview] = useState<{ stream: LiveStream; top: number; left: number } | null>(
-    null,
-  );
+  const [mode, setMode] = useState<'followed' | 'discover'>('followed');
+  const { preview, showPreview, hidePreview, onPreviewScroll } = useChannelPreview();
   const queryClient = useQueryClient();
 
-  const match = (r: Row) => {
-    const q = filter.trim().toLowerCase();
-    return (
-      !q ||
-      r.login.includes(q) ||
-      r.displayName.toLowerCase().includes(q) ||
-      (r.stream?.gameName.toLowerCase().includes(q) ?? false)
-    );
-  };
+  const match = (r: Row) => matchesChannel(r, filter);
   const shownLive = liveRows.filter(match);
   const shownOffline = offlineRows.filter(match);
   const others = useNotFollowedRows(inView, follows.isSuccess ? follows.data : undefined);
 
   return (
-    <aside className={styles.sidebar} aria-label="Followed channels">
+    <aside
+      className={styles.sidebar}
+      aria-label={mode === 'followed' ? 'Followed channels' : 'Discover Twitch'}
+    >
       <div className={styles.header}>
-        <h2>Followed</h2>
+        <h2>{mode === 'followed' ? 'Followed' : 'Discover'}</h2>
         {api && (
           <IconButton
             size="sm"
             label="Refresh now"
             icon={<RefreshCw size={14} className={live.isFetching ? 'spin' : undefined} />}
-            onClick={() => void queryClient.invalidateQueries({ queryKey: ['followed-live'] })}
+            onClick={() => {
+              void queryClient.invalidateQueries({ queryKey: ['followed-live'] });
+              void queryClient.invalidateQueries({ queryKey: ['streams'] });
+              void queryClient.invalidateQueries({ queryKey: ['category-streams'] });
+            }}
           />
         )}
         <IconButton
@@ -170,6 +182,29 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
           onClick={onCollapse}
         />
       </div>
+
+      {api && (
+        <div className={styles.modes} aria-label="Sidebar mode">
+          <button
+            aria-pressed={mode === 'followed'}
+            onClick={() => {
+              setMode('followed');
+              hidePreview();
+            }}
+          >
+            Followed
+          </button>
+          <button
+            aria-pressed={mode === 'discover'}
+            onClick={() => {
+              setMode('discover');
+              hidePreview();
+            }}
+          >
+            Discover
+          </button>
+        </div>
+      )}
 
       {!api ? (
         <div className={styles.notice}>
@@ -186,12 +221,19 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
           )}
           <LoginButton label={status === 'expired' ? 'Log in again' : undefined} />
         </div>
+      ) : mode === 'discover' ? (
+        <Discovery
+          inView={inView}
+          onHover={showPreview}
+          onDismiss={hidePreview}
+          onScroll={onPreviewScroll}
+        />
       ) : (
         <>
           <div className={styles.controls}>
             <input
               className={styles.filter}
-              placeholder="Filter channels or games"
+              placeholder="Name, category, title or tag"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               aria-label="Filter followed channels"
@@ -207,17 +249,18 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
               <option value="uptime">Newest</option>
             </select>
           </div>
-          <div className={styles.list} onScroll={() => setPreview(null)}>
+          <div className={styles.list} onScroll={onPreviewScroll}>
             {others.length > 0 && (
               <>
                 <div className={styles.section} title="Streams in this view you don't follow">
                   <span>Also watching · {others.length}</span>
                 </div>
-                {others.map((row) => (
+                {others.filter(match).map((row) => (
                   <ChannelRow
                     key={row.login}
                     row={row}
                     inView
+                    onHover={(el) => showPreview(row, el)}
                     actions={<FollowButton login={row.login} name={row.displayName} />}
                   />
                 ))}
@@ -253,19 +296,11 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
                 key={row.login}
                 row={row}
                 inView={inView.includes(row.login)}
-                onHover={(el) => {
-                  if (!el || !row.stream) return setPreview(null);
-                  const box = el.getBoundingClientRect();
-                  setPreview({
-                    stream: row.stream,
-                    top: Math.min(box.top, window.innerHeight - 250),
-                    left: box.right + 8,
-                  });
-                }}
+                onHover={(el) => showPreview(row, el)}
               />
             ))}
 
-            <HistorySection inView={inView} filter={match} />
+            <HistorySection inView={inView} filter={match} onHover={showPreview} />
 
             <button
               className={styles.section}
@@ -277,24 +312,18 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
             </button>
             {showOfflineFollows &&
               shownOffline.map((row) => (
-                <ChannelRow key={row.login} row={row} inView={inView.includes(row.login)} />
+                <ChannelRow
+                  key={row.login}
+                  row={row}
+                  inView={inView.includes(row.login)}
+                  onHover={(el) => showPreview(row, el)}
+                />
               ))}
           </div>
         </>
       )}
 
-      {preview && (
-        <div className={styles.preview} style={{ top: preview.top, left: preview.left }}>
-          <img src={sizedThumbnail(preview.stream.thumbnailUrl, 440, 248)} alt="" />
-          <div className={styles.previewText}>
-            <div>{preview.stream.title}</div>
-            <div>
-              {preview.stream.gameName} · {formatCount(preview.stream.viewerCount)} viewers · live{' '}
-              {formatUptime(preview.stream.startedAt)}
-            </div>
-          </div>
-        </div>
-      )}
+      <ChannelPreview preview={preview} />
     </aside>
   );
 }
@@ -315,6 +344,7 @@ function ChannelRow({
   const favorite = useChannelPrefs((p) => p.favorites.includes(row.login));
   const toggleFavorite = useChannelPrefs((p) => p.toggleFavorite);
   const s = row.stream;
+  const showPreview = useRowPreview(row, onHover);
   return (
     <div
       className={`${styles.rowWrap} ${favorite ? styles.favorite : ''} ${actions ? styles.withActions : ''}`}
@@ -329,11 +359,13 @@ function ChannelRow({
           (inView ? 'Click to remove' : 'Click to add') +
           ' · Shift+click to watch only this · drag onto a stream to replace it'
         }
-        onMouseEnter={(e) => onHover?.(e.currentTarget)}
-        onMouseLeave={() => onHover?.(null)}
+        onMouseEnter={(e) => showPreview(e.currentTarget)}
+        onMouseLeave={() => showPreview(null)}
+        onFocus={(e) => showPreview(e.currentTarget)}
+        onBlur={() => showPreview(null)}
         {...handlers}
         onClick={(e) => {
-          onHover?.(null); // the preview must not cover players while they start
+          showPreview(null); // the preview must not cover players while they start
           handlers.onClick(e);
         }}
       >
@@ -370,33 +402,89 @@ function ChannelRow({
 }
 
 function CollapsedRail({ onExpand }: { onExpand(): void }) {
-  const { liveRows } = useRows();
+  const { liveRows, follows } = useRows();
   const inView = useViewStore((s) => s.view.channels);
+  const showHistory = useSettings((s) => s.showHistory);
+  const others = useNotFollowedRows(inView, follows.isSuccess ? follows.data : undefined);
+  const { rows: history } = useHistoryRows(inView, follows.data, showHistory);
+  const { preview, showPreview, onPreviewScroll } = useChannelPreview();
   return (
-    <nav className={styles.rail} aria-label="Live followed channels">
+    <nav
+      className={styles.rail}
+      aria-label="Live followed channels and history"
+      onScroll={onPreviewScroll}
+    >
       <IconButton
         label="Expand sidebar (B)"
         icon={<PanelLeftOpen size={18} />}
         onClick={onExpand}
       />
       {liveRows.map((row) => (
-        <RailItem key={row.login} row={row} inView={inView.includes(row.login)} />
+        <RailItem
+          key={row.login}
+          row={row}
+          inView={inView.includes(row.login)}
+          onHover={(el) => showPreview(row, el)}
+        />
       ))}
+      {others.map((row) => (
+        <RailItem key={row.login} row={row} inView onHover={(el) => showPreview(row, el)} />
+      ))}
+      {showHistory && history.length > 0 && (
+        <>
+          <div className={styles.railSection} title="Watch history" aria-label="Watch history">
+            <History size={14} />
+          </div>
+          {history.map((row) => (
+            <RailItem
+              key={row.login}
+              row={row}
+              inView={false}
+              history
+              onHover={(el) => showPreview(row, el)}
+            />
+          ))}
+        </>
+      )}
+      <ChannelPreview preview={preview} />
     </nav>
   );
 }
 
-function RailItem({ row, inView }: { row: Row; inView: boolean }) {
+function RailItem({
+  row,
+  inView,
+  history,
+  onHover,
+}: {
+  row: Row;
+  inView: boolean;
+  history?: boolean;
+  onHover(el: HTMLElement | null): void;
+}) {
   const handlers = useRowHandlers(row.login);
+  const showPreview = useRowPreview(row, onHover);
   return (
     <button
       className={`${styles.railItem} ${inView ? styles.inView : ''}`}
-      title={`${row.displayName} — ${row.stream?.gameName ?? ''} (${formatCount(row.stream?.viewerCount ?? 0)})`}
+      title={`${row.displayName}${history ? ' · History' : ''} · ${row.stream ? row.stream.gameName : row.liveKnown === false ? 'Checking live status' : 'Offline'}`}
+      data-testid="rail-channel"
+      data-channel={row.login}
+      data-history={!!history}
+      data-live={!!row.stream}
       aria-label={row.displayName}
       aria-pressed={inView}
       {...handlers}
+      onMouseEnter={(e) => showPreview(e.currentTarget)}
+      onMouseLeave={() => showPreview(null)}
+      onFocus={(e) => showPreview(e.currentTarget)}
+      onBlur={() => showPreview(null)}
+      onClick={(e) => {
+        showPreview(null);
+        handlers.onClick(e);
+      }}
     >
-      <Avatar src={row.avatar} name={row.displayName} size={34} live />
+      <Avatar src={row.avatar} name={row.displayName} size={34} live={!!row.stream} />
     </button>
   );
 }
@@ -419,23 +507,46 @@ function FollowButton({ login, name }: { login: string; name: string }) {
 }
 
 /** Channels you watched without following them, newest first. */
-function HistorySection({ inView, filter }: { inView: string[]; filter: (r: Row) => boolean }) {
+function useHistoryRows(
+  inView: string[],
+  follows: FollowedChannelInfo[] | undefined,
+  enabled: boolean,
+) {
   const entries = useWatchHistory((h) => h.entries);
+  const followed = useMemo(() => new Set(follows?.map((f) => f.login)), [follows]);
+  const shown = useMemo(
+    () => entries.filter((e) => !inView.includes(e.login) && !followed.has(e.login)),
+    [entries, inView, followed],
+  );
+  const logins = useMemo(() => (enabled ? shown.map((e) => e.login) : []), [shown, enabled]);
+  const { live, known } = useLiveStatus(logins);
+  const users = useUsersFor(logins);
+  const profiles = new Map(users.data?.map((u) => [u.login, u]));
+  const rows: Row[] = shown.map((e) => ({
+    login: e.login,
+    displayName:
+      live.get(e.login)?.displayName ?? profiles.get(e.login)?.displayName ?? e.displayName,
+    avatar: profiles.get(e.login)?.profileImageUrl ?? '',
+    stream: live.get(e.login),
+    liveKnown: known,
+  }));
+  return { rows, count: shown.length };
+}
+
+function HistorySection({
+  inView,
+  filter,
+  onHover,
+}: {
+  inView: string[];
+  filter: (r: Row) => boolean;
+  onHover(row: Row, el: HTMLElement | null): void;
+}) {
   const { showHistory, update } = useSettings();
   const follows = useFollowedChannels();
-  const followed = useMemo(() => new Set(follows.data?.map((f) => f.login)), [follows.data]);
-  const shown = entries.filter((e) => !inView.includes(e.login) && !followed.has(e.login));
-  const logins = useMemo(() => shown.map((e) => e.login), [shown]);
-  const { live } = useLiveStatus(showHistory ? logins : []);
-  const rows: Row[] = shown
-    .map((e) => ({
-      login: e.login,
-      displayName: live.get(e.login)?.displayName ?? e.displayName,
-      avatar: '',
-      stream: live.get(e.login),
-    }))
-    .filter(filter);
-  if (!shown.length) return null;
+  const { rows: history, count } = useHistoryRows(inView, follows.data, showHistory);
+  const rows = history.filter(filter);
+  if (!count) return null;
   return (
     <>
       <div className={styles.section}>
@@ -464,6 +575,7 @@ function HistorySection({ inView, filter }: { inView: string[]; filter: (r: Row)
             <ChannelRow
               row={row}
               inView={false}
+              onHover={(el) => onHover(row, el)}
               actions={
                 <>
                   <FollowButton login={row.login} name={row.displayName} />
@@ -480,6 +592,206 @@ function HistorySection({ inView, filter }: { inView: string[]; filter: (r: Row)
             />
           </div>
         ))}
+    </>
+  );
+}
+
+function useDebouncedQuery(value: string) {
+  const [query, setQuery] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(value), 250);
+    return () => clearTimeout(timer);
+  }, [value]);
+  return query;
+}
+
+/** Twitch discovery is separate from filtering your own followed/history list. */
+function Discovery({
+  inView,
+  onHover,
+  onDismiss,
+  onScroll,
+}: {
+  inView: string[];
+  onHover(row: Row, el: HTMLElement | null): void;
+  onDismiss(): void;
+  onScroll(): void;
+}) {
+  const [kind, setKind] = useState<'channels' | 'categories'>('categories');
+  const [text, setText] = useState('');
+  const [category, setCategory] = useState<TwitchCategory | null>(null);
+  const [filter, setFilter] = useState('');
+  const query = useDebouncedQuery(text.trim());
+  const channels = useChannelSearch(kind === 'channels' ? query : '');
+  const categories = useCategorySearch(kind === 'categories' && !category ? query : '');
+  const categoryStreams = useCategoryStreams(category?.id ?? '');
+  const streams = useMemo(() => {
+    const unique = new Map<string, LiveStream>();
+    for (const page of categoryStreams.data?.pages ?? []) {
+      for (const stream of page.streams) unique.set(stream.login, stream);
+    }
+    return [...unique.values()];
+  }, [categoryStreams.data]);
+  const foundChannels = kind === 'channels' ? (channels.data ?? []) : [];
+  const liveLogins = foundChannels.filter((c) => c.isLive).map((c) => c.login);
+  const channelStreams = useStreamsFor(liveLogins);
+  const streamsByLogin = new Map(channelStreams.data?.map((s) => [s.login, s]));
+  const users = useUsersFor(category ? streams.map((s) => s.login) : []);
+  const profiles = new Map(users.data?.map((u) => [u.login, u]));
+  const rows: Row[] = category
+    ? streams.map((s) => ({
+        login: s.login,
+        displayName: s.displayName,
+        avatar: profiles.get(s.login)?.profileImageUrl ?? '',
+        stream: s,
+      }))
+    : foundChannels.map((c) => ({
+        login: c.login,
+        displayName: c.displayName,
+        avatar: c.profileImageUrl,
+        stream: streamsByLogin.get(c.login),
+        liveKnown: !c.isLive || channelStreams.isSuccess,
+      }));
+  const shown = rows.filter((row) => matchesChannel(row, filter));
+  const search = kind === 'channels' ? channels : categories;
+
+  return (
+    <>
+      <div className={styles.discoveryControls}>
+        <div className={styles.modes} aria-label="Discover by">
+          {(['categories', 'channels'] as const).map((value) => (
+            <button
+              key={value}
+              aria-pressed={kind === value}
+              onClick={() => {
+                setKind(value);
+                setCategory(null);
+                setFilter('');
+                onDismiss();
+              }}
+            >
+              {value === 'categories' ? 'Categories' : 'Channels'}
+            </button>
+          ))}
+        </div>
+        {category ? (
+          <>
+            <button
+              className={styles.categoryBack}
+              onClick={() => {
+                setCategory(null);
+                setFilter('');
+                onDismiss();
+              }}
+            >
+              ← Back to categories
+            </button>
+            <strong>{category.name}</strong>
+            <input
+              className={styles.filter}
+              placeholder="Name, title, tag or language"
+              aria-label="Filter loaded category streams"
+              value={filter}
+              onChange={(e) => {
+                setFilter(e.target.value);
+                onDismiss();
+              }}
+            />
+            <div className={styles.discoveryHint}>
+              Filters the {streams.length} loaded live streams. Load more to widen the results.
+            </div>
+          </>
+        ) : (
+          <>
+            <input
+              className={styles.filter}
+              placeholder={
+                kind === 'categories' ? 'Find a game or category' : 'Find a Twitch channel'
+              }
+              aria-label={
+                kind === 'categories' ? 'Search Twitch categories' : 'Search Twitch channels'
+              }
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                onDismiss();
+              }}
+            />
+            <div className={styles.discoveryHint}>
+              {kind === 'categories'
+                ? 'Choose a category to browse its live streams.'
+                : 'Search channel names, including offline channels.'}
+            </div>
+          </>
+        )}
+      </div>
+      <div className={styles.list} onScroll={onScroll}>
+        {!category && query.length < 2 && (
+          <div className={styles.empty}>Enter at least two characters to search Twitch.</div>
+        )}
+        {!category && query.length >= 2 && search.isPending && (
+          <div className={styles.empty}>Searching Twitch…</div>
+        )}
+        {!category && search.isError && (
+          <div className={styles.empty}>Couldn't search Twitch: {search.error.message}</div>
+        )}
+        {!category && query.length >= 2 && search.isSuccess && !search.data.length && (
+          <div className={styles.empty}>No {kind} match this search.</div>
+        )}
+        {!category &&
+          kind === 'categories' &&
+          categories.data?.map((result) => (
+            <button
+              key={result.id}
+              className={styles.categoryRow}
+              data-testid="category-result"
+              onClick={() => {
+                setCategory(result);
+                setFilter('');
+                onDismiss();
+              }}
+            >
+              <img src={sizedThumbnail(result.boxArtUrl, 52, 72)} alt="" loading="lazy" />
+              <span>
+                {result.name}
+                <small>Browse live streams</small>
+              </span>
+            </button>
+          ))}
+        {category && categoryStreams.isPending && (
+          <div className={styles.empty}>Loading live streams…</div>
+        )}
+        {category && categoryStreams.isError && (
+          <div className={styles.empty}>
+            Couldn't load this category: {categoryStreams.error.message}
+          </div>
+        )}
+        {category && categoryStreams.isSuccess && !shown.length && (
+          <div className={styles.empty}>
+            {filter
+              ? 'No loaded streams match this filter.'
+              : 'No streams are live in this category.'}
+          </div>
+        )}
+        {shown.map((row) => (
+          <ChannelRow
+            key={row.login}
+            row={row}
+            inView={inView.includes(row.login)}
+            onHover={(el) => onHover(row, el)}
+            actions={<FollowButton login={row.login} name={row.displayName} />}
+          />
+        ))}
+        {category && categoryStreams.hasNextPage && (
+          <button
+            className={styles.loadMore}
+            onClick={() => void categoryStreams.fetchNextPage()}
+            disabled={categoryStreams.isFetchingNextPage}
+          >
+            {categoryStreams.isFetchingNextPage ? 'Loading…' : 'Load more live streams'}
+          </button>
+        )}
+      </div>
     </>
   );
 }

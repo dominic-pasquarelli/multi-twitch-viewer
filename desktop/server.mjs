@@ -6,7 +6,10 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, sep } from 'node:path';
 
-export const PORT = 5757;
+// Isolated test profiles may use a separate port alongside an installed app.
+const testPort = process.env.MTV_USER_DATA ? Number(process.env.MTV_TEST_PORT) : 0;
+export const PORT =
+  Number.isInteger(testPort) && testPort > 0 && testPort <= 65535 ? testPort : 5757;
 export const APP_URL = `http://localhost:${PORT}/`;
 
 /** @type {Record<string, string>} */

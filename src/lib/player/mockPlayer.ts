@@ -97,6 +97,8 @@ export class MockPlayer implements PlayerAdapter {
     this.render();
     this.emit('pause');
   }
+  isPaused = () => this.paused;
+  getPlaybackStats = () => ({ bufferSize: this.paused ? 0 : 5, fps: this.paused ? 0 : 30 });
   on(event: PlayerEvent, handler: () => void) {
     let set = this.listeners.get(event);
     if (!set) this.listeners.set(event, (set = new Set()));

@@ -22,6 +22,7 @@ import { useHashSync } from '@/features/viewer/useHashSync';
 import { useDropOfflineStreams } from '@/features/viewer/useDropOfflineStreams';
 import { useRecordWatchHistory } from '@/features/history/useRecordWatchHistory';
 import { Viewer } from '@/features/viewer/Viewer';
+import { GroupBar } from '@/features/groups/GroupBar';
 import styles from './App.module.css';
 
 export function App() {
@@ -61,7 +62,14 @@ export function App() {
       <div className={`${styles.side} ${sidebarCollapsed ? styles.collapsed : ''}`}>
         <Sidebar />
       </div>
-      <main className={styles.main}>{!backgrounded && <Viewer />}</main>
+      <main className={styles.main}>
+        {!backgrounded && (
+          <>
+            <GroupBar />
+            <Viewer />
+          </>
+        )}
+      </main>
       {chatOpen && !backgrounded && (
         <div className={styles.chat}>
           <ChatPanel />

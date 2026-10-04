@@ -1,6 +1,5 @@
 import {
   ExternalLink,
-  GripVertical,
   Heart,
   Maximize2,
   MessageSquare,
@@ -10,6 +9,7 @@ import {
   X,
 } from 'lucide-react';
 import { audioLevel, mainChannel } from '@/lib/view/operations';
+import { streamSections } from '@/lib/view/groups';
 import { formatCount } from '@/lib/utils/format';
 import { useSettings } from '@/state/settingsStore';
 import { toast } from '@/state/toastStore';
@@ -18,138 +18,131 @@ import { useViewStore } from '@/state/viewStore';
 import { IconButton } from '@/ui/Button';
 import { useLiveStatus } from '../follows/queries';
 import { useFollowChannel } from '../follows/useFollowChannel';
-import { CHANNEL_MIME, setDragging } from './dnd';
-import { currentVolume, nudgeVolume, setStreamVolume, useVolumeModel, VOLUME_STEP } from './volume';
+import { currentVolume, setStreamMix, useVolumeModel, VOLUME_STEP } from './volume';
 import styles from './StreamControls.module.css';
 
 /**
- * Controls for the stream you last hovered, shown in the top bar instead of on
- * top of the video (Twitch players can pause when something covers them).
- * Drag the name onto another stream to swap them.
+ * Tile controls occupy their own reserved space above the video, so they never
+ * cover the Twitch iframe. Mix sliders adjust just this channel's balance.
  */
-export function StreamControls() {
-  const selected = useUi((s) => s.selected);
+export function StreamControls({ login }: { login: string }) {
   const view = useViewStore((s) => s.view);
   const duckLevel = useSettings((s) => s.duckLevel);
   const volumeModel = useVolumeModel();
   const live = useLiveStatus(view.channels).live;
   const { canFollow, follow } = useFollowChannel();
-  const flashN = useUi((s) => (s.volumeFlash?.login === selected ? s.volumeFlash.n : 0));
-
-  if (!selected || !view.channels.includes(selected)) {
-    // Narrow windows give these controls their own row: keep it there (with a
-    // hint) so the streams don't jump when you first hover one.
-    return view.channels.length ? (
-      <div className={`${styles.controls} ${styles.placeholder}`}>
-        Hover a stream to see its controls here
-      </div>
-    ) : null;
-  }
-  const login = selected;
+  const flashN = useUi((s) => (s.volumeFlash?.login === login ? s.volumeFlash.n : 0));
   const store = useViewStore.getState();
   const stream = live.get(login);
   const level = audioLevel(view, login, duckLevel);
   const volume = currentVolume(login, volumeModel);
-  const isMain = view.layout.mode === 'focus' && mainChannel(view) === login;
+  const peers =
+    streamSections(view).find((section) => section.channels.includes(login))?.channels ??
+    view.channels;
+  const isMain = view.layout.mode === 'focus' && mainChannel(view, peers) === login;
 
   return (
     <div
       className={styles.controls}
       data-testid="stream-controls"
+      data-channel={login}
       onWheel={(e) => {
-        if (e.deltaY !== 0) nudgeVolume(login, e.deltaY < 0 ? VOLUME_STEP : -VOLUME_STEP);
+        if (e.deltaY === 0 || !(e.target instanceof HTMLInputElement)) return;
+        setStreamMix(
+          login,
+          Math.max(0, Math.min(1, volume + (e.deltaY < 0 ? VOLUME_STEP : -VOLUME_STEP))),
+        );
+        useUi.getState().flashVolume(login);
       }}
     >
-      <div
-        className={styles.chip}
-        draggable
-        data-testid="stream-chip"
-        title="Drag onto another stream to swap places"
-        onDragStart={(e) => {
-          e.dataTransfer.setData(CHANNEL_MIME, login);
-          // Same effect the viewer accepts for sidebar drops (it swaps if already on screen).
-          e.dataTransfer.effectAllowed = 'copy';
-          setDragging(true);
-        }}
-        onDragEnd={() => setDragging(false)}
-      >
-        <GripVertical size={14} />
-        <span className={styles.name}>{stream?.displayName ?? login}</span>
-        {stream && <span className={styles.meta}>{formatCount(stream.viewerCount)}</span>}
+      <div className={styles.heading}>
+        <div className={styles.chip} data-testid="stream-chip">
+          <span className={styles.name}>{stream?.displayName ?? login}</span>
+          {stream && (
+            <span className={styles.meta} title="Viewers">
+              {formatCount(stream.viewerCount)}
+            </span>
+          )}
+        </div>
+        <IconButton
+          size="sm"
+          label={level.focused ? 'Stop listening (M mutes all)' : 'Listen to this stream'}
+          active={level.focused}
+          icon={level.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          onClick={() => store.toggleAudio(login)}
+        />
+        <input
+          className={styles.volume}
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round(volume * 100)}
+          aria-label={`${stream?.displayName ?? login} volume`}
+          title="This stream's mix volume (scroll to adjust)"
+          onChange={(e) => setStreamMix(login, Number(e.target.value) / 100)}
+        />
+        <span
+          key={flashN} // replays the highlight animation on every change
+          className={`${styles.percent} ${flashN ? styles.flash : ''}`}
+          data-testid="stream-volume"
+        >
+          {Math.round(volume * 100)}%
+        </span>
       </div>
-      <IconButton
-        size="sm"
-        label={level.focused ? 'Stop listening (M mutes all)' : 'Listen to this stream'}
-        active={level.focused}
-        icon={level.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-        onClick={() => store.toggleAudio(login)}
-      />
-      <input
-        className={styles.volume}
-        type="range"
-        min={0}
-        max={100}
-        value={Math.round(volume * 100)}
-        aria-label={`${stream?.displayName ?? login} volume`}
-        title="Volume (scroll here, or ↑/↓ for the stream you're hearing)"
-        onChange={(e) => setStreamVolume(login, Number(e.target.value) / 100)}
-      />
-      <span
-        key={flashN} // replays the highlight animation on every change
-        className={`${styles.percent} ${flashN ? styles.flash : ''}`}
-        data-testid="stream-volume"
-      >
-        {Math.round(volume * 100)}%
-      </span>
-      {view.channels.length > 1 && !isMain && (
+      <div className={styles.actions}>
+        {view.channels.length > 1 && !isMain && (
+          <IconButton
+            size="sm"
+            label="Make this the main stream"
+            icon={<Maximize2 size={15} />}
+            onClick={() => store.setMain(login)}
+          />
+        )}
         <IconButton
           size="sm"
-          label="Make this the main stream"
-          icon={<Maximize2 size={15} />}
-          onClick={() => store.setMain(login)}
+          label={view.chat.open && view.chat.channel === login ? 'Hide chat' : 'Show chat'}
+          active={view.chat.open && view.chat.channel === login}
+          icon={<MessageSquare size={15} />}
+          onClick={() =>
+            store.setChat({
+              open: !(view.chat.open && view.chat.channel === login),
+              channel: login,
+            })
+          }
         />
-      )}
-      <IconButton
-        size="sm"
-        label="Show chat"
-        className={styles.extra}
-        icon={<MessageSquare size={15} />}
-        onClick={() => store.setChat({ open: true, channel: login })}
-      />
-      <IconButton
-        size="sm"
-        label="Reload player"
-        className={styles.extra}
-        icon={<RotateCw size={15} />}
-        onClick={() => useUi.getState().reloadPlayer(login)}
-      />
-      <IconButton
-        size="sm"
-        label="Open on Twitch"
-        className={styles.extra}
-        icon={<ExternalLink size={15} />}
-        onClick={() => window.open(`https://www.twitch.tv/${login}`, '_blank', 'noopener')}
-      />
-      {canFollow(login) && (
         <IconButton
           size="sm"
-          label="Follow on Twitch"
-          icon={<Heart size={15} />}
-          onClick={() => void follow(login)}
-          data-testid="stream-follow"
+          label="Reload player"
+          icon={<RotateCw size={15} />}
+          onClick={() => useUi.getState().reloadPlayer(login)}
         />
-      )}
-      <IconButton
-        size="sm"
-        label="Remove"
-        icon={<X size={16} />}
-        onClick={() => {
-          store.removeChannel(login);
-          toast(`Removed ${login}`, {
-            action: { label: 'Undo', run: () => useViewStore.getState().undo() },
-          });
-        }}
-      />
+        <IconButton
+          size="sm"
+          label="Open on Twitch"
+          icon={<ExternalLink size={15} />}
+          onClick={() => window.open(`https://www.twitch.tv/${login}`, '_blank', 'noopener')}
+        />
+        {canFollow(login) && (
+          <IconButton
+            size="sm"
+            label="Follow on Twitch"
+            icon={<Heart size={15} />}
+            onClick={() => void follow(login)}
+            data-testid="stream-follow"
+          />
+        )}
+        <IconButton
+          size="sm"
+          label="Remove"
+          icon={<X size={16} />}
+          onClick={() => {
+            store.removeChannel(login);
+            toast(`Removed ${login}`, {
+              action: { label: 'Undo', run: () => useViewStore.getState().undo() },
+            });
+          }}
+        />
+      </div>
     </div>
   );
 }

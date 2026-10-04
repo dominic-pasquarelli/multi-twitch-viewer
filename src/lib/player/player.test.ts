@@ -37,6 +37,31 @@ describe('PlayerController', () => {
     expect(spy.mock.calls).toEqual([['480p30'], ['auto']]);
   });
 
+  it('temporarily caps background quality and restores the configured preference', async () => {
+    const { player, controller } = setup();
+    await flush();
+    controller.update({ quality: 'chunked' });
+    controller.setRecoveryQualityCap(360);
+    expect(player.quality).toBe('360p30');
+    controller.update({ quality: '720p60' });
+    expect(player.quality).toBe('360p30');
+    controller.setRecoveryQualityCap(null);
+    expect(player.quality).toBe('720p60');
+    controller.update({ quality: '160p30' });
+    controller.setRecoveryQualityCap(360);
+    expect(player.quality).toBe('160p30');
+  });
+
+  it('reapply repairs a player-side quality change while retaining a temporary cap', async () => {
+    const { player, controller } = setup();
+    await flush();
+    controller.update({ quality: 'chunked' });
+    controller.setRecoveryQualityCap(360);
+    player.setQuality('chunked');
+    controller.reapply();
+    expect(player.quality).toBe('360p30');
+  });
+
   it('pushes later updates straight to the player', async () => {
     const { player, controller } = setup();
     await flush();
