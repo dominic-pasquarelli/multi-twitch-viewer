@@ -113,6 +113,100 @@ describe('bandwidth and group recovery', () => {
     expect(recovery.plan([sample('a', { focused: true, status: 'paused' })]).resume).toEqual(['a']);
   });
 
+  it('disabling bandwidth saving releases its holds immediately while preserving manual and group pauses', () => {
+    let now = 0;
+    const recovery = new PlaybackRecovery(() => now);
+    const samples = ['one', 'two', 'manual', 'hidden'].map((login) => sample(login));
+    expect(recovery.plan(samples, false).pausedForBandwidth).toEqual([
+      'one',
+      'two',
+      'manual',
+      'hidden',
+    ]);
+    recovery.pauseManually('manual');
+    now = 1000;
+    const paused = samples.map((s) => ({
+      ...s,
+      hidden: s.login === 'hidden',
+      status: 'paused' as const,
+    }));
+    const disabled = recovery.plan(paused, false, false);
+    expect(disabled).toEqual({
+      degraded: false,
+      pause: [],
+      resume: ['one', 'two'],
+      pausedForBandwidth: [],
+    });
+    expect(recovery.isManagedPause('one')).toBe(false);
+    expect(recovery.isManagedPause('manual')).toBe(true);
+    expect(recovery.isManagedPause('hidden')).toBe(true);
+    expect(intentionallyPaused('manual')).toBe(true);
+    // Group return still resumes its stream, even offline with saving disabled.
+    expect(
+      recovery.plan(
+        paused.map((s) => ({ ...s, hidden: false })),
+        false,
+      ).resume,
+    ).toEqual(['hidden']);
+    expect(recovery.isManagedPause('manual')).toBe(true);
+    recovery.forget('manual');
+  });
+
+  it('ignores offline, starving statistics, and unrequested pauses while bandwidth saving is disabled', () => {
+    let now = 0;
+    const recovery = new PlaybackRecovery(() => now);
+    const starving = sample('a', { stats: { bufferSize: 0.1, fps: 0 } });
+    expect(recovery.plan([starving], false, false).degraded).toBe(false);
+    recovery.observeStatus('a', 'paused', false);
+    now = 2000;
+    recovery.observeStatus('a', 'paused', false);
+    now = 20_000;
+    expect(recovery.plan([starving], false)).toEqual({
+      degraded: false,
+      pause: [],
+      resume: [],
+      pausedForBandwidth: [],
+    });
+    recovery.observeStatus('a', 'paused', true);
+    expect(recovery.isManagedPause('a')).toBe(true);
+    recovery.forget('a');
+  });
+
+  it('requires fresh sustained starvation after bandwidth saving is re-enabled', () => {
+    let now = 0;
+    const recovery = new PlaybackRecovery(() => now);
+    const starving = sample('main', {
+      focused: true,
+      stats: { bufferSize: 0.1, fps: 0 },
+    });
+    recovery.plan([starving]);
+    now = 6000;
+    expect(recovery.plan([starving]).degraded).toBe(true);
+    now = 7000;
+    expect(recovery.plan([starving], false, false).degraded).toBe(false);
+    now = 60_000;
+    expect(recovery.plan([starving], true, true).degraded).toBe(false);
+    now = 65_999;
+    expect(recovery.plan([starving]).degraded).toBe(false);
+    now = 66_000;
+    expect(recovery.plan([starving]).degraded).toBe(true);
+  });
+
+  it('does not replay unexpected-pause evidence when bandwidth saving is re-enabled', () => {
+    const recovery = new PlaybackRecovery(() => 0);
+    recovery.observeStatus('a', 'paused', false);
+    recovery.observeStatus('a', 'paused', false);
+    expect(recovery.plan([sample('a')]).degraded).toBe(true);
+    expect(recovery.plan([sample('a')], true, false).degraded).toBe(false);
+    recovery.observeStatus('a', 'paused', false);
+    recovery.observeStatus('a', 'paused', false);
+    expect(recovery.plan([sample('a')], true, true).degraded).toBe(false);
+    recovery.observeStatus('a', 'paused', false);
+    expect(recovery.plan([sample('a')]).degraded).toBe(false);
+    recovery.observeStatus('a', 'paused', false);
+    expect(recovery.plan([sample('a')]).degraded).toBe(true);
+  });
+
   it('treats repeated unrequested pauses as pressure, but ignores deliberate pauses', () => {
     const recovery = new PlaybackRecovery(() => 0);
     recovery.observeStatus('user', 'paused', true);

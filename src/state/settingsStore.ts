@@ -24,6 +24,8 @@ export interface Settings {
   mainQuality: QualityChoice;
   /** Quality of all the other streams; lower saves bandwidth and CPU. */
   otherQuality: QualityChoice;
+  /** Reduce background quality and pause muted streams when the connection struggles. */
+  bandwidthSaving: boolean;
   refreshSeconds: number;
   sidebarSort: SidebarSort;
   sidebarCollapsed: boolean;
@@ -54,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chatFollowsAudio: true,
   mainQuality: 'source',
   otherQuality: 'fit',
+  bandwidthSaving: true,
   refreshSeconds: 60,
   sidebarSort: 'viewers',
   sidebarCollapsed: false,
@@ -88,6 +91,7 @@ export const useSettings = create<SettingsStore>()(
         delete p.qualityMode; // replaced by mainQuality/otherQuality
         if (!isQualityChoice(p.mainQuality)) delete p.mainQuality;
         if (!isQualityChoice(p.otherQuality)) delete p.otherQuality;
+        if (typeof p.bandwidthSaving !== 'boolean') delete p.bandwidthSaving;
         return { ...current, ...p };
       },
     },

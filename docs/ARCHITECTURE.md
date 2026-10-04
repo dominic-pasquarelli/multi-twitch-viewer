@@ -122,7 +122,10 @@ Behaviour notes:
 - **Recovery is temporary state.** `PlaybackRecovery` combines sustained low buffer/frame rate,
   repeated unrequested pauses and offline events. It caps background quality, holds muted streams,
   and resumes one every eight seconds after fifteen stable seconds. Manual, group and bandwidth
-  pause reasons are independent. A shared reload budget limits reloads across embed remounts.
+  pause reasons are independent. The persisted `bandwidthSaving` setting (on by default) disables
+  only network pressure handling, immediately clearing quality caps and bandwidth holds without
+  releasing manual or hidden-group pauses. Re-enabling starts with fresh pressure evidence.
+  A shared reload budget limits reloads across embed remounts, independently of this preference.
   Exact decoding errors are observed only in verified HTTPS Twitch player frames in Electron;
   browser recovery uses sustained playback starvation.
 - **`PlayerController` reconciles desired vs actual player state.** The app says what it wants

@@ -23,7 +23,7 @@ const launch = async (userData: string) => {
       });
     });
   }
-  return electron.launch({
+  const app = await electron.launch({
     // Test-only: CI runners and root shells can't use Chromium's sandbox helper.
     args: ['.', ...(process.env.CI || process.getuid?.() === 0 ? ['--no-sandbox'] : [])],
     env: {
@@ -33,7 +33,20 @@ const launch = async (userData: string) => {
       MTV_WEB_ROOT: join(process.cwd(), 'dist-e2e', 'mock'),
     },
   });
+  await app.evaluate(({ shell }) => {
+    const isolatedShell = Object.assign(shell, { __mtvTestExternalUrls: [] as string[] });
+    isolatedShell.openExternal = async (url) => {
+      isolatedShell.__mtvTestExternalUrls.push(url);
+    };
+  });
+  return app;
 };
+
+const externalUrls = (app: ElectronApplication) =>
+  app.evaluate(
+    ({ shell }) =>
+      (shell as typeof shell & { __mtvTestExternalUrls: string[] }).__mtvTestExternalUrls,
+  );
 
 const mainWindow = (app: ElectronApplication) =>
   app.evaluate(({ BrowserWindow }) => {
@@ -69,7 +82,7 @@ test('desktop app: plays streams, hides to the tray, remembers its window', asyn
 
   // Links elsewhere never take over the app window.
   await win.evaluate(() => (location.href = 'https://example.com/'));
-  await win.waitForTimeout(300);
+  await expect.poll(() => externalUrls(app)).toEqual(['https://example.com/']);
   expect(win.url()).toContain(`http://localhost:${testPort}/`);
 
   // Window position is remembered across restarts.
@@ -95,6 +108,11 @@ test('desktop app: plays streams, hides to the tray, remembers its window', asyn
   expect(bounds).toMatchObject({ width: 1100, height: 700 });
   // The last session (streams) comes back too.
   await expect(win.getByTestId('player-tile')).toHaveCount(2);
+  // Every launch, including a restart, isolates the real system browser.
+  expect(await externalUrls(app)).toEqual([]);
+  await win.evaluate(() => (location.href = 'https://example.com/'));
+  await expect.poll(() => externalUrls(app)).toEqual(['https://example.com/']);
+  expect(win.url()).toContain(`http://localhost:${testPort}/`);
   await app.evaluate(({ app: a }) => a.quit());
   await app.close().catch(() => {});
 });

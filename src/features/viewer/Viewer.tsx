@@ -54,8 +54,15 @@ export function Viewer() {
   const size = useElementSize(containerRef);
   const view = useViewStore((s) => s.view);
   const actions = useViewStore.getState();
-  const { tileGap, hideOffline, mainQuality, otherQuality, duckLevel, clickToFocus } =
-    useSettings();
+  const {
+    tileGap,
+    hideOffline,
+    mainQuality,
+    otherQuality,
+    duckLevel,
+    clickToFocus,
+    bandwidthSaving,
+  } = useSettings();
   const volumeModel = useVolumeModel();
   const playerStatus = useUi((s) => s.playerStatus);
   const selected = useUi((s) => s.selected);
@@ -104,6 +111,7 @@ export function Viewer() {
     muted,
     hidden,
     status: playerStatus,
+    bandwidthSaving,
   });
   const options = useMemo(
     () => ({

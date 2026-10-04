@@ -152,6 +152,12 @@ function SettingsForm() {
       {tab === 'players' && (
         <TabPanel id="players">
           <QualitySettings />
+          <Checkbox
+            checked={s.bandwidthSaving}
+            onChange={(v) => s.update({ bandwidthSaving: v })}
+            label="Automatic bandwidth saving"
+            help="When the connection struggles, reduce background quality and temporarily pause muted streams. Turn off to keep your selected quality and playback."
+          />
           {desktop && (
             <Checkbox
               checked={s.hideStreamInfo}
