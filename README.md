@@ -52,7 +52,8 @@ channels are live, and watch several streams at once with layouts that actually 
   **History** in the sidebar, split into Live and Offline, to bring back later. History stays newest
   first within each section, and channels keep their profile pictures when added to Also watching. The ♡ button (top-bar controls, _Also watching_ and
   History) opens the channel's Twitch page to follow it; Twitch doesn't let apps follow for you.
-  Collapsed followed and history icons show the same hover preview as the expanded sidebar.
+  The collapsed sidebar shows live followed and history icons with the same hover preview as the
+  expanded sidebar. Offline history remains available when you expand the sidebar.
 - **Discovery**: the sidebar's **Discover** tab searches channel names or Twitch categories.
   Selecting a category lists its live streams. Filter loaded results by title, tags, category or language.
 - **Presets**: save the current streams, layout, audio and chat as a named preset and load it in

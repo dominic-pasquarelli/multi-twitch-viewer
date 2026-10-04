@@ -482,7 +482,7 @@ function CollapsedRail({ onExpand }: { onExpand(): void }) {
   const showHistory = useSettings((s) => s.showHistory);
   const others = useNotFollowedRows(inView, follows.isSuccess ? follows.data : undefined);
   const { rows: history } = useHistoryRows(inView, follows.data, showHistory);
-  const groups = partitionChannelRows(history);
+  const liveHistory = history.filter((row) => row.stream);
   const { preview, showPreview, onPreviewScroll } = useChannelPreview();
   return (
     <nav
@@ -515,33 +515,29 @@ function CollapsedRail({ onExpand }: { onExpand(): void }) {
           ))}
         </div>
       )}
-      {showHistory &&
-        HISTORY_GROUPS.filter(({ status }) => groups[status].length > 0).map(
-          ({ status, label }) => (
-            <div
-              key={status}
-              className={styles.railGroup}
-              role="group"
-              aria-label={`${label} watch history`}
-              data-testid="history-section"
-              data-status={status}
-            >
-              <div className={styles.railSection} title={`History · ${label}`}>
-                <History size={14} />
-                <span className={styles.railStatus}>{label}</span>
-              </div>
-              {groups[status].map((row) => (
-                <RailItem
-                  key={row.login}
-                  row={row}
-                  inView={false}
-                  history
-                  onHover={(el) => showPreview(row, el)}
-                />
-              ))}
-            </div>
-          ),
-        )}
+      {showHistory && liveHistory.length > 0 && (
+        <div
+          className={styles.railGroup}
+          role="group"
+          aria-label="Live watch history"
+          data-testid="history-section"
+          data-status="live"
+        >
+          <div className={styles.railSection} title="History · Live">
+            <History size={14} />
+            <span className={styles.railStatus}>Live</span>
+          </div>
+          {liveHistory.map((row) => (
+            <RailItem
+              key={row.login}
+              row={row}
+              inView={false}
+              history
+              onHover={(el) => showPreview(row, el)}
+            />
+          ))}
+        </div>
+      )}
       <ChannelPreview preview={preview} />
     </nav>
   );
