@@ -36,6 +36,7 @@ export class PlaybackRecovery {
   private lastPressureAt = -Infinity;
   private lastResumeAt = -Infinity;
   private degraded = false;
+  private bandwidthSaving = true;
   private manualPauseInteraction = new Map<string, { version: number; time: number }>();
 
   constructor(private readonly now: () => number = Date.now) {}
@@ -95,6 +96,7 @@ export class PlaybackRecovery {
       this.pauseManually(login);
       return;
     }
+    if (!this.bandwidthSaving) return;
     const now = this.now();
     this.unexpectedPauses = this.unexpectedPauses.filter((t) => now - t < 15_000);
     this.unexpectedPauses.push(now);
@@ -113,7 +115,19 @@ export class PlaybackRecovery {
     setIntentionalPause(login, false);
   }
 
-  plan(samples: readonly RecoverySample[], online = true): RecoveryPlan {
+  plan(
+    samples: readonly RecoverySample[],
+    online = true,
+    bandwidthSaving = this.bandwidthSaving,
+  ): RecoveryPlan {
+    this.bandwidthSaving = bandwidthSaving;
+    if (!bandwidthSaving) {
+      this.degraded = false;
+      this.stalledSince.clear();
+      this.unexpectedPauses = [];
+      this.lastPressureAt = -Infinity;
+      this.lastResumeAt = -Infinity;
+    }
     const now = this.now();
     const logins = new Set(samples.map((sample) => sample.login));
     for (const login of this.holds.keys()) if (!logins.has(login)) this.forget(login);
@@ -127,6 +141,13 @@ export class PlaybackRecovery {
       else if (this.holds.get(login)?.has('group')) {
         this.release(login, 'group');
         if (!this.isManagedPause(login)) resume.add(login);
+      }
+      if (!bandwidthSaving) {
+        if (this.holds.get(login)?.has('bandwidth')) {
+          this.release(login, 'bandwidth');
+          if (!hidden && !this.isManagedPause(login)) resume.add(login);
+        }
+        continue;
       }
       // Low buffers alone are normal for low-latency streams. Require both
       // buffer starvation and a stopped frame rate for several samples.
@@ -143,7 +164,7 @@ export class PlaybackRecovery {
         if (now - this.stalledSince.get(login)! >= 6_000) this.pressure(now);
       } else this.stalledSince.delete(login);
     }
-    if (!online) this.pressure(now);
+    if (bandwidthSaving && !online) this.pressure(now);
 
     if (this.degraded) {
       for (const sample of samples) {

@@ -227,3 +227,91 @@ test('bandwidth recovery pauses muted streams and restarts them gradually', asyn
     timeout: 14000,
   });
 });
+
+test('bandwidth saving can be disabled immediately and stays off across restarts', async ({
+  page,
+  context,
+}) => {
+  await page.addInitScript(() => {
+    // Existing saved settings omit the new preference and keep its enabled default.
+    if (!localStorage.getItem('mtv:settings'))
+      localStorage.setItem(
+        'mtv:settings',
+        JSON.stringify({ version: 1, state: { otherQuality: '720p' } }),
+      );
+    if (!localStorage.getItem('mtv:session'))
+      localStorage.setItem(
+        'mtv:session',
+        JSON.stringify({
+          version: 1,
+          state: {
+            pinned: true,
+            view: {
+              channels: ['pixelpaladin', 'novastrike', 'cozycartographer', 'lunarlatte'],
+              layout: { mode: 'focus', main: 'pixelpaladin', mainScale: 'auto' },
+              audio: { mode: 'solo', active: ['pixelpaladin'] },
+              chat: { open: false, channel: 'pixelpaladin' },
+              groups: [
+                {
+                  id: 'watching',
+                  name: 'Watching',
+                  channels: ['pixelpaladin', 'novastrike', 'cozycartographer'],
+                },
+                { id: 'other', name: 'Other', channels: ['lunarlatte'] },
+              ],
+              activeGroup: 'watching',
+            },
+          },
+        }),
+      );
+  });
+  await page.goto('/');
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-quality', '720p60');
+  await expect(player(page, 'cozycartographer')).toHaveAttribute('data-paused', 'false');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-paused', 'true');
+  await player(page, 'cozycartographer').dispatchEvent('pointerdown');
+  await page.evaluate(() =>
+    (window as unknown as { mtvMock: { pause(login: string): void } }).mtvMock.pause(
+      'cozycartographer',
+    ),
+  );
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Players', exact: true }).click();
+  const saving = page.getByRole('checkbox', { name: /Automatic bandwidth saving/ });
+  await expect(saving).toBeChecked();
+  await context.setOffline(true);
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-paused', 'true');
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-quality', '360p30');
+  await saving.uncheck();
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-paused', 'false');
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-quality', '720p60');
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-volume', '0.50');
+  await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-paused', 'false');
+  await expect(player(page, 'cozycartographer')).toHaveAttribute('data-paused', 'true');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-paused', 'true');
+  await expect(page.getByText(/Connection recovery: background quality reduced/)).toBeHidden();
+  await page.keyboard.press('Escape');
+  // Hidden-group pauses still work with bandwidth saving disabled, even offline.
+  const groups = page.getByRole('navigation', { name: 'Stream groups' });
+  await groups.getByRole('button', { name: /^Other/ }).click();
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-paused', 'true');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-paused', 'false');
+  await groups.getByRole('button', { name: /^Watching/ }).click();
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-paused', 'false');
+  await expect(player(page, 'cozycartographer')).toHaveAttribute('data-paused', 'true');
+  await context.setOffline(false);
+  // The seed only fills empty storage; a restart loads the persisted preference.
+  await page.reload();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('tab', { name: 'Players', exact: true }).click();
+  await expect(saving).not.toBeChecked();
+  await context.setOffline(true);
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-quality', '720p60');
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-paused', 'false');
+  await expect(page.getByText(/Connection recovery: background quality reduced/)).toBeHidden();
+  // Re-enabling responds to new pressure normally.
+  await saving.check();
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-paused', 'true');
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-quality', '360p30');
+  await context.setOffline(false);
+});

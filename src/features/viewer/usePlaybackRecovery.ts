@@ -10,6 +10,7 @@ export interface PlaybackRecoveryOptions {
   focused: string | null;
   muted: ReadonlySet<string>;
   hidden?: ReadonlySet<string>;
+  bandwidthSaving?: boolean;
   status: Readonly<Record<string, PlayerStatus>>;
 }
 
@@ -41,6 +42,7 @@ export function usePlaybackRecovery({
   focused,
   muted,
   hidden,
+  bandwidthSaving = true,
   status,
 }: PlaybackRecoveryOptions) {
   const stalledSince = useRef(new Map<string, number>());
@@ -65,7 +67,7 @@ export function usePlaybackRecovery({
           stats: entry?.adapter.getPlaybackStats?.(),
         };
       });
-      const plan = playbackRecovery.plan(samples, navigator.onLine);
+      const plan = playbackRecovery.plan(samples, navigator.onLine, bandwidthSaving);
       for (const sample of samples) {
         const now = Date.now();
         const starving =
@@ -80,7 +82,8 @@ export function usePlaybackRecovery({
         if (starving) {
           if (!stalledSince.current.has(sample.login)) stalledSince.current.set(sample.login, now);
           // Cross-origin browser embeds cannot expose error #3000. A stream
-          // that keeps starving even after shedding load gets a bounded reload.
+          // that keeps starving gets a bounded reload, independently of the
+          // automatic bandwidth-saving preference.
           if (
             now - stalledSince.current.get(sample.login)! >= 30_000 &&
             scheduleReload(sample.login)
@@ -112,7 +115,7 @@ export function usePlaybackRecovery({
       window.removeEventListener('online', tick);
       window.removeEventListener('offline', tick);
     };
-  }, [channels, focused, muted, hidden, status]);
+  }, [channels, focused, muted, hidden, status, bandwidthSaving]);
 
   useEffect(() => {
     const unsubscribe = desktop?.onPlayerError?.(({ channel, code }) => {

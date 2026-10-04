@@ -28,7 +28,9 @@ channels are live, and watch several streams at once with layouts that actually 
   Returning restores the same mix and volumes, keeping manual pauses. Groups save with sessions and presets.
 - **Connection recovery**: sustained playback starvation reduces background quality to 360p (or
   the lowest available rendition) and temporarily pauses muted streams. After the connection settles,
-  streams resume one at a time. The desktop app also reloads decoding Error #3000 with bounded retries;
+  streams resume one at a time. Turn off **Automatic bandwidth saving** in **Settings → Players**
+  to keep your selected qualities and resume streams paused by this mode. Manual and hidden-group
+  pauses are preserved. The desktop app also reloads decoding Error #3000 with bounded retries;
   the browser version can recover sustained stalls but cannot read an error inside Twitch's iframe.
 - **Audio without the chaos**: pick a stream with `1`–`9` or its speaker button, and choose what
   the others do (top bar):
