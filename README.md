@@ -16,11 +16,18 @@ channels are live, and watch several streams at once with layouts that actually 
   - Turn on **Arrange**, then drag anywhere on a stream onto another to swap them. Streams
     never reload when they move.
   - Offline channels step aside and give their space to live ones, then come back when they go live.
-- **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar) to keep them at the
-  top. When a favorite goes live you get a Windows notification; click it to start watching.
-  Settings can switch this to everyone you follow, or off.
+- **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar or on a stream) to
+  keep them at the top. When a favorite goes live you get a Windows notification; click it to start
+  watching. Settings can switch this to everyone you follow, or off.
+- **Favorites view (a dynamic home)**: the Home button (or `H`, or the pinned **★ Favorites** row
+  at the top of **Presets**) shows whichever favorites are live. Favorites join when they go live
+  and leave about 1½ minutes after going offline; streams you add yourself stay alongside them,
+  and a favorite you close stays closed until it next goes live. **Manage favorites** (✎ on that
+  row) adds channels by name or link, including ones you don't follow. Loading a preset, a link
+  or **Clear all** leaves the view (Undo returns to it); your presets work as before.
+  **Settings → Layout → Open on Favorites at launch** starts the app there.
 - **Controls on each stream**: hovering a stream shows its controls (listen, volume, make main,
-  chat, reload, open on Twitch, remove), plus its category and title, in a compact overlay
+  chat, reload, open on Twitch, favorite, remove), plus its category and title, in a compact overlay
   at the top of its video. The controls
   disappear when you leave the stream, and stay open while you edit its volume. If a stream pauses on its own it resumes automatically; one
   you paused yourself (clicked inside the player) stays paused. Clicking a stream to make it the
@@ -208,6 +215,7 @@ lack of a "Log in" prompt) is logged in.
 | Make one stream big              | `L` or **Focus**; click a small playing stream (or ⤢ in the top bar) to make it main                            |
 | Rearrange                        | Enable **Arrange**, then drag a stream window onto another                                                      |
 | Save the current setup           | **Presets** → **Save current…**                                                                                 |
+| See whichever favorites are live | The Home button or `H` (the **★ Favorites** row in Presets); manage the list with ✎ on that row                 |
 | Keyboard shortcuts               | `?`                                                                                                             |
 
 Shortcuts pause while a Twitch player has keyboard focus (after you click inside it). Moving the

@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
+import { droppableWhenOffline } from '@/lib/view/favoritesHome';
 import { OfflineTracker } from '@/lib/view/offlineTracker';
+import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
 import { toast } from '@/state/toastStore';
 import { useUi } from '@/state/uiStore';
@@ -13,27 +15,32 @@ export const offlineDrop = { graceMs: 90_000 };
  * Temporary views (anything not loaded from a preset): streams that were live
  * and then stay offline are removed, with Undo. Kept (preset) views and the
  * "Remove streams that go offline" setting turned off leave them in place.
+ * The Favorites home view always lets its favorites go once they're offline.
  */
 export function useDropOfflineStreams(): void {
   const channels = useViewStore((s) => s.view.channels);
   const pinned = useViewStore((s) => s.pinned);
+  const home = useViewStore((s) => s.home);
+  const favorites = useChannelPrefs((s) => s.favorites);
   const enabled = useSettings((s) => s.dropOfflineStreams);
   const liveStatus = useLiveStatus(channels);
   const tracker = useRef(new OfflineTracker());
 
-  const latest = useRef({ channels, liveStatus, active: enabled && !pinned });
+  const rules = { home, favorites, temporary: enabled && !pinned };
+  const latest = useRef({ channels, liveStatus, rules });
   useEffect(() => {
-    latest.current = { channels, liveStatus, active: enabled && !pinned };
+    latest.current = { channels, liveStatus, rules };
   });
 
   useEffect(() => {
     const check = () => {
-      const { channels, liveStatus, active } = latest.current;
-      if (!active || !liveStatus.known) return;
+      const { channels, liveStatus, rules } = latest.current;
+      if (!liveStatus.known) return;
       tracker.current.graceMs = offlineDrop.graceMs;
       const playing = useUi.getState().playerStatus;
+      // Streams that may not be dropped are left out, so the tracker forgets them.
       const drop = tracker.current.update(
-        channels,
+        channels.filter((login) => droppableWhenOffline(login, rules)),
         (login) => liveStatus.live.has(login) || playing[login] === 'playing',
       );
       if (!drop.length) return;
@@ -45,5 +52,5 @@ export function useDropOfflineStreams(): void {
     check();
     const timer = setInterval(check, 5_000);
     return () => clearInterval(timer);
-  }, [channels, liveStatus, enabled, pinned]);
+  }, [channels, liveStatus, enabled, pinned, home, favorites]);
 }

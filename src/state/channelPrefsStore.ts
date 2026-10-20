@@ -21,6 +21,8 @@ interface ChannelPrefsStore {
   setOutput(volume: number): void;
   applyVolume(patch: VolumePatch): void;
   toggleFavorite(login: string): void;
+  /** Stars these channels (already starred ones keep their place). */
+  addFavorites(logins: string[]): void;
 }
 
 export const useChannelPrefs = create<ChannelPrefsStore>()(
@@ -39,6 +41,10 @@ export const useChannelPrefs = create<ChannelPrefsStore>()(
           favorites: s.favorites.includes(login)
             ? s.favorites.filter((f) => f !== login)
             : [...s.favorites, login],
+        })),
+      addFavorites: (logins) =>
+        set((s) => ({
+          favorites: [...s.favorites, ...new Set(logins.filter((l) => !s.favorites.includes(l)))],
         })),
       setVolume: (login, volume) =>
         set((s) => ({

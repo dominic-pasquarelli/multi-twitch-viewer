@@ -22,6 +22,7 @@ src/
 | -------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | `layout/`      | Pure geometry: `computeLayout({mode, count, container, options})` → one rect per slot.              | Adding a mode: write `myLayout.ts`, route it in `computeLayout.ts`. |
 | `view/`        | The "what I'm watching" model (`ViewState`) and pure operations: add, remove, swap, audio focus…    | Adding an operation + test; stores call it.                         |
+|                | `favoritesHome.ts`: which live favorites join the Favorites view and which streams may leave it.    |                                                                     |
 | `audio/`       | Volume model: per-channel volumes, or one master volume with per-channel balance (consistent mode). | Add a mode in `volumeModel.ts` + tests.                             |
 | `history/`     | Log of channels watched without following them (newest first, capped, validated on load).           |                                                                     |
 | `presets/`     | Preset type, export/import file format, validation, merging.                                        | Bump `EXPORT_VERSION` and migrate in `sanitizePreset`.              |
@@ -34,14 +35,14 @@ src/
 
 ### `state/`: stores
 
-| Store                   | Persisted as    | Contents                                                       |
-| ----------------------- | --------------- | -------------------------------------------------------------- |
-| `viewStore`             | `session`       | Current `ViewState` (last session), undo history (memory only) |
-| `presetsStore`          | `presets`       | Saved presets                                                  |
-| `settingsStore`         | `settings`      | Preferences (gap, audio behaviour, quality, Client ID…)        |
-| `channelPrefsStore`     | `channel-prefs` | Per-channel volume, app output volume                          |
-| `authStore`             | `auth`          | Twitch token + user                                            |
-| `uiStore`, `toastStore` | (not saved)     | Open dialogs, fullscreen, player status, toasts                |
+| Store                   | Persisted as    | Contents                                                                                                |
+| ----------------------- | --------------- | ------------------------------------------------------------------------------------------------------- |
+| `viewStore`             | `session`       | Current `ViewState` (last session), kept/temporary and Favorites-view flags, undo history (memory only) |
+| `presetsStore`          | `presets`       | Saved presets                                                                                           |
+| `settingsStore`         | `settings`      | Preferences (gap, audio behaviour, quality, Client ID…)                                                 |
+| `channelPrefsStore`     | `channel-prefs` | Per-channel volume, favorites, app output volume                                                        |
+| `authStore`             | `auth`          | Twitch token + user                                                                                     |
+| `uiStore`, `toastStore` | (not saved)     | Open dialogs, fullscreen, player status, toasts                                                         |
 
 Persisted data is re-validated on load (`sanitizeView`, `sanitizePreset`), so a corrupted or
 old entry falls back to defaults instead of crashing the app. All keys are prefixed `mtv:`.
@@ -119,6 +120,11 @@ Behaviour notes:
   `markSelection` opens a short grace period in which a pause is resumed at once and counts as
   neither a manual pause nor network pressure. Focus is handed back to the app after the click,
   so the next click into that player is seen and ends the grace period.
+- **The Favorites view is a mode of the session, not a preset.** `viewStore.home` marks it;
+  `useFavoritesHome` adds favorites as they go live (only on the transition, so one you closed
+  stays closed), and `useDropOfflineStreams` always lets favorites leave once offline, with other
+  streams following the temporary-view rule. Undo entries record the flag, so undoing a preset
+  load returns to it.
 - **App volume is applied last.** The output level multiplies each tile's duck scale before it
   reaches the player, and is divided back out of volume changes made with Twitch's own slider, so
   per-channel volumes and the mix are unchanged.

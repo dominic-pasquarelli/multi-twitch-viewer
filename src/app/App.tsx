@@ -6,6 +6,8 @@ import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
 import { Toasts } from '@/ui/Toasts';
 import { useGoLiveAlerts } from '@/features/alerts/useGoLiveAlerts';
+import { FavoritesDialog } from '@/features/favorites/FavoritesDialog';
+import { useFavoritesHome } from '@/features/favorites/useFavoritesHome';
 import { SetupDialog } from '@/features/auth/SetupDialog';
 import { useAuthBootstrap } from '@/features/auth/useAuthBootstrap';
 import { ChatPanel } from '@/features/chat/ChatPanel';
@@ -34,6 +36,7 @@ export function App() {
   useDropOfflineStreams();
   useRecordWatchHistory();
   useGoLiveAlerts();
+  useFavoritesHome();
   useEffect(() => installAudioUnlock(), []);
   useEffect(
     () => desktop?.onBackgroundChange((hidden) => useUi.getState().setBackgrounded(hidden)),
@@ -78,6 +81,7 @@ export function App() {
       <SettingsDialog />
       <SetupDialog />
       <SavePresetDialog />
+      <FavoritesDialog />
       <ShortcutsDialog />
       <UpdateBanner />
       <Toasts />

@@ -10,10 +10,16 @@ import { useSettings } from './settingsStore';
 
 const HISTORY_LIMIT = 20;
 
+/** An earlier view, for undo, and whether it was the Favorites home view. */
+export interface HistoryEntry {
+  view: ViewState;
+  home: boolean;
+}
+
 interface ViewStore {
   view: ViewState;
   /** Earlier views, for undo. */
-  history: ViewState[];
+  history: HistoryEntry[];
   /** What was audible before "mute all", so M can bring it back. */
   mutedFrom: string[] | null;
   /**
@@ -21,8 +27,17 @@ interface ViewStore {
    * is temporary and streams that go offline are removed.
    */
   pinned: boolean;
+  /**
+   * The Favorites home view (see lib/view/favoritesHome): live favorites join
+   * and leave on their own. Loading a preset, a link or Clear all leaves it.
+   */
+  home: boolean;
 
   addChannels(logins: string[]): void;
+  /** Favorites that just went live joining the home view (not an undo step). */
+  addHomeChannels(logins: string[]): void;
+  /** Replaces the view with these live favorites and makes it the home view. */
+  enterHome(logins: string[]): void;
   removeChannel(login: string): void;
   removeChannels(logins: string[]): void;
   setPinned(pinned: boolean): void;
@@ -68,7 +83,9 @@ export const useViewStore = create<ViewStore>()(
         }
         set({
           view: after,
-          history: undoable ? [...get().history, before].slice(-HISTORY_LIMIT) : get().history,
+          history: undoable
+            ? [...get().history, { view: before, home: get().home }].slice(-HISTORY_LIMIT)
+            : get().history,
           mutedFrom: after.audio.active.length ? null : get().mutedFrom,
           // An empty view starts over as a temporary one.
           pinned: after.channels.length ? get().pinned : false,
@@ -80,6 +97,7 @@ export const useViewStore = create<ViewStore>()(
         history: [],
         mutedFrom: null,
         pinned: false,
+        home: false,
 
         addChannels: (logins) =>
           apply((v) => {
@@ -90,6 +108,13 @@ export const useViewStore = create<ViewStore>()(
               }
             return next;
           }, true),
+        addHomeChannels: (logins) => {
+          if (get().home) apply((v) => ops.addChannels(v, logins));
+        },
+        enterHome: (logins) => {
+          apply((v) => ({ ...ops.watchOnly(v, logins), groups: [], activeGroup: null }), true);
+          set({ home: true, pinned: false });
+        },
         removeChannel: (login) => apply((v) => ops.removeChannel(v, login), true),
         removeChannels: (logins) =>
           apply((v) => logins.reduce((acc, l) => ops.removeChannel(acc, l), v), true),
@@ -101,8 +126,10 @@ export const useViewStore = create<ViewStore>()(
               ? groups.assignGroup(next, login, v.activeGroup)
               : next;
           }, true),
-        watchOnly: (logins) =>
-          apply((v) => ({ ...ops.watchOnly(v, logins), groups: [], activeGroup: null }), true),
+        watchOnly: (logins) => {
+          apply((v) => ({ ...ops.watchOnly(v, logins), groups: [], activeGroup: null }), true);
+          set({ home: false });
+        },
         replaceChannel: (t, r) =>
           apply((v) => {
             const next = ops.replaceChannel(v, t, r);
@@ -112,17 +139,20 @@ export const useViewStore = create<ViewStore>()(
           }, true),
         swapChannels: (a, b) =>
           apply((v) => groups.swapGroupChannels(ops.swapChannels(v, a, b), a, b), true),
-        clear: () =>
-          apply((v) => ({ ...ops.watchOnly(v, []), groups: [], activeGroup: null }), true),
+        clear: () => {
+          apply((v) => ({ ...ops.watchOnly(v, []), groups: [], activeGroup: null }), true);
+          set({ home: false });
+        },
         loadView: (view) => {
           apply(() => ops.normalize(structuredClone(view)), true);
-          set({ pinned: get().view.channels.length > 0 }); // a preset keeps its streams
+          // A preset keeps its streams.
+          set({ pinned: get().view.channels.length > 0, home: false });
         },
         undo: () => {
           const history = get().history;
           const previous = history[history.length - 1];
           if (!previous) return false;
-          set({ view: previous, history: history.slice(0, -1) });
+          set({ view: previous.view, home: previous.home, history: history.slice(0, -1) });
           return true;
         },
 
@@ -181,11 +211,13 @@ export const useViewStore = create<ViewStore>()(
       name: 'session',
       version: 1,
       storage: zustandStorage(),
-      partialize: (s) => ({ view: s.view, pinned: s.pinned }),
+      partialize: (s) => ({ view: s.view, pinned: s.pinned, home: s.home }),
       merge: (persisted, current) => {
-        const p = persisted as { view?: unknown; pinned?: unknown } | undefined;
+        const p = persisted as { view?: unknown; pinned?: unknown; home?: unknown } | undefined;
         const view = sanitizeView(p?.view);
-        return view ? { ...current, view, pinned: p?.pinned === true } : current;
+        return view
+          ? { ...current, view, pinned: p?.pinned === true, home: p?.home === true }
+          : current;
       },
     },
   ),

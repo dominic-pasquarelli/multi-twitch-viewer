@@ -71,6 +71,7 @@ export function Viewer() {
   const selected = useUi((s) => s.selected);
   const setSelected = useUi((s) => s.setSelected);
   const arranging = useUi((s) => s.arranging);
+  const home = useViewStore((s) => s.home);
   const [showOffline, setShowOffline] = useState(false);
   const liveStatus = useLiveStatus(view.channels);
 
@@ -282,7 +283,19 @@ export function Viewer() {
       onClick={onViewerClick}
       onContextMenu={onViewerContextMenu}
     >
-      {view.channels.length === 0 && <EmptyState />}
+      {view.channels.length === 0 &&
+        (home ? (
+          <EmptyState
+            title="No favorites are live right now"
+            action={
+              <Button onClick={() => useUi.getState().openDialog('favorites')}>
+                Manage favorites
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState />
+        ))}
       {selectedGroup && groupChannels.length === 0 && (
         <EmptyState
           title={`No streams in ${selectedGroup.name}`}

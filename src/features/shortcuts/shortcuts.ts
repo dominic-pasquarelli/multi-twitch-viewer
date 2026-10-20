@@ -12,6 +12,7 @@ export const SHORTCUTS: { keys: string; description: string }[] = [
   { keys: 'C', description: 'Show/hide chat' },
   { keys: 'F', description: 'Fullscreen' },
   { keys: 'P', description: 'Presets menu' },
+  { keys: 'H', description: 'Favorites view: the favorites that are live' },
   { keys: 'Ctrl/⌘ + Z', description: 'Undo (removed stream, loaded preset…)' },
   { keys: '?', description: 'This help' },
 ];

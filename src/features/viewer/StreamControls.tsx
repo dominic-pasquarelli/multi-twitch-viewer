@@ -4,12 +4,14 @@ import {
   Maximize2,
   MessageSquare,
   RotateCw,
+  Star,
   Volume2,
   VolumeX,
   X,
 } from 'lucide-react';
 import { audioLevel } from '@/lib/view/operations';
 import { formatCount } from '@/lib/utils/format';
+import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
 import { toast } from '@/state/toastStore';
 import { useUi } from '@/state/uiStore';
@@ -30,6 +32,7 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
   const volumeModel = useVolumeModel();
   const live = useLiveStatus(view.channels).live;
   const { canFollow, follow } = useFollowChannel();
+  const favorite = useChannelPrefs((s) => s.favorites.includes(login));
   const flashN = useUi((s) => (s.volumeFlash?.login === login ? s.volumeFlash.n : 0));
   const store = useViewStore.getState();
   const stream = live.get(login);
@@ -119,6 +122,18 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
           label="Open on Twitch"
           icon={<ExternalLink size={15} />}
           onClick={() => window.open(`https://www.twitch.tv/${login}`, '_blank', 'noopener')}
+        />
+        <IconButton
+          size="sm"
+          label={
+            favorite
+              ? 'Remove from favorites'
+              : 'Add to favorites: the Favorites view, sorted first, go-live alerts'
+          }
+          active={favorite}
+          icon={<Star size={15} fill={favorite ? 'currentColor' : 'none'} />}
+          onClick={() => useChannelPrefs.getState().toggleFavorite(login)}
+          data-testid="stream-favorite"
         />
         {canFollow(login) && (
           <IconButton

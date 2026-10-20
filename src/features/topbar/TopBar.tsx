@@ -23,6 +23,7 @@ import { useViewStore } from '@/state/viewStore';
 import { Avatar } from '@/ui/Avatar';
 import { IconButton } from '@/ui/Button';
 import { LoginButton } from '../auth/LoginPrompt';
+import { HomeButton } from '../favorites/HomeButton';
 import { Mixer } from '../mixer/Mixer';
 import { OutputVolume } from '../mixer/OutputVolume';
 import { PresetsMenu } from '../presets/PresetsMenu';
@@ -64,6 +65,7 @@ export function TopBar() {
         <img src="/favicon.svg" alt="" />
         <span className={styles.brandText}>Multi Twitch</span>
       </div>
+      <HomeButton />
 
       <AddChannelBox />
 
