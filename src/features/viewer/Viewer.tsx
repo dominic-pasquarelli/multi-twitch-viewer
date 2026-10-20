@@ -22,7 +22,7 @@ import { Button } from '@/ui/Button';
 import { useLiveStatus } from '../follows/queries';
 import { useStreamHotkeys } from '../shortcuts/useHotkeys';
 import { CHANNEL_MIME, setDragging } from './dnd';
-import { markInteraction } from './playerInteraction';
+import { markInteraction, markSelection, playerHasFocus } from './playerInteraction';
 import { playerRegistry } from './playerRegistry';
 import { playbackRecovery } from './playbackRecovery';
 import { usePlaybackRecovery } from './usePlaybackRecovery';
@@ -213,10 +213,17 @@ export function Viewer() {
       if (view.audio.mode === 'mix' || view.audio.active.includes(login)) return;
       store.focusAudio(login);
     }
-    // Clicking a Twitch video also pauses it; keep the stream playing.
+    // Clicking a Twitch video also pauses it, sometimes only after this runs.
+    // The tile resumes a pause that arrives during the selection's grace period.
+    playbackRecovery.allowManualPlay(login);
+    markSelection(login);
     setTimeout(() => {
-      playbackRecovery.allowManualPlay(login);
-      if (!playbackRecovery.isManagedPause(login)) playerRegistry.get(login)?.adapter.play();
+      // Hand keyboard focus back to the app once the click is done, so a
+      // second click into this player (e.g. to pause it) is seen as yours.
+      if (playerHasFocus(login)) (document.activeElement as HTMLElement).blur();
+      const entry = playerRegistry.get(login);
+      if (entry?.adapter.isPaused?.() && !playbackRecovery.isManagedPause(login))
+        entry.adapter.play();
     }, 400);
   }, []);
   useEffect(() => {

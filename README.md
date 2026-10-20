@@ -22,7 +22,9 @@ channels are live, and watch several streams at once with layouts that actually 
 - **Controls on each stream**: hovering a stream shows its controls (listen, volume, make main,
   chat, reload, open on Twitch, remove) in a compact overlay at the top of its video. The controls
   disappear when you leave the stream, and stay open while you edit its volume. If a stream pauses on its own it resumes automatically; one
-  you paused yourself (clicked inside the player) stays paused.
+  you paused yourself (clicked inside the player) stays paused. Clicking a stream to make it the
+  main one (or the one you hear) keeps it playing even though Twitch pauses a video on click;
+  click it again to pause it.
 - **Stream groups**: **Create group / Manage groups** names related perspectives and assigns streams.
   **All groups** clusters them together; in Focus, one chosen stream stays large across the whole
   view while the others remain clustered by group. Group tabs isolate one group and pause hidden streams.

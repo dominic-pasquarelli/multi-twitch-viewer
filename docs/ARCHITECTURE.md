@@ -114,7 +114,11 @@ Behaviour notes:
 - **Streams keep playing unless you paused them.** When a player reports `paused`, the tile
   resumes it after a moment unless you interacted with that player just before
   (`playerInteraction.ts`: click/focus inside it). `AutoResume` caps retries so a player that
-  keeps pausing isn't fought forever.
+  keeps pausing isn't fought forever. A click that selects a stream (makes it main or heard) is
+  not a pause request: Twitch toggles pause on click, sometimes after several hundred ms, so
+  `markSelection` opens a short grace period in which a pause is resumed at once and counts as
+  neither a manual pause nor network pressure. Focus is handed back to the app after the click,
+  so the next click into that player is seen and ends the grace period.
 - **Groups keep player DOM stable.** Optional groups and the selected tab are part of `ViewState`
   and validated when sessions/presets load. Grid computes separate group sections. Focus places
   one global main video ahead of the remaining labeled clusters; isolated tabs focus within their
