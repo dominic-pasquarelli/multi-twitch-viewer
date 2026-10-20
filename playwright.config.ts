@@ -33,6 +33,7 @@ export default defineConfig({
         'sweep1.spec.ts',
         'sweep2.spec.ts',
         'sidebar.spec.ts',
+        'controls.spec.ts',
       ],
       use: { ...chromium, baseURL: `http://localhost:${PORT}` },
     },

@@ -141,6 +141,16 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
           }}
         />
       </div>
+      {stream && (stream.gameName || stream.title) && (
+        <div
+          className={styles.info}
+          data-testid="stream-info"
+          title={[stream.gameName, stream.title].filter(Boolean).join('\n')}
+        >
+          {stream.gameName && <span className={styles.category}>{stream.gameName}</span>}
+          {stream.title && <span className={styles.title}>{stream.title}</span>}
+        </div>
+      )}
     </div>
   );
 }

@@ -20,7 +20,8 @@ channels are live, and watch several streams at once with layouts that actually 
   top. When a favorite goes live you get a Windows notification; click it to start watching.
   Settings can switch this to everyone you follow, or off.
 - **Controls on each stream**: hovering a stream shows its controls (listen, volume, make main,
-  chat, reload, open on Twitch, remove) in a compact overlay at the top of its video. The controls
+  chat, reload, open on Twitch, remove), plus its category and title, in a compact overlay
+  at the top of its video. The controls
   disappear when you leave the stream, and stay open while you edit its volume. If a stream pauses on its own it resumes automatically; one
   you paused yourself (clicked inside the player) stays paused. Clicking a stream to make it the
   main one (or the one you hear) keeps it playing even though Twitch pauses a video on click;

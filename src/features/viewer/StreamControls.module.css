@@ -48,6 +48,31 @@
   font-size: 11px;
   white-space: nowrap;
 }
+/* Category and title: one line under the controls, the title truncated first. */
+.info {
+  flex: 1 0 100%;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 4px 1px;
+  font-size: 11px;
+  line-height: 15px;
+  white-space: nowrap;
+}
+.category {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--accent);
+  font-weight: 600;
+}
+.title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
+}
 .volume {
   flex: 0 1 90px;
   width: 90px;
