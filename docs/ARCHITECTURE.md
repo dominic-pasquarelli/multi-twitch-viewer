@@ -39,7 +39,7 @@ src/
 | `viewStore`             | `session`       | Current `ViewState` (last session), undo history (memory only) |
 | `presetsStore`          | `presets`       | Saved presets                                                  |
 | `settingsStore`         | `settings`      | Preferences (gap, audio behaviour, quality, Client ID…)        |
-| `channelPrefsStore`     | `channel-prefs` | Per-channel volume                                             |
+| `channelPrefsStore`     | `channel-prefs` | Per-channel volume, app output volume                          |
 | `authStore`             | `auth`          | Twitch token + user                                            |
 | `uiStore`, `toastStore` | (not saved)     | Open dialogs, fullscreen, player status, toasts                |
 
@@ -119,6 +119,9 @@ Behaviour notes:
   `markSelection` opens a short grace period in which a pause is resumed at once and counts as
   neither a manual pause nor network pressure. Focus is handed back to the app after the click,
   so the next click into that player is seen and ends the grace period.
+- **App volume is applied last.** The output level multiplies each tile's duck scale before it
+  reaches the player, and is divided back out of volume changes made with Twitch's own slider, so
+  per-channel volumes and the mix are unchanged.
 - **Groups keep player DOM stable.** Optional groups and the selected tab are part of `ViewState`
   and validated when sessions/presets load. Grid computes separate group sections. Focus places
   one global main video ahead of the remaining labeled clusters; isolated tabs focus within their

@@ -24,6 +24,7 @@ import { Avatar } from '@/ui/Avatar';
 import { IconButton } from '@/ui/Button';
 import { LoginButton } from '../auth/LoginPrompt';
 import { Mixer } from '../mixer/Mixer';
+import { OutputVolume } from '../mixer/OutputVolume';
 import { PresetsMenu } from '../presets/PresetsMenu';
 import { pauseAll, playAll } from '../viewer/playbackActions';
 import { AddChannelBox } from './AddChannelBox';
@@ -125,6 +126,7 @@ export function TopBar() {
           onClick={() => store.toggleMuteAll()}
           disabled={!view.channels.length}
         />
+        <OutputVolume />
         <Mixer />
       </div>
 

@@ -42,6 +42,8 @@ channels are live, and watch several streams at once with layouts that actually 
   - **Duck**: the others keep playing quietly (20% by default) so you notice when something happens.
   - **Mix** (`Shift+1`–`9`): several streams at full volume.
     Changing the main video keeps your mix. Hover a stream to adjust its volume directly on the video.
+  - **App volume** (slider next to Mute all): one level for everything the app plays, on top of
+    each stream's own volume and the mix. Scroll over it to adjust; it's remembered.
   - **Mixer** (sliders button next to them): every stream's volume in one list, to balance the
     streams you hear together.
   - **Consistent volume** (in the Mixer or Settings → Audio): every stream you switch to plays at
@@ -195,6 +197,7 @@ lack of a "Log in" prompt) is logged in.
 | Choose what you hear             | `1`–`9`, click the stream (grid with Solo/Duck), the speaker button in the top bar, or unmute it in the player  |
 | Hear the others quietly          | **Duck** in the top bar (background level in Settings)                                                          |
 | Change volume                    | `↑`/`↓`, or scroll over the stream controls in the top bar                                                      |
+| Turn the whole app up or down    | The **App volume** slider next to Mute all                                                                      |
 | Get told when someone goes live  | Star them in the sidebar; allow notifications in Settings → Alerts                                              |
 | Hear several at once             | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                                                        |
 | Balance volumes                  | The Mixer (sliders button in the top bar); **Consistent volume** keeps switching even                           |

@@ -14,6 +14,7 @@ import type { ViewState } from '@/lib/view/types';
 import { streamVolume } from '@/lib/audio/volumeModel';
 import { audioLevel, mainChannel } from '@/lib/view/operations';
 import { displayedChannels, streamSections } from '@/lib/view/groups';
+import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
 import { toast } from '@/state/toastStore';
 import { useUi } from '@/state/uiStore';
@@ -65,6 +66,7 @@ export function Viewer() {
     bandwidthSaving,
   } = useSettings();
   const volumeModel = useVolumeModel();
+  const output = useChannelPrefs((s) => s.output);
   const playerStatus = useUi((s) => s.playerStatus);
   const selected = useUi((s) => s.selected);
   const setSelected = useUi((s) => s.setSelected);
@@ -336,7 +338,7 @@ export function Viewer() {
             audible={level.focused}
             main={view.layout.mode === 'focus' && login === focused}
             muted={level.muted}
-            volumeScale={level.scale}
+            volumeScale={level.scale * output}
             volume={streamVolume(volumeModel, login)}
             quality={isPrimary(view, login, shown) ? mainQuality : otherQuality}
             belowMinimum={isBelowMinimum(rect, DEFAULT_LAYOUT_OPTIONS.minTile)}
