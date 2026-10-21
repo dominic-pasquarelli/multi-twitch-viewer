@@ -38,11 +38,13 @@ export function Mixer() {
         disabled={!view.channels.length}
         data-testid="mixer-button"
       />
+      {/* Stays open while you use a player's own volume slider, so you can watch its row follow. */}
       <Popover
         open={open}
         onClose={() => setOpen(false)}
         className={styles.panel}
         ignoreRefs={[wrapRef]}
+        closeOnBlur={false}
       >
         <div data-testid="mixer">
           <Checkbox

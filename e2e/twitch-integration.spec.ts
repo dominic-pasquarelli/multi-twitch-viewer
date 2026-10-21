@@ -424,3 +424,41 @@ test('a linked channel offline on Twitch plays through Kick: official API, brows
   expect(kickCalls).toContain('channels charlie Bearer kick-token');
   expect(kickCalls.filter((c) => c.startsWith('token'))).toHaveLength(1);
 });
+
+test("the Mixer stays open while you use Twitch's own volume slider, and follows it", async ({
+  page,
+}) => {
+  await stubTwitch(page, []);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  const rows = page.getByTestId('channel-row');
+  await rows.nth(0).click();
+  await rows.nth(1).click();
+  await page.getByRole('button', { name: 'Mix', exact: true }).click();
+  const alpha = page.locator('iframe[data-fake-twitch=alpha]');
+  await expect(alpha).toHaveAttribute('data-muted', 'false');
+
+  await page.getByTestId('mixer-button').click();
+  const mixer = page.getByTestId('mixer');
+  const row = page.locator('[data-testid=mixer-row][data-channel=alpha]');
+  await expect(row.getByTestId('mixer-volume')).toHaveText('50%');
+  // Clicking into the player (to reach Twitch's controls) keeps the Mixer open.
+  const tile = page.locator('[data-testid=player-tile][data-channel=alpha]');
+  await tile.hover();
+  await alpha.click();
+  await expect(mixer).toBeVisible();
+  // Like dragging the volume slider in Twitch's controls.
+  await page.evaluate(() => {
+    type Fake = { opts: { channel: string }; setVolume(v: number): void };
+    const players = (window as unknown as { __fakePlayers: Fake[] }).__fakePlayers;
+    players.find((p) => p.opts.channel === 'alpha')!.setVolume(0.2);
+  });
+  await expect(row.getByTestId('mixer-volume')).toHaveText('20%', { timeout: 5000 });
+  await expect(row.getByRole('slider')).toHaveValue('20');
+  await expect(mixer).toBeVisible();
+  // A click elsewhere in the app still closes it.
+  await page.getByRole('heading', { name: 'Followed', exact: true }).click();
+  await expect(mixer).toBeHidden();
+  await tile.hover();
+  await expect(tile.getByTestId('stream-volume')).toHaveText('20%');
+});

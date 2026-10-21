@@ -61,7 +61,8 @@ channels are live, and watch several streams at once with layouts that actually 
   - **App volume** (slider next to Mute all): one level for everything the app plays, on top of
     each stream's own volume and the mix. Scroll over it to adjust; it's remembered.
   - **Mixer** (sliders button next to them): every stream's volume in one list, to balance the
-    streams you hear together.
+    streams you hear together. It stays open while you use a player's own controls, so you can
+    watch a row follow Twitch's volume slider.
   - **Consistent volume** (in the Mixer or Settings → Audio): every stream you switch to plays at
     one master volume. Mixer sliders then just even out a loud or quiet streamer.
   - `↑`/`↓` changes the volume of the stream you're hearing, or scroll over the stream controls

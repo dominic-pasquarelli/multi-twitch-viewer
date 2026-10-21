@@ -8,6 +8,8 @@ interface PopoverProps {
   style?: CSSProperties;
   /** Elements that should not count as "outside" (e.g. the toggle button). */
   ignoreRefs?: React.RefObject<HTMLElement | null>[];
+  /** false: stay open while you use a player's own controls (a click into its iframe). */
+  closeOnBlur?: boolean;
 }
 
 /** A floating panel that closes on outside click or Escape. */
@@ -18,6 +20,7 @@ export function Popover({
   className,
   style,
   ignoreRefs = [],
+  closeOnBlur = true,
 }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
   const ignore = useRef(ignoreRefs);
@@ -40,13 +43,13 @@ export function Popover({
     const onBlur = () => onClose();
     document.addEventListener('pointerdown', onDown);
     document.addEventListener('keydown', onKey);
-    window.addEventListener('blur', onBlur);
+    if (closeOnBlur) window.addEventListener('blur', onBlur);
     return () => {
       document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('keydown', onKey);
       window.removeEventListener('blur', onBlur);
     };
-  }, [open, onClose]);
+  }, [open, onClose, closeOnBlur]);
 
   if (!open) return null;
   return (
