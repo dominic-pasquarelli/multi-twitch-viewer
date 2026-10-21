@@ -16,7 +16,8 @@ channels are live, and watch several streams at once with layouts that actually 
   - Turn on **Arrange**, then drag anywhere on a stream onto another to swap them. Streams
     never reload when they move.
   - Offline channels step aside and give their space to live ones, then come back when they go live.
-- **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar or on a stream) to
+- **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar, History and Also
+  watching included, or on a stream) to
   keep them at the top. When a favorite goes live you get a Windows notification; click it to start
   watching. Settings can switch this to everyone you follow, or off.
 - **Favorites view (a dynamic home)**: the Home button (or `H`, or the pinned **★ Favorites** row

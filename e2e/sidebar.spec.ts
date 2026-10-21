@@ -292,3 +292,32 @@ test('discovery searches categories, filters live metadata, and still searches c
   await row(page, 'novastrike').click();
   await expect(page.locator('[data-testid=player-tile][data-channel=novastrike]')).toBeVisible();
 });
+
+test('history and also-watching channels can be favorited from their rows', async ({ page }) => {
+  await seedHistory(page);
+  await page.goto('/');
+  const history = page.locator('[data-testid=history-row][data-channel=pastlive]');
+  await expect(history).toBeVisible();
+  const star = history.getByTestId('favorite-toggle');
+  await history.hover();
+  await expect(star).toHaveAttribute('aria-pressed', 'false');
+  await star.click();
+  await expect(star).toHaveAttribute('aria-pressed', 'true');
+  // A favorite keeps its filled star visible after the pointer leaves.
+  await page.getByTestId('add-channel').hover();
+  await expect(star).toBeVisible();
+  await expect(history.getByRole('button', { name: 'Remove pastlive from history' })).toBeHidden();
+  // It's a favorite like any other, e.g. in the Favorites list.
+  await page.getByTestId('home-button').click();
+  await expect(page.locator('[data-testid=player-tile][data-channel=pastlive]')).toBeVisible();
+
+  // Also watching (on screen, not followed) has the same star.
+  await page.evaluate(() => (location.hash = '#/somestranger'));
+  const other = row(page, 'somestranger');
+  await other.hover();
+  await other.locator('..').getByTestId('favorite-toggle').click();
+  await expect(other.locator('..').getByTestId('favorite-toggle')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});

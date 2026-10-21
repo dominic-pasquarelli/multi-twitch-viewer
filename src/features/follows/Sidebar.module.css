@@ -367,6 +367,20 @@
 .actions:focus-within {
   display: flex;
 }
+/* Favoritable rows (history, also watching): the star joins the actions and
+   stays visible, alone, on a favorite while the row isn't hovered. */
+.withStar .row {
+  padding-right: 84px;
+}
+.favorite.withStar .actions {
+  display: flex;
+}
+.favorite.withStar:not(:hover, :has(:focus-visible)) .actions > :not(.actionStar) {
+  display: none;
+}
+.favorite .actionStar {
+  color: #f5c518;
+}
 .rowAction {
   display: inline-flex;
   padding: 4px;
