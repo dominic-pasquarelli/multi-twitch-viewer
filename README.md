@@ -16,7 +16,8 @@ channels are live, and watch several streams at once with layouts that actually 
   - Turn on **Arrange**, then drag anywhere on a stream onto another to swap them. Streams
     never reload when they move.
   - Offline channels step aside and give their space to live ones, then come back when they go live.
-- **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar or on a stream) to
+- **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar, History and Also
+  watching included, or on a stream) to
   keep them at the top. When a favorite goes live you get a Windows notification; click it to start
   watching. Settings can switch this to everyone you follow, or off.
 - **Favorites view (a dynamic home)**: the Home button (or `H`, or the pinned **★ Favorites** row
@@ -26,6 +27,14 @@ channels are live, and watch several streams at once with layouts that actually 
   row) adds channels by name or link, including ones you don't follow. Loading a preset, a link
   or **Clear all** leaves the view (Undo returns to it); your presets work as before.
   **Settings → Layout → Open on Favorites at launch** starts the app there.
+- **Kick for streamers on both platforms** (optional): link a Twitch channel to the same
+  streamer's Kick channel (🔗 on the stream, or **Settings → Account → Linked Kick channels**).
+  While they're offline on Twitch but live on Kick, their stream plays from Kick (marked **Kick**)
+  and counts as live in the sidebar, the Favorites view and go-live alerts, with Kick chat in the
+  chat panel; it switches back the moment they go live on Twitch. Needs a free Kick app, see
+  [Kick setup](#kick-setup-optional). In the desktop app Kick streams follow Solo/Duck/Mix and
+  every volume control; in a browser they're muted unless they're the one you hear (switching
+  reloads the Kick player), because Kick's embedded player can't be controlled from a web page.
 - **Controls on each stream**: hovering a stream shows its controls (listen, volume, make main,
   chat, reload, open on Twitch, favorite, remove), plus its category and title, in a compact overlay
   at the top of its video. The controls
@@ -49,10 +58,14 @@ channels are live, and watch several streams at once with layouts that actually 
   - **Duck**: the others keep playing quietly (20% by default) so you notice when something happens.
   - **Mix** (`Shift+1`–`9`): several streams at full volume.
     Changing the main video keeps your mix. Hover a stream to adjust its volume directly on the video.
+    In the focus layout the main stream plays at the **main level** (100% unless you move its
+    slider) while the others keep their own levels: a small stream set to 20% plays at 100% while
+    it's the main one and goes back to 20% after. Turn this off in the Mixer or Settings → Audio.
   - **App volume** (slider next to Mute all): one level for everything the app plays, on top of
     each stream's own volume and the mix. Scroll over it to adjust; it's remembered.
   - **Mixer** (sliders button next to them): every stream's volume in one list, to balance the
-    streams you hear together.
+    streams you hear together. It stays open while you use a player's own controls, so you can
+    watch a row follow Twitch's volume slider.
   - **Consistent volume** (in the Mixer or Settings → Audio): every stream you switch to plays at
     one master volume. Mixer sliders then just even out a loud or quiet streamer.
   - `↑`/`↓` changes the volume of the stream you're hearing, or scroll over the stream controls
@@ -74,7 +87,8 @@ channels are live, and watch several streams at once with layouts that actually 
   (`http://localhost:5757/#/chan1/chan2?layout=focus`). Pasting a multitwitch.tv link into the
   add box loads all of its channels.
 - **Also**: tabbed chat (`C`) that follows the stream you're hearing, fullscreen (`F`), undo
-  (`Ctrl+Z`).
+  (`Ctrl+Z`). In fullscreen the sidebar is tucked away: move the pointer to the left edge to slide
+  it out over the streams, or press `B` to keep it open beside them (`B` again hides it).
 - **Quality where it counts**: the main stream plays at source quality, the smaller ones at a
   quality that matches their size (never below 360p), which saves bandwidth and CPU. Change both in
   **Settings → Players**.
@@ -119,6 +133,7 @@ involved.
    asks.
 2. For Turbo in the players, open **Settings → Account → Sign in to Twitch players** once. The desktop app
    has its own built-in browser, so it doesn't use your normal browser's Twitch login.
+3. Optional: the [Kick setup](#kick-setup-optional), to watch streamers who are also on Kick.
 
 ### How it behaves
 
@@ -176,6 +191,18 @@ follow. The app walks you through this (**Set up Twitch login**). The steps are:
 The app only asks for the `user:read:follows` permission. The login lasts about 60 days. After
 that the app shows **Log in again**, which is one click because Twitch remembers you approved it.
 
+### Kick setup (optional)
+
+Only needed for linked Kick channels (**Kick for streamers on both platforms** above). The app
+checks who is live with Kick's official API, which needs your own free Kick app:
+
+1. On [kick.com → Settings → Developer](https://kick.com/settings/developer), create an app.
+   Any name works; for the redirect URL use `http://localhost:5757`. No scopes are needed.
+2. Copy its **Client ID** and **Client Secret** into **Settings → Account → Kick**. They stay on
+   this computer.
+3. Link channels: 🔗 on a stream's controls, or **Linked Kick channels…** in the same place.
+   The Kick name is filled in with the Twitch one; change it if theirs differs.
+
 ## Turbo / no ads
 
 **Desktop app:** use **Settings → Account → Sign in to Twitch players** once; that's all.
@@ -216,6 +243,7 @@ lack of a "Log in" prompt) is logged in.
 | Rearrange                        | Enable **Arrange**, then drag a stream window onto another                                                      |
 | Save the current setup           | **Presets** → **Save current…**                                                                                 |
 | See whichever favorites are live | The Home button or `H` (the **★ Favorites** row in Presets); manage the list with ✎ on that row                 |
+| Watch a streamer on Kick         | 🔗 on the stream links their Kick channel; it plays from Kick while they're offline on Twitch                   |
 | Keyboard shortcuts               | `?`                                                                                                             |
 
 Shortcuts pause while a Twitch player has keyboard focus (after you click inside it). Moving the

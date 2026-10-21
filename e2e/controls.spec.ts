@@ -40,3 +40,52 @@ test('the app volume scales every stream and is remembered', async ({ page }) =>
   await page.getByTestId('output-volume').fill('100');
   await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.50');
 });
+
+test('in Mix + Focus the main stream plays at the main level, the others at their own', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/novastrike/cozycartographer?layout=focus');
+  await page.getByRole('button', { name: 'Mix', exact: true }).click();
+  const novastrike = tile(page, 'novastrike');
+  await novastrike.hover();
+  await novastrike.getByRole('button', { name: 'Listen to this stream', exact: true }).click();
+  await novastrike.getByRole('slider').fill('20');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-volume', '0.20');
+  // The main stream is at 100% while the others keep their own levels.
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '1.00');
+  await tile(page, 'pixelpaladin').hover();
+  await expect(tile(page, 'pixelpaladin').getByTestId('stream-volume')).toHaveText('100%');
+
+  // The 20% stream becomes main: 100%, and the old main is back at its own 50%.
+  await novastrike.hover();
+  await novastrike.getByRole('button', { name: 'Make this the main stream' }).click();
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-volume', '1.00');
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.50');
+
+  // The main stream's slider sets the main level, for whichever stream is main.
+  await novastrike.hover();
+  await novastrike.getByRole('slider').fill('80');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-volume', '0.80');
+  await page.getByTestId('mixer-button').click();
+  const mainRow = page.locator('[data-testid=mixer-row][data-channel=novastrike]');
+  await expect(mainRow).toContainText('Main');
+  await expect(mainRow.getByTestId('mixer-volume')).toHaveText('80%');
+  await page.keyboard.press('Escape');
+  await tile(page, 'pixelpaladin').hover();
+  await tile(page, 'pixelpaladin')
+    .getByRole('button', { name: 'Make this the main stream' })
+    .click();
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.80');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-volume', '0.20');
+
+  // Turned off (or outside Focus), every stream plays at its own level.
+  await page.getByTestId('mixer-button').click();
+  await page.getByText('Main stream at full volume (Mix + Focus)').click();
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.50');
+  await page.getByText('Main stream at full volume (Mix + Focus)').click();
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.80');
+  await page.keyboard.press('Escape');
+  await page.locator('body').press('l'); // grid
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.50');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-volume', '0.20');
+});

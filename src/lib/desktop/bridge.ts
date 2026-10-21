@@ -1,3 +1,5 @@
+import type { KickPlayerCommand, KickPlayerState } from '../player/kickEmbed';
+
 /**
  * The API the Electron app exposes to the page (desktop/preload.cjs).
  * Undefined when running in a normal browser (`npm start`, `npm run dev`).
@@ -34,6 +36,11 @@ export interface DesktopBridge {
   installUpdate(): void;
   /** Presses play inside every Twitch player (gets past content blurs the embed API can't). */
   playAll?(channels?: readonly string[]): void;
+  /**
+   * Controls the video inside the Kick player frame whose URL carries `mtv=<id>`
+   * (see desktop/kickPlayer.mjs); null while it has no video.
+   */
+  kickPlayer?(id: string, command: KickPlayerCommand): Promise<KickPlayerState | null>;
   /** Tweaks Twitch's own UI inside the players (see desktop/playerChrome.mjs). */
   setPlayerChrome?(options: PlayerChrome): void;
   onUpdateStatus(callback: (status: UpdateStatus) => void): () => void;

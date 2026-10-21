@@ -58,3 +58,37 @@ describe('consistent volume', () => {
     expect(setMasterVolume(3)).toEqual({ master: 1 });
   });
 });
+
+describe('main stream priority (Mix + Focus)', () => {
+  it('plays the main stream at the main level and the others at their own', () => {
+    const m = model({ volumes: { small: 0.2, other: 0.6 }, priorityMain: 'small' });
+    expect(streamVolume(m, 'small')).toBe(1); // 100% by default while it's the main one
+    expect(streamVolume(m, 'other')).toBe(0.6);
+    // Another stream becomes main: the first one is back at its own 20%.
+    const next = { ...m, priorityMain: 'other' };
+    expect(streamVolume(next, 'small')).toBe(0.2);
+    expect(streamVolume(next, 'other')).toBe(1);
+    expect(streamVolume({ ...m, priorityMain: null }, 'small')).toBe(0.2);
+  });
+
+  it("sets the main level from the main stream's sliders, keeping its own level", () => {
+    const m = model({ volumes: { small: 0.2 }, priorityMain: 'small', mainLevel: 1 });
+    expect(setMixVolume(m, 'small', 0.8)).toEqual({ mainLevel: 0.8 });
+    expect(setHeardVolume(m, 'small', 0.7)).toEqual({ mainLevel: 0.7 });
+    expect(setMixVolume(m, 'other', 0.3)).toEqual({ volumes: { small: 0.2, other: 0.3 } });
+    expect(streamVolume({ ...m, mainLevel: 0.8 }, 'small')).toBe(0.8);
+  });
+
+  it('is a share of the master volume in consistent mode', () => {
+    const m = model({
+      consistent: true,
+      master: 0.5,
+      balance: { small: 0.4 },
+      priorityMain: 'small',
+    });
+    expect(streamVolume(m, 'small')).toBe(0.5);
+    expect(streamVolume({ ...m, priorityMain: null }, 'small')).toBe(0.2);
+    expect(setMixVolume(m, 'small', 0.25)).toEqual({ mainLevel: 0.5 });
+    expect(setHeardVolume({ ...m, mainLevel: 0.5 }, 'small', 0.4)).toEqual({ master: 0.8 });
+  });
+});

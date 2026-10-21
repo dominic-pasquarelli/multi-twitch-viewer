@@ -9,9 +9,13 @@ import {
   mockHue,
   setMockLive,
 } from '@/lib/twitch/mockApi';
+import { createKickApi } from '@/lib/kick/kickApi';
+import { createMockKickApi, setMockKickLive } from '@/lib/kick/mockKickApi';
+import { createKickPlayerFactory } from '@/lib/player/kickEmbed';
 import { twitchPlayerFactory } from '@/lib/player/twitchEmbed';
 import { createMockPlayerFactory } from '@/lib/player/mockPlayer';
 import { useAuth } from '@/state/authStore';
+import { useSettings } from '@/state/settingsStore';
 import { offlineDrop } from '@/features/viewer/useDropOfflineStreams';
 import { ServicesContext, useClientId, type Services } from './servicesContext';
 
@@ -19,6 +23,12 @@ const mockPlayers = createMockPlayerFactory({
   isLive: (login) => MOCK_CHANNELS.find((c) => c.login === login)?.live ?? true,
   hueFor: mockHue,
 });
+const mockKickPlayers = createMockPlayerFactory({ hueFor: () => 140, platform: 'kick' });
+// The desktop app can reach into Kick's player frames; a browser can't.
+const kickControl = desktop?.kickPlayer;
+const kickPlayers = createKickPlayerFactory(
+  kickControl ? (id, command) => kickControl(id, command) : undefined,
+);
 
 // Test/demo hooks in mock mode: simulate going live, or a player pausing itself.
 if (IS_MOCK) {
@@ -31,6 +41,7 @@ if (IS_MOCK) {
         mockPlayers.instances.filter((p) => p.channel === login).forEach((p) => p.emit('offline'));
     },
     setOfflineGrace: (ms: number) => (offlineDrop.graceMs = ms),
+    setKickLive: (slug: string, live: boolean) => setMockKickLive(slug, live),
     pause: (login: string) =>
       mockPlayers.instances
         .filter((p) => p.channel === login)
@@ -66,6 +77,8 @@ export function ServicesProvider({
 }) {
   const clientId = useClientId();
   const hasToken = useAuth((s) => !!s.token);
+  const kickClientId = useSettings((s) => s.kickClientId.trim());
+  const kickClientSecret = useSettings((s) => s.kickClientSecret.trim());
 
   const value = useMemo<Services>(() => {
     const api = IS_MOCK
@@ -77,15 +90,22 @@ export function ServicesProvider({
             onUnauthorized: () => useAuth.getState().markExpired(),
           })
         : null;
+    const kickApi = IS_MOCK
+      ? createMockKickApi()
+      : kickClientId && kickClientSecret
+        ? createKickApi({ clientId: kickClientId, clientSecret: kickClientSecret })
+        : null;
     return {
       api,
       playerFactory: IS_MOCK ? mockPlayers : twitchPlayerFactory,
+      kickApi,
+      kickPlayerFactory: IS_MOCK ? mockKickPlayers : kickPlayers,
       clientId,
       mock: IS_MOCK,
       openFollowPage,
       ...override,
     };
-  }, [clientId, hasToken, override]);
+  }, [clientId, hasToken, kickClientId, kickClientSecret, override]);
 
   return <ServicesContext.Provider value={value}>{children}</ServicesContext.Provider>;
 }

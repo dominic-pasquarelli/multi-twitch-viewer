@@ -21,6 +21,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useServices } from '@/app/servicesContext';
 import { favoritesFirst } from '@/lib/alerts/goLive';
+import { KickBadge } from '../kick/KickBadge';
 import type {
   ChannelSearchResult,
   LiveStream,
@@ -246,6 +247,7 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
             onClick={() => {
               void queryClient.invalidateQueries({ queryKey: ['followed-live'] });
               void queryClient.invalidateQueries({ queryKey: ['streams'] });
+              void queryClient.invalidateQueries({ queryKey: ['kick-live'] });
               void queryClient.invalidateQueries({ queryKey: ['category-streams'] });
             }}
           />
@@ -337,6 +339,7 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
                     inView
                     onHover={(el) => showPreview(row, el)}
                     actions={<FollowButton login={row.login} name={row.displayName} />}
+                    favoritable
                   />
                 ))}
               </>
@@ -408,21 +411,30 @@ function ChannelRow({
   inView,
   onHover,
   actions,
+  favoritable,
 }: {
   row: Row;
   inView: boolean;
   onHover?(el: HTMLElement | null): void;
   /** Buttons shown on hover instead of the favorite star (e.g. Follow, Forget). */
   actions?: ReactNode;
+  /** With actions: also show the favorite star among them (history, also watching). */
+  favoritable?: boolean;
 }) {
   const handlers = useRowHandlers(row.login);
   const favorite = useChannelPrefs((p) => p.favorites.includes(row.login));
-  const toggleFavorite = useChannelPrefs((p) => p.toggleFavorite);
   const s = row.stream;
   const showPreview = useRowPreview(row, onHover);
   return (
     <div
-      className={`${styles.rowWrap} ${favorite ? styles.favorite : ''} ${actions ? styles.withActions : ''}`}
+      className={[
+        styles.rowWrap,
+        favorite && styles.favorite,
+        actions && styles.withActions,
+        actions && favoritable && styles.withStar,
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       <button
         className={`${styles.row} ${inView ? styles.inView : ''} ${s ? '' : styles.offline}`}
@@ -450,29 +462,54 @@ function ChannelRow({
           {s && <div className={styles.game}>{s.gameName || 'No category'}</div>}
         </span>
         {s && (
-          <span className={styles.viewers}>
-            <span className={styles.dot} />
+          <span className={styles.viewers} data-platform={s.platform ?? 'twitch'}>
+            {s.platform === 'kick' ? <KickBadge /> : <span className={styles.dot} />}
             {formatCount(s.viewerCount)}
           </span>
         )}
       </button>
       {actions ? (
-        <div className={styles.actions}>{actions}</div>
+        <div className={styles.actions}>
+          {favoritable && (
+            <FavoriteStar
+              row={row}
+              favorite={favorite}
+              className={`${styles.rowAction} ${styles.actionStar}`}
+            />
+          )}
+          {actions}
+        </div>
       ) : (
-        <button
-          className={styles.star}
-          aria-pressed={favorite}
-          aria-label={favorite ? `Unfavorite ${row.displayName}` : `Favorite ${row.displayName}`}
-          title={
-            favorite ? 'Remove from favorites' : 'Favorite: keep at the top and get go-live alerts'
-          }
-          data-testid="favorite-toggle"
-          onClick={() => toggleFavorite(row.login)}
-        >
-          <Star size={14} fill={favorite ? 'currentColor' : 'none'} />
-        </button>
+        <FavoriteStar row={row} favorite={favorite} className={styles.star} />
       )}
     </div>
+  );
+}
+
+function FavoriteStar({
+  row,
+  favorite,
+  className,
+}: {
+  row: Row;
+  favorite: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      className={className}
+      aria-pressed={favorite}
+      aria-label={favorite ? `Unfavorite ${row.displayName}` : `Favorite ${row.displayName}`}
+      title={
+        favorite
+          ? 'Remove from favorites'
+          : 'Favorite: keep at the top, get go-live alerts and add to the Favorites view'
+      }
+      data-testid="favorite-toggle"
+      onClick={() => useChannelPrefs.getState().toggleFavorite(row.login)}
+    >
+      <Star size={14} fill={favorite ? 'currentColor' : 'none'} />
+    </button>
   );
 }
 
@@ -559,7 +596,7 @@ function RailItem({
   return (
     <button
       className={`${styles.railItem} ${inView ? styles.inView : ''}`}
-      title={`${row.displayName}${history ? ' · History' : ''} · ${row.stream ? row.stream.gameName : row.liveKnown === false ? 'Checking live status' : 'Offline'}`}
+      title={`${row.displayName}${history ? ' · History' : ''} · ${row.stream ? `${row.stream.platform === 'kick' ? 'On Kick · ' : ''}${row.stream.gameName}` : row.liveKnown === false ? 'Checking live status' : 'Offline'}`}
       data-testid="rail-channel"
       data-channel={row.login}
       data-history={!!history}
@@ -677,6 +714,7 @@ function HistorySection({
                     row={row}
                     inView={false}
                     onHover={(el) => onHover(row, el)}
+                    favoritable
                     actions={
                       <>
                         <FollowButton login={row.login} name={row.displayName} />

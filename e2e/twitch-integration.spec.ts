@@ -344,3 +344,123 @@ test('a stream selected with a click keeps playing when Twitch pauses it on that
   await expect(bravo).toHaveAttribute('data-paused', 'true');
   await expect(tile).toHaveAttribute('data-status', 'paused');
 });
+
+test('a linked channel offline on Twitch plays through Kick: official API, browser player', async ({
+  page,
+}) => {
+  await stubTwitch(page, []);
+  const kickCalls: string[] = [];
+  const kickCors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' };
+  await page.route('https://id.kick.com/oauth/token', (route) => {
+    if (route.request().method() === 'OPTIONS')
+      return route.fulfill({ status: 204, headers: kickCors });
+    kickCalls.push(`token ${route.request().postData()}`);
+    return route.fulfill({
+      headers: kickCors,
+      json: { access_token: 'kick-token', token_type: 'Bearer', expires_in: 3600 },
+    });
+  });
+  await page.route('https://api.kick.com/public/v1/channels?**', (route) => {
+    if (route.request().method() === 'OPTIONS')
+      return route.fulfill({ status: 204, headers: kickCors });
+    const url = new URL(route.request().url());
+    kickCalls.push(
+      `channels ${url.searchParams.getAll('slug').join(',')} ${route.request().headers()['authorization']}`,
+    );
+    return route.fulfill({
+      headers: kickCors,
+      json: {
+        data: url.searchParams.getAll('slug').map((slug) => ({
+          slug,
+          stream_title: `${slug} on Kick`,
+          category: { name: 'IRL' },
+          stream: { is_live: true, viewer_count: 77, start_time: new Date().toISOString() },
+        })),
+      },
+    });
+  });
+  await page.route('https://player.kick.com/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<p>Kick player</p>' }),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  const rows = page.getByTestId('channel-row');
+  await expect(rows).toHaveCount(3);
+
+  await page.getByTestId('settings-button').click();
+  await page.getByRole('tab', { name: 'Account' }).click();
+  await page.getByTestId('kick-client-id').fill('kick-id');
+  await page.getByTestId('kick-client-secret').fill('kick-secret');
+  await page.getByRole('button', { name: 'Linked Kick channels…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Linked Kick channels' });
+  await dialog.getByTestId('kick-link-twitch').fill('charlie');
+  await dialog.getByRole('button', { name: 'Link', exact: true }).click();
+  await expect(dialog.getByTestId('kick-link')).toContainText('Live on Kick · IRL');
+  await page.keyboard.press('Escape');
+
+  // Charlie is offline on Twitch, live on Kick: listed live, and it plays from Kick.
+  const charlie = page.locator('[data-testid=channel-row][data-channel=charlie]');
+  await expect(charlie).toHaveAttribute('data-live', 'true');
+  await page.locator('[data-testid=channel-row][data-channel=alpha]').click();
+  await charlie.click();
+  const kick = page.locator('iframe[data-kick-player=charlie]');
+  await expect(kick).toHaveAttribute(
+    'src',
+    /^https:\/\/player\.kick\.com\/charlie\?autoplay=true&muted=true&mtv=/,
+  );
+  await expect(page.locator('[data-testid=player-tile][data-channel=charlie]')).toHaveAttribute(
+    'data-status',
+    'playing',
+  );
+  // A browser can't set Kick's volume: it's unmuted only as the stream you hear.
+  await page.keyboard.press('2');
+  await expect(kick).toHaveAttribute('src', /muted=false/);
+  await page.keyboard.press('1');
+  await expect(kick).toHaveAttribute('src', /muted=true/);
+
+  expect(kickCalls[0]).toBe(
+    'token grant_type=client_credentials&client_id=kick-id&client_secret=kick-secret',
+  );
+  expect(kickCalls).toContain('channels charlie Bearer kick-token');
+  expect(kickCalls.filter((c) => c.startsWith('token'))).toHaveLength(1);
+});
+
+test("the Mixer stays open while you use Twitch's own volume slider, and follows it", async ({
+  page,
+}) => {
+  await stubTwitch(page, []);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  const rows = page.getByTestId('channel-row');
+  await rows.nth(0).click();
+  await rows.nth(1).click();
+  await page.getByRole('button', { name: 'Mix', exact: true }).click();
+  const alpha = page.locator('iframe[data-fake-twitch=alpha]');
+  await expect(alpha).toHaveAttribute('data-muted', 'false');
+
+  await page.getByTestId('mixer-button').click();
+  const mixer = page.getByTestId('mixer');
+  const row = page.locator('[data-testid=mixer-row][data-channel=alpha]');
+  await expect(row.getByTestId('mixer-volume')).toHaveText('50%');
+  // Clicking into the player (to reach Twitch's controls) keeps the Mixer open.
+  // Low on the video, where Twitch's controls are, clear of the open Mixer.
+  const tile = page.locator('[data-testid=player-tile][data-channel=alpha]');
+  const low = { x: 40, y: (await tile.boundingBox())!.height - 30 };
+  await tile.hover({ position: low });
+  await alpha.click({ position: low });
+  await expect(mixer).toBeVisible();
+  // Like dragging the volume slider in Twitch's controls.
+  await page.evaluate(() => {
+    type Fake = { opts: { channel: string }; setVolume(v: number): void };
+    const players = (window as unknown as { __fakePlayers: Fake[] }).__fakePlayers;
+    players.find((p) => p.opts.channel === 'alpha')!.setVolume(0.2);
+  });
+  await expect(row.getByTestId('mixer-volume')).toHaveText('20%', { timeout: 5000 });
+  await expect(row.getByRole('slider')).toHaveValue('20');
+  await expect(mixer).toBeVisible();
+  // A click elsewhere in the app still closes it.
+  await page.getByRole('heading', { name: 'Followed', exact: true }).click();
+  await expect(mixer).toBeHidden();
+  await tile.hover({ position: low });
+  await expect(tile.getByTestId('stream-volume')).toHaveText('20%');
+});

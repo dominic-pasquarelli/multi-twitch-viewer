@@ -15,6 +15,11 @@ contextBridge.exposeInMainWorld('mtvDesktop', {
   installUpdate: () => ipcRenderer.send('mtv:update-install'),
   /** @param {readonly string[] | undefined} channels */
   playAll: (channels) => ipcRenderer.send('mtv:play-all', channels),
+  /**
+   * @param {string} id
+   * @param {{ muted?: boolean, volume?: number, play?: boolean, pause?: boolean }} command
+   */
+  kickPlayer: (id, command) => ipcRenderer.invoke('mtv:kick-player', String(id), command ?? {}),
   /** @param {{ hideStreamInfo: boolean, skipContentWarning: boolean }} options */
   setPlayerChrome: (options) =>
     ipcRenderer.send('mtv:player-chrome', {

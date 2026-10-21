@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { VolumePatch } from '@/lib/audio/volumeModel';
+import { sanitizeKickLinks } from '@/lib/kick/links';
+import type { KickLinks } from '@/lib/kick/types';
 import { zustandStorage } from '@/lib/persistence/zustandStorage';
 
 /**
@@ -14,9 +16,15 @@ interface ChannelPrefsStore {
   master: number;
   /** Consistent-volume mode: each channel's level against the master (1 = same). */
   balance: Record<string, number>;
+  /** Main stream priority: the level the main stream plays at (see lib/audio/volumeModel). */
+  mainLevel: number;
   favorites: string[];
   /** The app's output level (0–1): scales everything it plays, after the mix. */
   output: number;
+  /** Twitch login → Kick slug: plays from Kick while live only there (lib/kick). */
+  kickLinks: KickLinks;
+  linkKick(login: string, slug: string): void;
+  unlinkKick(login: string): void;
   setVolume(login: string, volume: number): void;
   setOutput(volume: number): void;
   applyVolume(patch: VolumePatch): void;
@@ -31,8 +39,17 @@ export const useChannelPrefs = create<ChannelPrefsStore>()(
       volumes: {},
       master: 0.5,
       balance: {},
+      mainLevel: 1,
       favorites: [],
       output: 1,
+      kickLinks: {},
+      linkKick: (login, slug) => set((s) => ({ kickLinks: { ...s.kickLinks, [login]: slug } })),
+      unlinkKick: (login) =>
+        set((s) => {
+          const kickLinks = { ...s.kickLinks };
+          delete kickLinks[login];
+          return { kickLinks };
+        }),
       applyVolume: (patch) => set(patch),
       setOutput: (volume) =>
         set({ output: Math.round(Math.min(1, Math.max(0, volume)) * 100) / 100 }),
@@ -65,7 +82,12 @@ export const useChannelPrefs = create<ChannelPrefsStore>()(
           volumes: numberRecord(p.volumes),
           balance: numberRecord(p.balance),
           master: typeof p.master === 'number' && p.master >= 0 && p.master <= 1 ? p.master : 0.5,
+          mainLevel:
+            typeof p.mainLevel === 'number' && p.mainLevel >= 0 && p.mainLevel <= 1
+              ? p.mainLevel
+              : 1,
           output: typeof p.output === 'number' && p.output >= 0 && p.output <= 1 ? p.output : 1,
+          kickLinks: sanitizeKickLinks(p.kickLinks),
           favorites: Array.isArray(p.favorites)
             ? p.favorites.filter((f): f is string => typeof f === 'string')
             : [],

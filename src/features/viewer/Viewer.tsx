@@ -12,6 +12,7 @@ import { desktop } from '@/lib/desktop/bridge';
 import type { PlayerStatus } from '@/lib/player/types';
 import type { ViewState } from '@/lib/view/types';
 import { streamVolume } from '@/lib/audio/volumeModel';
+import { kickSlugFor } from '@/lib/kick/liveMerge';
 import { audioLevel, mainChannel } from '@/lib/view/operations';
 import { displayedChannels, streamSections } from '@/lib/view/groups';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
@@ -31,7 +32,7 @@ import { computeGroupedLayout } from './groupedLayout';
 import { EmptyState } from './EmptyState';
 import { PlayerTile } from './PlayerTile';
 import { useElementSize } from './useElementSize';
-import { setStreamVolume, useVolumeModel } from './volume';
+import { keepOwnVolume, setStreamVolume, useVolumeModel } from './volume';
 import styles from './Viewer.module.css';
 
 /** Closes any reachable stream surface consistently, with Undo. */
@@ -110,6 +111,13 @@ export function Viewer() {
     view.layout.mode === 'focus'
       ? mainChannel(view, shown)
       : (view.audio.active.find((c) => shown.includes(c)) ?? shown[0] ?? null);
+  // Who is shown big, for main stream priority (see viewer/volume.ts).
+  const setMainStream = useUi((s) => s.setMainStream);
+  const mainStream = view.layout.mode === 'focus' ? focused : null;
+  useEffect(() => {
+    if (mainStream) keepOwnVolume(mainStream);
+    setMainStream(mainStream);
+  }, [mainStream, setMainStream]);
   const recovery = usePlaybackRecovery({
     channels: view.channels,
     focused,
@@ -347,6 +355,7 @@ export function Viewer() {
           <PlayerTile
             key={login}
             login={login}
+            kick={kickSlugFor(liveStatus.live.get(login))}
             rect={rect}
             audible={level.focused}
             main={view.layout.mode === 'focus' && login === focused}

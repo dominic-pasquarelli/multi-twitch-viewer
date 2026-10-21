@@ -1,8 +1,10 @@
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useServices } from '@/app/servicesContext';
+import { kickLiveByLogin, withKickLive } from '@/lib/kick/liveMerge';
 import type { LiveStream, TwitchUser } from '@/lib/twitch/types';
 import { useAuth } from '@/state/authStore';
+import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
 
 export interface FollowedChannelInfo {
@@ -12,8 +14,23 @@ export interface FollowedChannelInfo {
   profileImageUrl: string;
 }
 
-/** Your followed channels that are live right now (auto-refreshing). */
+/**
+ * Your followed channels that are live right now (auto-refreshing), including
+ * linked ones live only on Kick (platform "kick").
+ */
 export function useFollowedLive() {
+  const query = useTwitchFollowedLive();
+  const follows = useFollowedChannels();
+  const kick = useKickLive();
+  const data = useMemo(() => {
+    if (!query.data || !kick.size || !follows.data) return query.data;
+    const names = new Map(follows.data.map((f) => [f.login, f.displayName]));
+    return withKickLive(query.data, kick, names.keys(), names);
+  }, [query.data, kick, follows.data]);
+  return useMemo(() => ({ ...query, data }) as typeof query, [query, data]);
+}
+
+function useTwitchFollowedLive() {
   const { api } = useServices();
   const userId = useAuth((s) => s.user?.id);
   const refreshSeconds = useSettings((s) => s.refreshSeconds);
@@ -51,18 +68,52 @@ export function useFollowedChannels() {
   });
 }
 
-/** Live status of specific channels (e.g. the ones on screen that you don't follow). */
+/**
+ * Live status of specific channels (e.g. the ones on screen that you don't
+ * follow), including linked ones live only on Kick.
+ */
 export function useStreamsFor(logins: string[]) {
   const { api } = useServices();
   const refreshSeconds = useSettings((s) => s.refreshSeconds);
   const key = [...logins].sort();
-  return useQuery({
+  const query = useQuery({
     queryKey: ['streams', key],
     queryFn: () => api!.getStreamsByLogins(key),
     enabled: !!api && key.length > 0,
     refetchInterval: refreshSeconds * 1000,
     placeholderData: keepPreviousData,
   });
+  const kick = useKickLive();
+  const keyId = key.join(',');
+  const data = useMemo(
+    () => (query.data && kick.size ? withKickLive(query.data, kick, keyId.split(',')) : query.data),
+    [query.data, kick, keyId],
+  );
+  return useMemo(() => ({ ...query, data }) as typeof query, [query, data]);
+}
+
+/** Live status of the Kick channels you linked (needs your Kick app; see lib/kick). */
+export function useKickChannels() {
+  const { kickApi } = useServices();
+  const refreshSeconds = useSettings((s) => s.refreshSeconds);
+  const links = useChannelPrefs((s) => s.kickLinks);
+  const slugs = useMemo(() => [...new Set(Object.values(links))].sort(), [links]);
+  return useQuery({
+    queryKey: ['kick-live', slugs],
+    queryFn: () => kickApi!.getChannels(slugs),
+    enabled: !!kickApi && slugs.length > 0,
+    refetchInterval: refreshSeconds * 1000,
+    // Like follows: keep checking in the background so go-live alerts still arrive.
+    refetchIntervalInBackground: true,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Linked channels live on Kick, by Twitch login. */
+export function useKickLive(): ReadonlyMap<string, LiveStream> {
+  const links = useChannelPrefs((s) => s.kickLinks);
+  const { data } = useKickChannels();
+  return useMemo(() => kickLiveByLogin(links, data ?? []), [links, data]);
 }
 
 export function useChannelSearch(query: string) {

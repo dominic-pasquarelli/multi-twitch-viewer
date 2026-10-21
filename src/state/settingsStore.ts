@@ -9,6 +9,9 @@ export type SidebarSort = 'viewers' | 'name' | 'uptime';
 export interface Settings {
   /** Overrides VITE_TWITCH_CLIENT_ID when set. */
   clientId: string;
+  /** Your Kick app (kick.com developer settings), for linked channels' live status. */
+  kickClientId: string;
+  kickClientSecret: string;
   tileGap: number;
   /** Collapse tiles of channels that are offline; they come back when live. */
   hideOffline: boolean;
@@ -36,6 +39,8 @@ export interface Settings {
   liveAlerts: LiveAlertMode;
   /** Every stream you listen to plays at one master volume (see lib/audio/volumeModel). */
   consistentVolume: boolean;
+  /** Mix + Focus: the main stream plays at the main level, the others at their own. */
+  mainPriority: boolean;
   /** Duck audio mode: how loud the background streams play (0–1 of their volume). */
   duckLevel: number;
   /** Focus layout: clicking a small stream makes it the main one. */
@@ -50,6 +55,8 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   clientId: '',
+  kickClientId: '',
+  kickClientSecret: '',
   tileGap: 4,
   hideOffline: true,
   dropOfflineStreams: true,
@@ -66,6 +73,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showOfflineFollows: true,
   liveAlerts: 'favorites',
   consistentVolume: false,
+  mainPriority: true,
   duckLevel: 0.2,
   clickToFocus: true,
   rightClickCloses: true,

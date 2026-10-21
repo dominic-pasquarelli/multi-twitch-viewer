@@ -22,6 +22,7 @@ export function Mixer() {
   const view = useViewStore((s) => s.view);
   const duckLevel = useSettings((s) => s.duckLevel);
   const update = useSettings((s) => s.update);
+  const mainPriority = useSettings((s) => s.mainPriority);
   const volumeModel = useVolumeModel();
   const live = useLiveStatus(view.channels).live;
   const channels = slotOrder(view, view.channels);
@@ -38,11 +39,13 @@ export function Mixer() {
         disabled={!view.channels.length}
         data-testid="mixer-button"
       />
+      {/* Stays open while you use a player's own volume slider, so you can watch its row follow. */}
       <Popover
         open={open}
         onClose={() => setOpen(false)}
         className={styles.panel}
         ignoreRefs={[wrapRef]}
+        closeOnBlur={false}
       >
         <div data-testid="mixer">
           <Checkbox
@@ -50,6 +53,12 @@ export function Mixer() {
             onChange={(v) => update({ consistentVolume: v })}
             label="Consistent volume"
             help="Every stream you switch to plays at the same master volume. The sliders below then even out a loud or quiet streamer."
+          />
+          <Checkbox
+            checked={mainPriority}
+            onChange={(v) => update({ mainPriority: v })}
+            label="Main stream at full volume (Mix + Focus)"
+            help="The big stream plays at the main level (100% unless you set its slider); the others keep their own levels, and get them back when another stream is main."
           />
           {volumeModel.consistent && (
             <label className={`${styles.row} ${styles.master}`}>
@@ -70,6 +79,7 @@ export function Mixer() {
             const level = audioLevel(view, login, duckLevel);
             const volume = currentVolume(login, volumeModel);
             const name = live.get(login)?.displayName ?? login;
+            const isMain = volumeModel.priorityMain === login;
             return (
               <div
                 key={login}
@@ -86,6 +96,14 @@ export function Mixer() {
                 />
                 <span className={styles.name} title={name}>
                   {i < 9 && <kbd>{i + 1}</kbd>} {name}
+                  {isMain && (
+                    <span
+                      className={styles.mainTag}
+                      title="Plays at the main level while it's the main stream; its own level comes back after"
+                    >
+                      Main
+                    </span>
+                  )}
                 </span>
                 <input
                   type="range"
@@ -93,7 +111,7 @@ export function Mixer() {
                   max={100}
                   value={pct(volume)}
                   onChange={(e) => setStreamMix(login, Number(e.target.value) / 100)}
-                  aria-label={`${name} volume`}
+                  aria-label={isMain ? `Main stream level (${name})` : `${name} volume`}
                 />
                 <span className={styles.percent} data-testid="mixer-volume">
                   {pct(volume)}%

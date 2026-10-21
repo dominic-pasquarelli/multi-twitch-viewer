@@ -71,9 +71,11 @@ export function useHotkeys(): void {
         '\\': () => view.setMainScale('auto'),
         '/': () => ui.requestAddBoxFocus(),
         b: () =>
-          useSettings
-            .getState()
-            .update({ sidebarCollapsed: !useSettings.getState().sidebarCollapsed }),
+          ui.fullscreen
+            ? ui.setFullscreenSidebar(!ui.fullscreenSidebar)
+            : useSettings
+                .getState()
+                .update({ sidebarCollapsed: !useSettings.getState().sidebarCollapsed }),
         c: () => view.setChat({ open: !view.view.chat.open }),
         f: () => void toggleFullscreen(),
         p: () => ui.setPresetsMenuOpen(!ui.presetsMenuOpen),

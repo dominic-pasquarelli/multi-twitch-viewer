@@ -5,7 +5,7 @@ import { useServices } from '@/app/servicesContext';
 import type { Rect } from '@/lib/layout';
 import { PlayerController } from '@/lib/player/PlayerController';
 import { pickQuality, type QualityChoice } from '@/lib/player/quality';
-import type { PlayerStatus } from '@/lib/player/types';
+import type { PlayerFactory, PlayerStatus } from '@/lib/player/types';
 import { useUi } from '@/state/uiStore';
 import { IconButton } from '@/ui/Button';
 import { AutoResume } from './autoResume';
@@ -18,6 +18,8 @@ import styles from './PlayerTile.module.css';
 
 export interface PlayerTileProps {
   login: string;
+  /** The Kick channel to play instead, while this one is live only on Kick. */
+  kick: string | null;
   rect: Rect;
   /** The stream you're focused on (full volume, highlighted). */
   audible: boolean;
@@ -45,6 +47,10 @@ export interface PlayerTileProps {
   onSelect(login: string): void;
 }
 
+/** Players without volume control (Kick in a browser) only play sound when heard. */
+const playerMuted = (muted: boolean, audible: boolean, factory: PlayerFactory): boolean =>
+  muted || (factory.capabilities?.volume === false && !audible);
+
 /** Volume actually sent to the player: the channel's volume times the duck and output scale. */
 const effectiveVolume = (volume: number | null, scale: number): number | null =>
   volume === null ? (scale === 1 ? null : 0.5 * scale) : volume * scale;
@@ -57,8 +63,10 @@ const effectiveVolume = (volume: number | null, scale: number): number | null =>
  * (mute/volume/quality), never re-created, so streams don't restart.
  */
 export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
-  const { login, rect, audible, muted, volume, volumeScale, status } = props;
-  const { playerFactory } = useServices();
+  const { login, kick, rect, audible, volume, volumeScale, status } = props;
+  const services = useServices();
+  const playerFactory = kick ? services.kickPlayerFactory : services.playerFactory;
+  const muted = playerMuted(props.muted, audible, playerFactory);
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<PlayerController | null>(null);
   const reloadKey = useUi((s) => s.reloadRequests[login] ?? 0);
@@ -149,10 +157,14 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
     const autoResume = new AutoResume();
     let resumeTimer: ReturnType<typeof setTimeout> | undefined;
     // Start muted so autoplay is allowed; the controller unmutes once ready.
-    const adapter = playerFactory.create(host, { channel: login, muted: true });
+    const adapter = playerFactory.create(host, { channel: kick ?? login, muted: true });
     const controller = new PlayerController(
       adapter,
-      { muted: p.muted, volume: effectiveVolume(p.volume, p.volumeScale), quality: null },
+      {
+        muted: playerMuted(p.muted, p.audible, playerFactory),
+        volume: effectiveVolume(p.volume, p.volumeScale),
+        quality: null,
+      },
       {
         onStatus: (s) => {
           latest.current.onStatus(login, s);
@@ -203,7 +215,8 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       controllerRef.current = null;
       latest.current.onStatus(login, null);
     };
-  }, [login, playerFactory, reloadKey]);
+    // Switching between Twitch and Kick creates the other player.
+  }, [login, kick, playerFactory, reloadKey]);
 
   useEffect(() => {
     controllerRef.current?.update({ muted });

@@ -28,13 +28,14 @@ export function useGoLiveAlerts(): void {
 
     for (const stream of fresh) {
       const watch = () => useViewStore.getState().addChannels([stream.login]);
-      const shown = notify(`${stream.displayName} is live`, {
+      const where = stream.platform === 'kick' ? ' on Kick' : '';
+      const shown = notify(`${stream.displayName} is live${where}`, {
         body: `${stream.gameName ? `${stream.gameName} · ` : ''}${stream.title}\nClick to watch`,
         tag: `live-${stream.login}`,
         onClick: watch,
       });
       if (!shown)
-        toast(`${stream.displayName} just went live`, {
+        toast(`${stream.displayName} just went live${where}`, {
           action: { label: 'Watch', run: watch },
           ms: 15000,
         });

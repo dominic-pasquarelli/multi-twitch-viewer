@@ -7,6 +7,7 @@ import { useViewStore } from '@/state/viewStore';
 import { Toasts } from '@/ui/Toasts';
 import { useGoLiveAlerts } from '@/features/alerts/useGoLiveAlerts';
 import { FavoritesDialog } from '@/features/favorites/FavoritesDialog';
+import { KickLinksDialog } from '@/features/kick/KickLinksDialog';
 import { useFavoritesHome } from '@/features/favorites/useFavoritesHome';
 import { SetupDialog } from '@/features/auth/SetupDialog';
 import { useAuthBootstrap } from '@/features/auth/useAuthBootstrap';
@@ -53,16 +54,31 @@ export function App() {
   const sidebarCollapsed = useSettings((s) => s.sidebarCollapsed);
   const chatOpen = useViewStore((s) => s.view.chat.open);
   const fullscreen = useUi((s) => s.fullscreen);
+  const sidebarPinned = useUi((s) => s.fullscreenSidebar);
   // Hidden in the tray: unmount the players so nothing plays or downloads.
   const backgrounded = useUi((s) => s.backgrounded);
 
   return (
-    <div className={`${styles.app} ${fullscreen ? styles.fullscreen : ''}`}>
+    <div
+      className={[
+        styles.app,
+        fullscreen && styles.fullscreen,
+        fullscreen && sidebarPinned && styles.sidePinned,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       {fullscreen && <div className={styles.hotzone} />}
       <div className={styles.top}>
         <TopBar />
       </div>
-      <div className={`${styles.side} ${sidebarCollapsed ? styles.collapsed : ''}`}>
+      {fullscreen && !sidebarPinned && (
+        <div className={styles.sideHotzone} data-testid="sidebar-hotzone" />
+      )}
+      <div
+        className={`${styles.side} ${sidebarCollapsed ? styles.collapsed : ''}`}
+        data-testid="sidebar-slot"
+      >
         <Sidebar />
       </div>
       <main className={styles.main}>
@@ -82,6 +98,7 @@ export function App() {
       <SetupDialog />
       <SavePresetDialog />
       <FavoritesDialog />
+      <KickLinksDialog />
       <ShortcutsDialog />
       <UpdateBanner />
       <Toasts />

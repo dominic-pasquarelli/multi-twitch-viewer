@@ -248,3 +248,41 @@ test('desktop app: decoding error 3000 reloads only the failed stream', async ()
     await app.close();
   }
 });
+
+test('desktop app: controls the video inside a Kick player frame', async () => {
+  const app = await launch(mkdtempSync(join(tmpdir(), 'mtv-desktop-')));
+  try {
+    const win = await app.firstWindow();
+    // Kick's embed has no API; the main process sets the frame's own <video>.
+    await app
+      .context()
+      .route('https://player.kick.com/**', (route) =>
+        route.fulfill({ contentType: 'text/html', body: '<video muted></video>' }),
+      );
+    await win.evaluate(() => {
+      const iframe = document.createElement('iframe');
+      iframe.src = 'https://player.kick.com/somestreamer?autoplay=true&muted=true&mtv=ktest1';
+      document.body.append(iframe);
+    });
+    type Bridge = {
+      mtvDesktop: { kickPlayer(id: string, command: object): Promise<unknown> };
+    };
+    const control = (id: string, command: object) =>
+      win.evaluate(([i, c]) => (window as unknown as Bridge).mtvDesktop.kickPlayer(i, c), [
+        id,
+        command,
+      ] as const);
+    await expect.poll(() => control('ktest1', {})).toMatchObject({ muted: true });
+    expect(await control('ktest1', { muted: false, volume: 0.25 })).toEqual({
+      paused: true,
+      muted: false,
+      volume: 0.25,
+    });
+    // Only the frame with that id, and nothing for unknown or malformed ids.
+    expect(await control('other', { muted: true })).toBeNull();
+    expect(await control('../ktest1', { muted: true })).toBeNull();
+    expect(await control('ktest1', {})).toMatchObject({ muted: false, volume: 0.25 });
+  } finally {
+    await app.close();
+  }
+});

@@ -7,6 +7,11 @@
  *   switching streams keeps the same loudness. A per-channel balance
  *   (1 = same as master) still lets the mixer even out a loud or quiet one.
  *
+ * Main stream priority (Mix + Focus): the main stream plays at one main
+ * level (100% by default; of the master in consistent mode) instead of its
+ * own, and setting its volume sets that level. The others keep theirs, so a
+ * stream set to 20% plays at 100% while it's the main one and at 20% after.
+ *
  * Pure functions; the stores hold the state.
  */
 export interface VolumeModel {
@@ -17,9 +22,15 @@ export interface VolumeModel {
   volumes: Record<string, number>;
   /** Consistent mode: each channel's level relative to master (1 = same). */
   balance: Record<string, number>;
+  /** The main stream while main stream priority applies, else null. */
+  priorityMain?: string | null;
+  /** The level the priority main stream plays at (0–1, default 1). */
+  mainLevel?: number;
 }
 
-export type VolumePatch = Partial<Pick<VolumeModel, 'master' | 'volumes' | 'balance'>>;
+export type VolumePatch = Partial<
+  Pick<VolumeModel, 'master' | 'volumes' | 'balance' | 'mainLevel'>
+>;
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -29,9 +40,15 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
  * null = no preference yet: leave the player's own volume.
  */
 export function streamVolume(m: VolumeModel, login: string): number | null {
-  if (m.consistent) return round2(clamp(m.master * (m.balance[login] ?? 1), 0, 1));
-  return m.volumes[login] ?? null;
+  const main = isPriorityMain(m, login);
+  if (m.consistent)
+    return round2(clamp(m.master * (main ? mainLevel(m) : (m.balance[login] ?? 1)), 0, 1));
+  return main ? mainLevel(m) : (m.volumes[login] ?? null);
 }
+
+const isPriorityMain = (m: VolumeModel, login: string) =>
+  !!m.priorityMain && m.priorityMain === login;
+const mainLevel = (m: VolumeModel) => m.mainLevel ?? 1;
 
 /**
  * "I want to hear this stream at `volume`" (arrow keys, top-bar slider, the
@@ -40,8 +57,10 @@ export function streamVolume(m: VolumeModel, login: string): number | null {
  */
 export function setHeardVolume(m: VolumeModel, login: string, volume: number): VolumePatch {
   const v = clamp(volume, 0, 1);
-  if (!m.consistent) return { volumes: { ...m.volumes, [login]: round2(v) } };
-  const balance = m.balance[login] ?? 1;
+  const main = isPriorityMain(m, login);
+  if (!m.consistent)
+    return main ? { mainLevel: round2(v) } : { volumes: { ...m.volumes, [login]: round2(v) } };
+  const balance = main ? mainLevel(m) : (m.balance[login] ?? 1);
   if (balance <= 0) return {};
   return { master: round2(clamp(v / balance, 0, 1)) };
 }
@@ -52,9 +71,13 @@ export function setHeardVolume(m: VolumeModel, login: string, volume: number): V
  */
 export function setMixVolume(m: VolumeModel, login: string, volume: number): VolumePatch {
   const v = clamp(volume, 0, 1);
-  if (!m.consistent) return { volumes: { ...m.volumes, [login]: round2(v) } };
+  const main = isPriorityMain(m, login);
+  if (!m.consistent)
+    return main ? { mainLevel: round2(v) } : { volumes: { ...m.volumes, [login]: round2(v) } };
   if (m.master <= 0) return {};
-  return { balance: { ...m.balance, [login]: round2(v / m.master) } };
+  return main
+    ? { mainLevel: round2(clamp(v / m.master, 0, 1)) }
+    : { balance: { ...m.balance, [login]: round2(v / m.master) } };
 }
 
 /** Consistent mode: raise or lower the master volume. */

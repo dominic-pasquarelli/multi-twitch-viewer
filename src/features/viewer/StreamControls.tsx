@@ -1,6 +1,7 @@
 import {
   ExternalLink,
   Heart,
+  Link2,
   Maximize2,
   MessageSquare,
   RotateCw,
@@ -9,6 +10,7 @@ import {
   VolumeX,
   X,
 } from 'lucide-react';
+import { kickChannelUrl, kickSlugFor } from '@/lib/kick';
 import { audioLevel } from '@/lib/view/operations';
 import { formatCount } from '@/lib/utils/format';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
@@ -18,6 +20,7 @@ import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
 import { IconButton } from '@/ui/Button';
 import { useLiveStatus } from '../follows/queries';
+import { KickBadge } from '../kick/KickBadge';
 import { useFollowChannel } from '../follows/useFollowChannel';
 import { currentVolume, setStreamMix, useVolumeModel, VOLUME_STEP } from './volume';
 import styles from './StreamControls.module.css';
@@ -36,6 +39,8 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
   const flashN = useUi((s) => (s.volumeFlash?.login === login ? s.volumeFlash.n : 0));
   const store = useViewStore.getState();
   const stream = live.get(login);
+  const kick = kickSlugFor(stream);
+  const kickLink = useChannelPrefs((s) => s.kickLinks[login]);
   const level = audioLevel(view, login, duckLevel);
   const volume = currentVolume(login, volumeModel);
 
@@ -56,6 +61,7 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
       <div className={styles.heading}>
         <div className={styles.chip} data-testid="stream-chip">
           <span className={styles.name}>{stream?.displayName ?? login}</span>
+          {kick && <KickBadge />}
           {stream && (
             <span className={styles.meta} title="Viewers">
               {formatCount(stream.viewerCount)}
@@ -76,7 +82,11 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
           max={100}
           value={Math.round(volume * 100)}
           aria-label={`${stream?.displayName ?? login} volume`}
-          title="This stream's mix volume (scroll to adjust)"
+          title={
+            volumeModel.priorityMain === login
+              ? 'Main stream level: whichever stream is main plays at this (scroll to adjust)'
+              : "This stream's mix volume (scroll to adjust)"
+          }
           onChange={(e) => {
             setStreamMix(login, Number(e.target.value) / 100);
             useUi.getState().flashVolume(login);
@@ -119,9 +129,27 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
         />
         <IconButton
           size="sm"
-          label="Open on Twitch"
+          label={kick ? 'Open on Kick' : 'Open on Twitch'}
           icon={<ExternalLink size={15} />}
-          onClick={() => window.open(`https://www.twitch.tv/${login}`, '_blank', 'noopener')}
+          onClick={() =>
+            window.open(
+              kick ? kickChannelUrl(kick) : `https://www.twitch.tv/${login}`,
+              '_blank',
+              'noopener',
+            )
+          }
+        />
+        <IconButton
+          size="sm"
+          label={
+            kickLink
+              ? `Linked to kick.com/${kickLink}: plays from Kick while offline on Twitch`
+              : 'Link a Kick channel: watch there while offline on Twitch'
+          }
+          active={!!kickLink}
+          icon={<Link2 size={15} />}
+          onClick={() => useUi.getState().openKickLinks(login)}
+          data-testid="stream-kick-link"
         />
         <IconButton
           size="sm"

@@ -16,7 +16,9 @@ async function seedGroups(page: Page) {
     if (!localStorage.getItem('mtv:settings'))
       localStorage.setItem(
         'mtv:settings',
-        JSON.stringify({ version: 1, state: { otherQuality: '720p' } }),
+        // A plain mix: the main stream keeps its own level (main stream priority is
+        // covered in controls.spec.ts).
+        JSON.stringify({ version: 1, state: { otherQuality: '720p', mainPriority: false } }),
       );
     if (!localStorage.getItem('mtv:session'))
       localStorage.setItem(
