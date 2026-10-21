@@ -39,13 +39,26 @@ const FAKE_PLAYER_SCRIPT = `
     frame.setAttribute('data-parent', (opts.parent || []).join(','));
     frame.style.width = opts.width; frame.style.height = opts.height;
     document.getElementById(id).appendChild(frame);
-    this.frame = frame; this.sync();
+    this.frame = frame; this.paused = false; this.pauses = 0; this.sync();
     (window.__fakePlayers = window.__fakePlayers || []).push(this);
+    // Like Twitch, a click on the video toggles pause (after a delay, if set).
+    var clickPauseMs = window.__fakeClickPauseMs;
+    var listen = function () {
+      var doc = frame.contentDocument;
+      if (!clickPauseMs || !doc || doc.__fakeListening) return;
+      doc.__fakeListening = true;
+      doc.addEventListener('click', function () {
+        setTimeout(function () { if (self.paused) self.play(); else self.pause(); }, clickPauseMs);
+      });
+    };
+    listen(); frame.addEventListener('load', listen);
     setTimeout(function () { self.emit('ready'); self.emit('playing'); }, 30);
   }
   Player.prototype.sync = function () {
     this.frame.setAttribute('data-muted', String(this.muted));
     this.frame.setAttribute('data-volume', String(this.volume));
+    this.frame.setAttribute('data-paused', String(this.paused));
+    this.frame.setAttribute('data-pauses', String(this.pauses));
   };
   Player.prototype.addEventListener = function (e, cb) { (this.listeners[e] = this.listeners[e] || []).push(cb); };
   Player.prototype.emit = function (e) { (this.listeners[e] || []).forEach(function (cb) { cb(); }); };
@@ -56,7 +69,14 @@ const FAKE_PLAYER_SCRIPT = `
   Player.prototype.getQualities = function () { return []; };
   Player.prototype.getQuality = function () { return 'auto'; };
   Player.prototype.setQuality = function () {};
-  Player.prototype.play = function () {}; Player.prototype.pause = function () {};
+  Player.prototype.play = function () {
+    if (!this.paused) return;
+    this.paused = false; this.sync(); this.emit('playing');
+  };
+  Player.prototype.pause = function () {
+    this.paused = true; this.pauses++; this.sync(); this.emit('pause');
+  };
+  Player.prototype.isPaused = function () { return this.paused; };
   Player.READY = 'ready'; Player.PLAYING = 'playing'; Player.PAUSE = 'pause'; Player.OFFLINE = 'offline';
   Player.ONLINE = 'online'; Player.ENDED = 'ended'; Player.PLAYBACK_BLOCKED = 'blocked';
   window.Twitch = { Player: Player };
@@ -287,4 +307,40 @@ test('controls follow the pointer into and out of cross-origin videos without in
   await expect(stream).toHaveAttribute('data-hovered', 'false');
   await expect(controls).toBeHidden();
   await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+});
+
+test('a stream selected with a click keeps playing when Twitch pauses it on that click', async ({
+  page,
+}) => {
+  // Twitch can apply its click-to-pause later than the app's first check.
+  await page.addInitScript(() => Object.assign(window, { __fakeClickPauseMs: 700 }));
+  await stubTwitch(page, []);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  const rows = page.getByTestId('channel-row');
+  await rows.nth(0).click();
+  await rows.nth(1).click();
+  await page.keyboard.press('l');
+  const tile = page.locator('[data-testid=player-tile][data-channel=bravo]');
+  const bravo = page.locator('iframe[data-fake-twitch=bravo]');
+  await expect(tile).toHaveAttribute('data-main', 'false');
+  await expect(tile).toHaveAttribute('data-status', 'playing');
+
+  await tile.hover();
+  await bravo.click();
+  await expect(tile).toHaveAttribute('data-main', 'true');
+  await expect(bravo).toHaveAttribute('data-pauses', '1'); // the click's pause arrived…
+  await expect(bravo).toHaveAttribute('data-paused', 'false'); // …and was undone
+  await page.waitForTimeout(800);
+  await expect(bravo).toHaveAttribute('data-paused', 'false');
+  await expect(tile).toHaveAttribute('data-status', 'playing');
+  await expect(page.getByText(/Connection recovery/)).toHaveCount(0);
+
+  // Clicking the main stream again is a pause you asked for, even right away.
+  await tile.hover();
+  await bravo.click();
+  await expect(bravo).toHaveAttribute('data-pauses', '2');
+  await page.waitForTimeout(1500);
+  await expect(bravo).toHaveAttribute('data-paused', 'true');
+  await expect(tile).toHaveAttribute('data-status', 'paused');
 });

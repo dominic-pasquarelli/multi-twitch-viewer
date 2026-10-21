@@ -10,7 +10,7 @@ import { useUi } from '@/state/uiStore';
 import { IconButton } from '@/ui/Button';
 import { AutoResume } from './autoResume';
 import { CHANNEL_MIME, setDragging } from './dnd';
-import { markInteraction, pausedByUser } from './playerInteraction';
+import { markInteraction, pausedByUser, selectedRecently } from './playerInteraction';
 import { playerRegistry } from './playerRegistry';
 import { playbackRecovery } from './playbackRecovery';
 import { StreamControls } from './StreamControls';
@@ -25,7 +25,7 @@ export interface PlayerTileProps {
   main: boolean;
   /** Muted entirely (solo mode, or everything muted). */
   muted: boolean;
-  /** Volume multiplier, e.g. 0.2 for background streams in duck mode. */
+  /** Volume multiplier: e.g. 0.2 for background streams in duck mode, times the app's output level. */
   volumeScale: number;
   /** The channel's remembered volume (null = leave the player's own). */
   volume: number | null;
@@ -45,7 +45,7 @@ export interface PlayerTileProps {
   onSelect(login: string): void;
 }
 
-/** Volume actually sent to the player: the channel's volume times the duck scale. */
+/** Volume actually sent to the player: the channel's volume times the duck and output scale. */
 const effectiveVolume = (volume: number | null, scale: number): number | null =>
   volume === null ? (scale === 1 ? null : 0.5 * scale) : volume * scale;
 
@@ -156,31 +156,37 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       {
         onStatus: (s) => {
           latest.current.onStatus(login, s);
-          playbackRecovery.observeStatus(login, s, pausedByUser(login));
+          // The click that selected this stream may pause it: neither your
+          // pause nor a sign of a struggling connection, so undo it promptly.
+          const selectionPause = s === 'paused' && selectedRecently(login);
+          if (!selectionPause) playbackRecovery.observeStatus(login, s, pausedByUser(login));
           // Keep streams playing unless you paused them yourself.
           clearTimeout(resumeTimer);
           if (
             s === 'paused' &&
             !latest.current.hidden &&
             !playbackRecovery.isManagedPause(login) &&
-            autoResume.shouldResume(pausedByUser(login))
+            (selectionPause || autoResume.shouldResume(pausedByUser(login)))
           ) {
-            resumeTimer = setTimeout(() => {
-              if (
-                controller.status === 'paused' &&
-                !latest.current.hidden &&
-                !pausedByUser(login) &&
-                !playbackRecovery.isManagedPause(login)
-              )
-                adapter.play();
-            }, 600);
+            resumeTimer = setTimeout(
+              () => {
+                if (
+                  controller.status === 'paused' &&
+                  !latest.current.hidden &&
+                  !pausedByUser(login) &&
+                  !playbackRecovery.isManagedPause(login)
+                )
+                  adapter.play();
+              },
+              selectionPause ? 150 : 600,
+            );
           }
         },
         onExternalMute: (m) => {
           // Muting a quiet background stream in duck mode doesn't change focus.
           if (!m || latest.current.audible) latest.current.onExternalMute(login, m);
         },
-        // Undo the duck scale so the remembered volume stays the "full" one.
+        // Undo the duck and output scale so the remembered volume stays the "full" one.
         onExternalVolume: (v) =>
           latest.current.onVolume(login, Math.min(1, v / (latest.current.volumeScale || 1))),
       },

@@ -9,7 +9,13 @@ const store = () => useViewStore.getState();
 
 beforeEach(() => {
   useSettings.setState({ ...DEFAULT_SETTINGS });
-  useViewStore.setState({ view: emptyView(), history: [], mutedFrom: null });
+  useViewStore.setState({
+    view: emptyView(),
+    history: [],
+    mutedFrom: null,
+    pinned: false,
+    home: false,
+  });
   usePresets.setState({ presets: [] });
   useChannelPrefs.setState({ volumes: {}, balance: {}, master: 0.5 });
 });
@@ -86,5 +92,44 @@ describe('viewStore', () => {
     usePresets.getState().save('Mine', store().view);
     expect(usePresets.getState().presets).toHaveLength(1);
     expect(usePresets.getState().presets[0]!.view.channels).toEqual(['a', 'b']);
+  });
+
+  it('the Favorites view keeps extras and live joins, and leaves on a preset, link or clear', () => {
+    store().addChannels(['other']);
+    store().enterHome(['fav1', 'fav2']);
+    expect(store().home).toBe(true);
+    expect(store().pinned).toBe(false);
+    expect(store().view.channels).toEqual(['fav1', 'fav2']);
+
+    store().addChannels(['extra']); // your own additions stay in the home view
+    store().addHomeChannels(['fav3']); // a favorite went live
+    expect(store().view.channels).toEqual(['fav1', 'fav2', 'extra', 'fav3']);
+    expect(store().home).toBe(true);
+
+    store().removeChannels(['fav1', 'fav2', 'extra', 'fav3']); // e.g. everyone went offline
+    expect(store().home).toBe(true); // still home: favorites join when they go live
+
+    store().loadView({ ...emptyView(), channels: ['p'] });
+    expect(store().home).toBe(false);
+    store().addHomeChannels(['fav1']); // ignored outside the home view
+    expect(store().view.channels).toEqual(['p']);
+
+    store().enterHome([]);
+    store().watchOnly(['link']);
+    expect(store().home).toBe(false);
+    store().enterHome([]);
+    store().clear();
+    expect(store().home).toBe(false);
+  });
+
+  it('undo returns to the Favorites view from a loaded preset', () => {
+    store().enterHome(['fav']);
+    store().loadView({ ...emptyView(), channels: ['p'] });
+    expect(store().home).toBe(false);
+    store().undo();
+    expect(store().view.channels).toEqual(['fav']);
+    expect(store().home).toBe(true);
+    store().undo(); // back before the home view
+    expect(store().home).toBe(false);
   });
 });

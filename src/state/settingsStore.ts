@@ -14,6 +14,8 @@ export interface Settings {
   hideOffline: boolean;
   /** Temporary views (not loaded from a preset) drop streams that go offline. */
   dropOfflineStreams: boolean;
+  /** Start on the Favorites home view (live favorites) instead of the last session. */
+  openHomeAtLaunch: boolean;
   /** Sidebar: show the history of channels watched without following them. */
   showHistory: boolean;
   /** In focus mode, the main stream is the one you hear. */
@@ -51,6 +53,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tileGap: 4,
   hideOffline: true,
   dropOfflineStreams: true,
+  openHomeAtLaunch: false,
   showHistory: true,
   audioFollowsMain: true,
   chatFollowsAudio: true,

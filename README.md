@@ -16,13 +16,23 @@ channels are live, and watch several streams at once with layouts that actually 
   - Turn on **Arrange**, then drag anywhere on a stream onto another to swap them. Streams
     never reload when they move.
   - Offline channels step aside and give their space to live ones, then come back when they go live.
-- **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar) to keep them at the
-  top. When a favorite goes live you get a Windows notification; click it to start watching.
-  Settings can switch this to everyone you follow, or off.
+- **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar or on a stream) to
+  keep them at the top. When a favorite goes live you get a Windows notification; click it to start
+  watching. Settings can switch this to everyone you follow, or off.
+- **Favorites view (a dynamic home)**: the Home button (or `H`, or the pinned **★ Favorites** row
+  at the top of **Presets**) shows whichever favorites are live. Favorites join when they go live
+  and leave about 1½ minutes after going offline; streams you add yourself stay alongside them,
+  and a favorite you close stays closed until it next goes live. **Manage favorites** (✎ on that
+  row) adds channels by name or link, including ones you don't follow. Loading a preset, a link
+  or **Clear all** leaves the view (Undo returns to it); your presets work as before.
+  **Settings → Layout → Open on Favorites at launch** starts the app there.
 - **Controls on each stream**: hovering a stream shows its controls (listen, volume, make main,
-  chat, reload, open on Twitch, remove) in a compact overlay at the top of its video. The controls
+  chat, reload, open on Twitch, favorite, remove), plus its category and title, in a compact overlay
+  at the top of its video. The controls
   disappear when you leave the stream, and stay open while you edit its volume. If a stream pauses on its own it resumes automatically; one
-  you paused yourself (clicked inside the player) stays paused.
+  you paused yourself (clicked inside the player) stays paused. Clicking a stream to make it the
+  main one (or the one you hear) keeps it playing even though Twitch pauses a video on click;
+  click it again to pause it.
 - **Stream groups**: **Create group / Manage groups** names related perspectives and assigns streams.
   **All groups** clusters them together; in Focus, one chosen stream stays large across the whole
   view while the others remain clustered by group. Group tabs isolate one group and pause hidden streams.
@@ -39,6 +49,8 @@ channels are live, and watch several streams at once with layouts that actually 
   - **Duck**: the others keep playing quietly (20% by default) so you notice when something happens.
   - **Mix** (`Shift+1`–`9`): several streams at full volume.
     Changing the main video keeps your mix. Hover a stream to adjust its volume directly on the video.
+  - **App volume** (slider next to Mute all): one level for everything the app plays, on top of
+    each stream's own volume and the mix. Scroll over it to adjust; it's remembered.
   - **Mixer** (sliders button next to them): every stream's volume in one list, to balance the
     streams you hear together.
   - **Consistent volume** (in the Mixer or Settings → Audio): every stream you switch to plays at
@@ -192,6 +204,7 @@ lack of a "Log in" prompt) is logged in.
 | Choose what you hear             | `1`–`9`, click the stream (grid with Solo/Duck), the speaker button in the top bar, or unmute it in the player  |
 | Hear the others quietly          | **Duck** in the top bar (background level in Settings)                                                          |
 | Change volume                    | `↑`/`↓`, or scroll over the stream controls in the top bar                                                      |
+| Turn the whole app up or down    | The **App volume** slider next to Mute all                                                                      |
 | Get told when someone goes live  | Star them in the sidebar; allow notifications in Settings → Alerts                                              |
 | Hear several at once             | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                                                        |
 | Balance volumes                  | The Mixer (sliders button in the top bar); **Consistent volume** keeps switching even                           |
@@ -202,6 +215,7 @@ lack of a "Log in" prompt) is logged in.
 | Make one stream big              | `L` or **Focus**; click a small playing stream (or ⤢ in the top bar) to make it main                            |
 | Rearrange                        | Enable **Arrange**, then drag a stream window onto another                                                      |
 | Save the current setup           | **Presets** → **Save current…**                                                                                 |
+| See whichever favorites are live | The Home button or `H` (the **★ Favorites** row in Presets); manage the list with ✎ on that row                 |
 | Keyboard shortcuts               | `?`                                                                                                             |
 
 Shortcuts pause while a Twitch player has keyboard focus (after you click inside it). Moving the

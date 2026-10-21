@@ -1,0 +1,26 @@
+.output {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+.output input {
+  width: 80px;
+  accent-color: var(--accent);
+}
+.percent {
+  width: 32px;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* Narrow windows: the slider stays, the readout moves into its tooltip. */
+@media (max-width: 1700px) {
+  .output input {
+    width: 60px;
+  }
+  .percent {
+    display: none;
+  }
+}

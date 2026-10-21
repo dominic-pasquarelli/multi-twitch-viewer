@@ -147,6 +147,12 @@ function SettingsForm() {
             label="Remove streams that go offline (temporary views)"
             help="A view you put together is temporary: a stream that goes offline for about 1½ minutes is removed (with Undo). Views loaded or saved as a preset keep their streams. Switch per view in Presets."
           />
+          <Checkbox
+            checked={s.openHomeAtLaunch}
+            onChange={(v) => s.update({ openHomeAtLaunch: v })}
+            label="Open on Favorites at launch"
+            help="Start with whichever favorites are live instead of your last session (Undo brings that back). Opening a link still shows the link."
+          />
         </TabPanel>
       )}
       {tab === 'players' && (

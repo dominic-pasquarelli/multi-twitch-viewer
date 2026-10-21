@@ -4,6 +4,7 @@ import { displayedChannels, groupedSlotOrder } from '@/lib/view/groups';
 import { useSettings } from '@/state/settingsStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
+import { openHome } from '../favorites/useFavoritesHome';
 import { toggleFullscreen } from '../topbar/fullscreen';
 import { nudgeHeard, VOLUME_STEP } from '../viewer/volume';
 
@@ -76,6 +77,7 @@ export function useHotkeys(): void {
         c: () => view.setChat({ open: !view.view.chat.open }),
         f: () => void toggleFullscreen(),
         p: () => ui.setPresetsMenuOpen(!ui.presetsMenuOpen),
+        h: openHome,
         '?': () => ui.openDialog('shortcuts'),
       };
       const action = actions[e.key.toLowerCase()] ?? actions[e.key];

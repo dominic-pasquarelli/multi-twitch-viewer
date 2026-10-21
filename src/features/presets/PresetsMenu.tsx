@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Bookmark, Check, Download, Pencil, Save, Trash2, Upload } from 'lucide-react';
+import { Bookmark, Check, Download, Pencil, Save, Star, Trash2, Upload } from 'lucide-react';
 import { exportPresets, parsePresetsFile, type Preset } from '@/lib/presets/presets';
 import { usePresets } from '@/state/presetsStore';
 import { useUi } from '@/state/uiStore';
@@ -8,6 +8,7 @@ import { useViewStore } from '@/state/viewStore';
 import { toast } from '@/state/toastStore';
 import { Button, IconButton } from '@/ui/Button';
 import { Popover } from '@/ui/Popover';
+import { goHome, useLiveFavorites } from '../favorites/useFavoritesHome';
 import { useFollowedLive } from '../follows/queries';
 import { downloadText, pickTextFile } from './fileIO';
 import styles from './PresetsMenu.module.css';
@@ -59,8 +60,9 @@ export function PresetsMenu() {
         className={styles.panel}
         ignoreRefs={[buttonRef]}
       >
-        <KeepToggle />
+        <FavoritesRow onDone={() => setOpen(false)} />
         <div className={styles.divider} />
+        <KeepToggle />
         {presets.length === 0 && (
           <div className={styles.empty}>
             No saved presets yet. Set up some streams and a layout, then save them here to pull them
@@ -187,26 +189,87 @@ function PresetRow({
   );
 }
 
+/** The Favorites home view: always first, filled with whichever favorites are live. */
+function FavoritesRow({ onDone }: { onDone(): void }) {
+  const { favorites, live } = useLiveFavorites();
+  const home = useViewStore((s) => s.home);
+  const openDialog = useUi((s) => s.openDialog);
+  return (
+    <div className={`${styles.row} ${home ? styles.current : ''}`} data-testid="favorites-preset">
+      <button
+        className={styles.load}
+        disabled={!favorites.length}
+        onClick={() => {
+          goHome(live);
+          onDone();
+        }}
+        title={favorites.length ? favorites.join(', ') : undefined}
+      >
+        <strong>
+          <Star size={13} fill="currentColor" className={styles.star} /> Favorites
+        </strong>
+        <small>
+          {favorites.length ? (
+            <>
+              <span className={styles.liveCount}>{live.length} live</span> of {favorites.length} ·
+              updates on its own
+            </>
+          ) : (
+            'Star channels to fill this view with whoever is live'
+          )}
+        </small>
+      </button>
+      <div className={`${styles.actions} ${favorites.length ? '' : styles.shown}`}>
+        <IconButton
+          size="sm"
+          label="Manage favorites"
+          icon={<Pencil size={14} />}
+          onClick={() => openDialog('favorites')}
+          data-testid="manage-favorites"
+        />
+      </div>
+    </div>
+  );
+}
+
 /** Whether the current view drops streams that go offline (temporary) or keeps them. */
 function KeepToggle() {
   const pinned = useViewStore((s) => s.pinned);
+  const home = useViewStore((s) => s.home);
   const hasChannels = useViewStore((s) => s.view.channels.length > 0);
   const dropOffline = useSettings((s) => s.dropOfflineStreams);
+  if (home)
+    return (
+      <>
+        <div className={styles.keep} data-testid="home-note">
+          <span>
+            <b>You’re on the Favorites view</b>
+            <br />
+            Favorites join when they go live and leave when they go offline. Loading a preset or
+            link leaves it.
+          </span>
+        </div>
+        <div className={styles.divider} />
+      </>
+    );
   if (!dropOffline || !hasChannels) return null;
   return (
-    <label className={styles.keep} data-testid="keep-view">
-      <input
-        type="checkbox"
-        checked={pinned}
-        onChange={(e) => useViewStore.getState().setPinned(e.target.checked)}
-      />
-      <span>
-        <b>Keep offline streams in this view</b>
-        <br />
-        {pinned
-          ? 'They stay (hidden until live), like a saved preset.'
-          : 'Off: this is a temporary view, streams that go offline are removed.'}
-      </span>
-    </label>
+    <>
+      <label className={styles.keep} data-testid="keep-view">
+        <input
+          type="checkbox"
+          checked={pinned}
+          onChange={(e) => useViewStore.getState().setPinned(e.target.checked)}
+        />
+        <span>
+          <b>Keep offline streams in this view</b>
+          <br />
+          {pinned
+            ? 'They stay (hidden until live), like a saved preset.'
+            : 'Off: this is a temporary view, streams that go offline are removed.'}
+        </span>
+      </label>
+      <div className={styles.divider} />
+    </>
   );
 }

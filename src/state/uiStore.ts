@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { PlayerStatus } from '@/lib/player/types';
 
-export type DialogName = 'settings' | 'shortcuts' | 'savePreset' | 'setup' | null;
+export type DialogName = 'settings' | 'shortcuts' | 'savePreset' | 'setup' | 'favorites' | null;
 
 /** Transient UI state (never persisted). */
 interface UiStore {

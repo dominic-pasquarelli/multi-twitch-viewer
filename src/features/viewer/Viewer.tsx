@@ -14,6 +14,7 @@ import type { ViewState } from '@/lib/view/types';
 import { streamVolume } from '@/lib/audio/volumeModel';
 import { audioLevel, mainChannel } from '@/lib/view/operations';
 import { displayedChannels, streamSections } from '@/lib/view/groups';
+import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
 import { toast } from '@/state/toastStore';
 import { useUi } from '@/state/uiStore';
@@ -22,7 +23,7 @@ import { Button } from '@/ui/Button';
 import { useLiveStatus } from '../follows/queries';
 import { useStreamHotkeys } from '../shortcuts/useHotkeys';
 import { CHANNEL_MIME, setDragging } from './dnd';
-import { markInteraction } from './playerInteraction';
+import { markInteraction, markSelection, playerHasFocus } from './playerInteraction';
 import { playerRegistry } from './playerRegistry';
 import { playbackRecovery } from './playbackRecovery';
 import { usePlaybackRecovery } from './usePlaybackRecovery';
@@ -65,10 +66,12 @@ export function Viewer() {
     bandwidthSaving,
   } = useSettings();
   const volumeModel = useVolumeModel();
+  const output = useChannelPrefs((s) => s.output);
   const playerStatus = useUi((s) => s.playerStatus);
   const selected = useUi((s) => s.selected);
   const setSelected = useUi((s) => s.setSelected);
   const arranging = useUi((s) => s.arranging);
+  const home = useViewStore((s) => s.home);
   const [showOffline, setShowOffline] = useState(false);
   const liveStatus = useLiveStatus(view.channels);
 
@@ -213,10 +216,17 @@ export function Viewer() {
       if (view.audio.mode === 'mix' || view.audio.active.includes(login)) return;
       store.focusAudio(login);
     }
-    // Clicking a Twitch video also pauses it; keep the stream playing.
+    // Clicking a Twitch video also pauses it, sometimes only after this runs.
+    // The tile resumes a pause that arrives during the selection's grace period.
+    playbackRecovery.allowManualPlay(login);
+    markSelection(login);
     setTimeout(() => {
-      playbackRecovery.allowManualPlay(login);
-      if (!playbackRecovery.isManagedPause(login)) playerRegistry.get(login)?.adapter.play();
+      // Hand keyboard focus back to the app once the click is done, so a
+      // second click into this player (e.g. to pause it) is seen as yours.
+      if (playerHasFocus(login)) (document.activeElement as HTMLElement).blur();
+      const entry = playerRegistry.get(login);
+      if (entry?.adapter.isPaused?.() && !playbackRecovery.isManagedPause(login))
+        entry.adapter.play();
     }, 400);
   }, []);
   useEffect(() => {
@@ -273,7 +283,19 @@ export function Viewer() {
       onClick={onViewerClick}
       onContextMenu={onViewerContextMenu}
     >
-      {view.channels.length === 0 && <EmptyState />}
+      {view.channels.length === 0 &&
+        (home ? (
+          <EmptyState
+            title="No favorites are live right now"
+            action={
+              <Button onClick={() => useUi.getState().openDialog('favorites')}>
+                Manage favorites
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState />
+        ))}
       {selectedGroup && groupChannels.length === 0 && (
         <EmptyState
           title={`No streams in ${selectedGroup.name}`}
@@ -329,7 +351,7 @@ export function Viewer() {
             audible={level.focused}
             main={view.layout.mode === 'focus' && login === focused}
             muted={level.muted}
-            volumeScale={level.scale}
+            volumeScale={level.scale * output}
             volume={streamVolume(volumeModel, login)}
             quality={isPrimary(view, login, shown) ? mainQuality : otherQuality}
             belowMinimum={isBelowMinimum(rect, DEFAULT_LAYOUT_OPTIONS.minTile)}

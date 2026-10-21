@@ -15,9 +15,14 @@ interface ChannelPrefsStore {
   /** Consistent-volume mode: each channel's level against the master (1 = same). */
   balance: Record<string, number>;
   favorites: string[];
+  /** The app's output level (0–1): scales everything it plays, after the mix. */
+  output: number;
   setVolume(login: string, volume: number): void;
+  setOutput(volume: number): void;
   applyVolume(patch: VolumePatch): void;
   toggleFavorite(login: string): void;
+  /** Stars these channels (already starred ones keep their place). */
+  addFavorites(logins: string[]): void;
 }
 
 export const useChannelPrefs = create<ChannelPrefsStore>()(
@@ -27,12 +32,19 @@ export const useChannelPrefs = create<ChannelPrefsStore>()(
       master: 0.5,
       balance: {},
       favorites: [],
+      output: 1,
       applyVolume: (patch) => set(patch),
+      setOutput: (volume) =>
+        set({ output: Math.round(Math.min(1, Math.max(0, volume)) * 100) / 100 }),
       toggleFavorite: (login) =>
         set((s) => ({
           favorites: s.favorites.includes(login)
             ? s.favorites.filter((f) => f !== login)
             : [...s.favorites, login],
+        })),
+      addFavorites: (logins) =>
+        set((s) => ({
+          favorites: [...s.favorites, ...new Set(logins.filter((l) => !s.favorites.includes(l)))],
         })),
       setVolume: (login, volume) =>
         set((s) => ({
@@ -53,6 +65,7 @@ export const useChannelPrefs = create<ChannelPrefsStore>()(
           volumes: numberRecord(p.volumes),
           balance: numberRecord(p.balance),
           master: typeof p.master === 'number' && p.master >= 0 && p.master <= 1 ? p.master : 0.5,
+          output: typeof p.output === 'number' && p.output >= 0 && p.output <= 1 ? p.output : 1,
           favorites: Array.isArray(p.favorites)
             ? p.favorites.filter((f): f is string => typeof f === 'string')
             : [],

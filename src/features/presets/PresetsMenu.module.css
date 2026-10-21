@@ -99,3 +99,13 @@
   margin-top: 2px;
   accent-color: var(--accent);
 }
+.current {
+  background: var(--accent-soft);
+}
+.star {
+  color: var(--accent);
+  vertical-align: -1px;
+}
+.actions.shown {
+  opacity: 1;
+}
