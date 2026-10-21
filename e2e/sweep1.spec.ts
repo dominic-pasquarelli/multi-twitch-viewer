@@ -4,6 +4,15 @@ const tile = (page: Page, login: string) =>
   page.locator(`[data-testid=player-tile][data-channel=${login}]`);
 const player = (page: Page, login: string) => tile(page, login).locator('.mock-player');
 const channels = ['pixelpaladin', 'novastrike', 'cozycartographer', 'lunarlatte'];
+// A plain mix, where the main stream keeps its own level (main stream priority off;
+// the main level is covered in controls.spec.ts).
+const plainMix = (page: Page) =>
+  page.addInitScript(() =>
+    localStorage.setItem(
+      'mtv:settings',
+      JSON.stringify({ version: 1, state: { mainPriority: false } }),
+    ),
+  );
 
 test('keyboard focus and chat use the isolated group', async ({ page }) => {
   await page.addInitScript(() =>
@@ -46,6 +55,7 @@ test('keyboard focus and chat use the isolated group', async ({ page }) => {
 test('hover controls overlay full-size videos and focus changes preserve an adjusted mix', async ({
   page,
 }) => {
+  await plainMix(page);
   await page.goto('/#/pixelpaladin/novastrike?layout=focus');
   await expect(player(page, 'novastrike')).toHaveAttribute('data-paused', 'false');
   await page.getByRole('button', { name: 'Mix', exact: true }).click();
@@ -148,6 +158,7 @@ test('Pause all stays paused and Play all resumes the streams', async ({ page })
 test('groups cluster, isolate, preserve mounts and audio, and keep manual pauses', async ({
   page,
 }) => {
+  await plainMix(page);
   await page.goto(`/#/${channels.join('/')}?layout=focus`);
   await expect(player(page, 'lunarlatte')).toHaveAttribute('data-paused', 'false');
   await page.getByRole('button', { name: 'Mix', exact: true }).click();

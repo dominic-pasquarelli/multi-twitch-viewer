@@ -443,9 +443,11 @@ test("the Mixer stays open while you use Twitch's own volume slider, and follows
   const row = page.locator('[data-testid=mixer-row][data-channel=alpha]');
   await expect(row.getByTestId('mixer-volume')).toHaveText('50%');
   // Clicking into the player (to reach Twitch's controls) keeps the Mixer open.
+  // Low on the video, where Twitch's controls are, clear of the open Mixer.
   const tile = page.locator('[data-testid=player-tile][data-channel=alpha]');
-  await tile.hover();
-  await alpha.click();
+  const low = { x: 40, y: (await tile.boundingBox())!.height - 30 };
+  await tile.hover({ position: low });
+  await alpha.click({ position: low });
   await expect(mixer).toBeVisible();
   // Like dragging the volume slider in Twitch's controls.
   await page.evaluate(() => {
@@ -459,6 +461,6 @@ test("the Mixer stays open while you use Twitch's own volume slider, and follows
   // A click elsewhere in the app still closes it.
   await page.getByRole('heading', { name: 'Followed', exact: true }).click();
   await expect(mixer).toBeHidden();
-  await tile.hover();
+  await tile.hover({ position: low });
   await expect(tile.getByTestId('stream-volume')).toHaveText('20%');
 });

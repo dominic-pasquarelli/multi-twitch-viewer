@@ -23,7 +23,7 @@ src/
 | `layout/`      | Pure geometry: `computeLayout({mode, count, container, options})` → one rect per slot.               | Adding a mode: write `myLayout.ts`, route it in `computeLayout.ts`. |
 | `view/`        | The "what I'm watching" model (`ViewState`) and pure operations: add, remove, swap, audio focus…     | Adding an operation + test; stores call it.                         |
 |                | `favoritesHome.ts`: which live favorites join the Favorites view and which streams may leave it.     |                                                                     |
-| `audio/`       | Volume model: per-channel volumes, or one master volume with per-channel balance (consistent mode).  | Add a mode in `volumeModel.ts` + tests.                             |
+| `audio/`       | Volume model: per-channel volumes, or a master volume with per-channel balance; main stream level.   | Add a mode in `volumeModel.ts` + tests.                             |
 | `history/`     | Log of channels watched without following them (newest first, capped, validated on load).            |                                                                     |
 | `presets/`     | Preset type, export/import file format, validation, merging.                                         | Bump `EXPORT_VERSION` and migrate in `sanitizePreset`.              |
 | `twitch/`      | `TwitchApi` interface, Helix client (auth headers, pagination, 401/429), OAuth helpers, mock API.    | Implement `TwitchApi` (e.g. a caching or proxy variant).            |
@@ -135,6 +135,11 @@ Behaviour notes:
   `capabilities.volume`: in the desktop app the main process controls the frame's video and the
   app's mute/volume are re-applied every second (Kick's player restores its own volume after an
   unmute); in a browser it's muted unless heard, and mute changes reload it.
+- **The main stream level is part of the volume model.** In Mix + Focus (setting on), the
+  `VolumeModel` carries `priorityMain` (the stream the Viewer shows big, kept in `uiStore`) and
+  `mainLevel`: that stream plays at the main level, and setting its volume anywhere (hover
+  slider, Mixer, arrow keys, Twitch's own slider) sets the main level instead of its own, which
+  it gets back when another stream is main.
 - **App volume is applied last.** The output level multiplies each tile's duck scale before it
   reaches the player, and is divided back out of volume changes made with Twitch's own slider, so
   per-channel volumes and the mix are unchanged.

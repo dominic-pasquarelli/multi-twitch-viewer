@@ -21,6 +21,9 @@ interface UiStore {
   /** Enables tile dragging without intercepting the Twitch player's controls. */
   arranging: boolean;
   setArranging(v: boolean): void;
+  /** The big stream in focus layout, as shown (null in grid). */
+  mainStream: string | null;
+  setMainStream(login: string | null): void;
   /** The last hovered stream (keyboard shortcuts use it). */
   selected: string | null;
   setSelected(login: string | null): void;
@@ -53,6 +56,8 @@ export const useUi = create<UiStore>()((set) => ({
   arranging: false,
   setArranging: (arranging) => set({ arranging }),
   volumeFlash: null,
+  mainStream: null,
+  setMainStream: (mainStream) => set((s) => (s.mainStream === mainStream ? s : { mainStream })),
   selected: null,
   setSelected: (selected) => set((s) => (s.selected === selected ? s : { selected })),
   reloadRequests: {},

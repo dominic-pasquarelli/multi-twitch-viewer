@@ -222,6 +222,12 @@ function SettingsForm() {
             label="Hear the main stream in focus layout"
           />
           <Checkbox
+            checked={s.mainPriority}
+            onChange={(v) => s.update({ mainPriority: v })}
+            label="Main stream at full volume (Mix + Focus)"
+            help="In Mix with the focus layout, the big stream plays at the main level (100% unless you change its slider) and the others keep their own levels, which they get back when another stream is main."
+          />
+          <Checkbox
             checked={s.chatFollowsAudio}
             onChange={(v) => s.update({ chatFollowsAudio: v })}
             label="Chat follows the stream you're hearing"

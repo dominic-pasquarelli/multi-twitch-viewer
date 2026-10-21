@@ -39,6 +39,8 @@ export interface Settings {
   liveAlerts: LiveAlertMode;
   /** Every stream you listen to plays at one master volume (see lib/audio/volumeModel). */
   consistentVolume: boolean;
+  /** Mix + Focus: the main stream plays at the main level, the others at their own. */
+  mainPriority: boolean;
   /** Duck audio mode: how loud the background streams play (0–1 of their volume). */
   duckLevel: number;
   /** Focus layout: clicking a small stream makes it the main one. */
@@ -71,6 +73,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showOfflineFollows: true,
   liveAlerts: 'favorites',
   consistentVolume: false,
+  mainPriority: true,
   duckLevel: 0.2,
   clickToFocus: true,
   rightClickCloses: true,

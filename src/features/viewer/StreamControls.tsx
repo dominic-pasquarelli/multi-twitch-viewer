@@ -82,7 +82,11 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
           max={100}
           value={Math.round(volume * 100)}
           aria-label={`${stream?.displayName ?? login} volume`}
-          title="This stream's mix volume (scroll to adjust)"
+          title={
+            volumeModel.priorityMain === login
+              ? 'Main stream level: whichever stream is main plays at this (scroll to adjust)'
+              : "This stream's mix volume (scroll to adjust)"
+          }
           onChange={(e) => {
             setStreamMix(login, Number(e.target.value) / 100);
             useUi.getState().flashVolume(login);

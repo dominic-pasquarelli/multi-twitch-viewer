@@ -58,6 +58,9 @@ channels are live, and watch several streams at once with layouts that actually 
   - **Duck**: the others keep playing quietly (20% by default) so you notice when something happens.
   - **Mix** (`Shift+1`–`9`): several streams at full volume.
     Changing the main video keeps your mix. Hover a stream to adjust its volume directly on the video.
+    In the focus layout the main stream plays at the **main level** (100% unless you move its
+    slider) while the others keep their own levels: a small stream set to 20% plays at 100% while
+    it's the main one and goes back to 20% after. Turn this off in the Mixer or Settings → Audio.
   - **App volume** (slider next to Mute all): one level for everything the app plays, on top of
     each stream's own volume and the mix. Scroll over it to adjust; it's remembered.
   - **Mixer** (sliders button next to them): every stream's volume in one list, to balance the

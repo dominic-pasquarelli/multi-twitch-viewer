@@ -16,6 +16,8 @@ interface ChannelPrefsStore {
   master: number;
   /** Consistent-volume mode: each channel's level against the master (1 = same). */
   balance: Record<string, number>;
+  /** Main stream priority: the level the main stream plays at (see lib/audio/volumeModel). */
+  mainLevel: number;
   favorites: string[];
   /** The app's output level (0–1): scales everything it plays, after the mix. */
   output: number;
@@ -37,6 +39,7 @@ export const useChannelPrefs = create<ChannelPrefsStore>()(
       volumes: {},
       master: 0.5,
       balance: {},
+      mainLevel: 1,
       favorites: [],
       output: 1,
       kickLinks: {},
@@ -79,6 +82,10 @@ export const useChannelPrefs = create<ChannelPrefsStore>()(
           volumes: numberRecord(p.volumes),
           balance: numberRecord(p.balance),
           master: typeof p.master === 'number' && p.master >= 0 && p.master <= 1 ? p.master : 0.5,
+          mainLevel:
+            typeof p.mainLevel === 'number' && p.mainLevel >= 0 && p.mainLevel <= 1
+              ? p.mainLevel
+              : 1,
           output: typeof p.output === 'number' && p.output >= 0 && p.output <= 1 ? p.output : 1,
           kickLinks: sanitizeKickLinks(p.kickLinks),
           favorites: Array.isArray(p.favorites)
