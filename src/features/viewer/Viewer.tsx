@@ -12,6 +12,7 @@ import { desktop } from '@/lib/desktop/bridge';
 import type { PlayerStatus } from '@/lib/player/types';
 import type { ViewState } from '@/lib/view/types';
 import { streamVolume } from '@/lib/audio/volumeModel';
+import { kickSlugFor } from '@/lib/kick/liveMerge';
 import { audioLevel, mainChannel } from '@/lib/view/operations';
 import { displayedChannels, streamSections } from '@/lib/view/groups';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
@@ -347,6 +348,7 @@ export function Viewer() {
           <PlayerTile
             key={login}
             login={login}
+            kick={kickSlugFor(liveStatus.live.get(login))}
             rect={rect}
             audible={level.focused}
             main={view.layout.mode === 'focus' && login === focused}

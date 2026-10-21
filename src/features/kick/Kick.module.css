@@ -1,0 +1,81 @@
+.badge {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #53fc18;
+  color: #0b0b0b;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 14px;
+  letter-spacing: 0.02em;
+}
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.editor p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.add input {
+  flex: 1;
+  min-width: 0;
+}
+.arrow {
+  color: var(--text-faint);
+}
+.list {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.list li:hover {
+  background: var(--surface-3);
+}
+.name {
+  min-width: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-faint);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.live {
+  color: var(--success);
+}
+.warning {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-3);
+  font-size: 13px;
+}
+.error {
+  color: var(--danger);
+}

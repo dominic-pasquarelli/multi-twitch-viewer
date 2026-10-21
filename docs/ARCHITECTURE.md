@@ -18,20 +18,21 @@ src/
 
 ### `lib/`: the core modules
 
-| Module         | What it does                                                                                        | Swap / extend by…                                                   |
-| -------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `layout/`      | Pure geometry: `computeLayout({mode, count, container, options})` → one rect per slot.              | Adding a mode: write `myLayout.ts`, route it in `computeLayout.ts`. |
-| `view/`        | The "what I'm watching" model (`ViewState`) and pure operations: add, remove, swap, audio focus…    | Adding an operation + test; stores call it.                         |
-|                | `favoritesHome.ts`: which live favorites join the Favorites view and which streams may leave it.    |                                                                     |
-| `audio/`       | Volume model: per-channel volumes, or one master volume with per-channel balance (consistent mode). | Add a mode in `volumeModel.ts` + tests.                             |
-| `history/`     | Log of channels watched without following them (newest first, capped, validated on load).           |                                                                     |
-| `presets/`     | Preset type, export/import file format, validation, merging.                                        | Bump `EXPORT_VERSION` and migrate in `sanitizePreset`.              |
-| `twitch/`      | `TwitchApi` interface, Helix client (auth headers, pagination, 401/429), OAuth helpers, mock API.   | Implement `TwitchApi` (e.g. a caching or proxy variant).            |
-| `player/`      | `PlayerAdapter` interface, Twitch embed adapter, mock player, `PlayerController`, quality picker.   | Implement `PlayerAdapter` for another player.                       |
-| `persistence/` | `KeyValueStore` interface (localStorage with memory fallback) and the zustand adapter.              | Implement `KeyValueStore` (file, sync service…).                    |
-| `alerts/`      | Which streams just went live (for notifications), favorites-first sorting.                          |                                                                     |
-| `channels/`    | Parse names, `@names`, twitch.tv, player and multitwitch links.                                     |                                                                     |
-| `utils/`       | Formatting helpers (viewer counts, uptime, thumbnails).                                             |                                                                     |
+| Module         | What it does                                                                                         | Swap / extend by…                                                   |
+| -------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `layout/`      | Pure geometry: `computeLayout({mode, count, container, options})` → one rect per slot.               | Adding a mode: write `myLayout.ts`, route it in `computeLayout.ts`. |
+| `view/`        | The "what I'm watching" model (`ViewState`) and pure operations: add, remove, swap, audio focus…     | Adding an operation + test; stores call it.                         |
+|                | `favoritesHome.ts`: which live favorites join the Favorites view and which streams may leave it.     |                                                                     |
+| `audio/`       | Volume model: per-channel volumes, or one master volume with per-channel balance (consistent mode).  | Add a mode in `volumeModel.ts` + tests.                             |
+| `history/`     | Log of channels watched without following them (newest first, capped, validated on load).            |                                                                     |
+| `presets/`     | Preset type, export/import file format, validation, merging.                                         | Bump `EXPORT_VERSION` and migrate in `sanitizePreset`.              |
+| `twitch/`      | `TwitchApi` interface, Helix client (auth headers, pagination, 401/429), OAuth helpers, mock API.    | Implement `TwitchApi` (e.g. a caching or proxy variant).            |
+| `kick/`        | Linked Kick channels: `KickApi` (official API, app token), links, URLs, merging Kick-live streams.   | Implement `KickApi` (another source of Kick live status).           |
+| `player/`      | `PlayerAdapter` interface, Twitch and Kick embed adapters, mock player, `PlayerController`, quality. | Implement `PlayerAdapter` for another player.                       |
+| `persistence/` | `KeyValueStore` interface (localStorage with memory fallback) and the zustand adapter.               | Implement `KeyValueStore` (file, sync service…).                    |
+| `alerts/`      | Which streams just went live (for notifications), favorites-first sorting.                           |                                                                     |
+| `channels/`    | Parse names, `@names`, twitch.tv, player and multitwitch links.                                      |                                                                     |
+| `utils/`       | Formatting helpers (viewer counts, uptime, thumbnails).                                              |                                                                     |
 
 ### `state/`: stores
 
@@ -39,8 +40,8 @@ src/
 | ----------------------- | --------------- | ------------------------------------------------------------------------------------------------------- |
 | `viewStore`             | `session`       | Current `ViewState` (last session), kept/temporary and Favorites-view flags, undo history (memory only) |
 | `presetsStore`          | `presets`       | Saved presets                                                                                           |
-| `settingsStore`         | `settings`      | Preferences (gap, audio behaviour, quality, Client ID…)                                                 |
-| `channelPrefsStore`     | `channel-prefs` | Per-channel volume, favorites, app output volume                                                        |
+| `settingsStore`         | `settings`      | Preferences (gap, audio behaviour, quality, Client ID, Kick app credentials…)                           |
+| `channelPrefsStore`     | `channel-prefs` | Per-channel volume, favorites, app output volume, Kick links                                            |
 | `authStore`             | `auth`          | Twitch token + user                                                                                     |
 | `uiStore`, `toastStore` | (not saved)     | Open dialogs, fullscreen, player status, toasts                                                         |
 
@@ -66,6 +67,7 @@ build step:
 | `navigation.mjs`   | Only the app and `*.twitch.tv` pages may load in the window; everything else opens in the system browser. Also the permission allow-list and the Chrome-like user agent.                                                                                                |
 | `tray.mjs`         | Tray icon and menu (show, restart to install update, quit).                                                                                                                                                                                                             |
 | `updates.mjs`      | Compares the commit stamped into the build with the newest commit on `main` (GitHub API, or the git refs endpoint if rate-limited); **Update now** runs the installer script.                                                                                           |
+| `kickPlayer.mjs`   | Mutes, sets the volume of, plays and pauses the `<video>` inside a Kick player frame (Kick's embed has no API); frames are found by the `mtv` id the page puts in their URL.                                                                                            |
 | `playerChrome.mjs` | Tweaks Twitch's UI inside the player iframes (only the main process can reach them): hides the stream-info overlay (found from the channel link and Follow/Subscribe buttons, not Twitch's class names) and clicks through the "intended for certain audiences" notice. |
 | `preload.cjs`      | The only bridge to the page: `window.mtvDesktop` (see `src/lib/desktop/bridge.ts`).                                                                                                                                                                                     |
 
@@ -125,6 +127,14 @@ Behaviour notes:
   stays closed), and `useDropOfflineStreams` always lets favorites leave once offline, with other
   streams following the temporary-view rule. Undo entries record the flag, so undoing a preset
   load returns to it.
+- **Kick is a fallback, not a second source of truth.** `useFollowedLive` and `useStreamsFor`
+  merge linked channels live only on Kick into their results as `LiveStream`s with
+  `platform: 'kick'` (`lib/kick/liveMerge.ts`; Twitch always wins), so the sidebar, Favorites,
+  alerts, offline hiding and hover info need no Kick code. A tile whose stream is on Kick creates
+  the Kick player instead (a platform switch reloads it). Kick players report
+  `capabilities.volume`: in the desktop app the main process controls the frame's video and the
+  app's mute/volume are re-applied every second (Kick's player restores its own volume after an
+  unmute); in a browser it's muted unless heard, and mute changes reload it.
 - **App volume is applied last.** The output level multiplies each tile's duck scale before it
   reaches the player, and is divided back out of volume changes made with Twitch's own slider, so
   per-channel volumes and the mix are unchanged.

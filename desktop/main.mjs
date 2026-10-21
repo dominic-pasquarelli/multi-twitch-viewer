@@ -29,6 +29,7 @@ import {
   playAllFrames,
   scanPlayerErrors,
 } from './playerChrome.mjs';
+import { controlKickPlayer } from './kickPlayer.mjs';
 import { APP_URL, PORT, startServer } from './server.mjs';
 import { APP_ID, desktopIcons, setWindowBranding } from './branding.mjs';
 import { createTray } from './tray.mjs';
@@ -119,6 +120,9 @@ async function start() {
       : undefined;
     playAllFrames(win?.webContents.mainFrame.framesInSubtree ?? [], allowed);
   });
+  ipcMain.handle('mtv:kick-player', (_e, id, command) =>
+    controlKickPlayer(win?.webContents.mainFrame.framesInSubtree ?? [], id, command),
+  );
   ipcMain.on('mtv:player-chrome', (_e, options) => {
     playerChrome = normalizePlayerChrome(options);
     for (const frame of win?.webContents.mainFrame.framesInSubtree ?? []) {

@@ -7,6 +7,7 @@ import { useViewStore } from '@/state/viewStore';
 import { Toasts } from '@/ui/Toasts';
 import { useGoLiveAlerts } from '@/features/alerts/useGoLiveAlerts';
 import { FavoritesDialog } from '@/features/favorites/FavoritesDialog';
+import { KickLinksDialog } from '@/features/kick/KickLinksDialog';
 import { useFavoritesHome } from '@/features/favorites/useFavoritesHome';
 import { SetupDialog } from '@/features/auth/SetupDialog';
 import { useAuthBootstrap } from '@/features/auth/useAuthBootstrap';
@@ -97,6 +98,7 @@ export function App() {
       <SetupDialog />
       <SavePresetDialog />
       <FavoritesDialog />
+      <KickLinksDialog />
       <ShortcutsDialog />
       <UpdateBanner />
       <Toasts />

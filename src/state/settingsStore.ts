@@ -9,6 +9,9 @@ export type SidebarSort = 'viewers' | 'name' | 'uptime';
 export interface Settings {
   /** Overrides VITE_TWITCH_CLIENT_ID when set. */
   clientId: string;
+  /** Your Kick app (kick.com developer settings), for linked channels' live status. */
+  kickClientId: string;
+  kickClientSecret: string;
   tileGap: number;
   /** Collapse tiles of channels that are offline; they come back when live. */
   hideOffline: boolean;
@@ -50,6 +53,8 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   clientId: '',
+  kickClientId: '',
+  kickClientSecret: '',
   tileGap: 4,
   hideOffline: true,
   dropOfflineStreams: true,

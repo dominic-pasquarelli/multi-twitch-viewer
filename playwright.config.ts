@@ -35,6 +35,7 @@ export default defineConfig({
         'sidebar.spec.ts',
         'favorites.spec.ts',
         'controls.spec.ts',
+        'kick.spec.ts',
         'fullscreen.spec.ts',
       ],
       use: { ...chromium, baseURL: `http://localhost:${PORT}` },

@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import { ENV_CLIENT_ID } from '@/config/appConfig';
+import type { KickApi } from '@/lib/kick/types';
 import type { PlayerFactory } from '@/lib/player/types';
 import type { TwitchApi } from '@/lib/twitch/types';
 import { useSettings } from '@/state/settingsStore';
@@ -8,6 +9,10 @@ export interface Services {
   /** null until a Client ID is configured and you are logged in. */
   api: TwitchApi | null;
   playerFactory: PlayerFactory;
+  /** null until your Kick app's Client ID and Secret are set (Settings → Account). */
+  kickApi: KickApi | null;
+  /** Players for linked channels that are live only on Kick. */
+  kickPlayerFactory: PlayerFactory;
   clientId: string;
   mock: boolean;
   /**

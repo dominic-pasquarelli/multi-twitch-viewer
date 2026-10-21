@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useServices } from '@/app/servicesContext';
+import { kickChatUrl, kickSlugFor } from '@/lib/kick';
 import { chatEmbedUrl } from '@/lib/twitch/embedUrls';
 import { displayedChannels } from '@/lib/view/groups';
 import { useViewStore } from '@/state/viewStore';
 import { IconButton } from '@/ui/Button';
+import { useLiveStatus } from '../follows/queries';
+import { KickBadge } from '../kick/KickBadge';
 import styles from './ChatPanel.module.css';
 
 const MAX_KEPT_ALIVE = 4;
@@ -21,6 +24,9 @@ export function ChatPanel() {
     ? view.chat.channel
     : (displayedChannels(view, view.audio.active).at(-1) ?? channels[0] ?? null);
   const setChat = useViewStore((s) => s.setChat);
+  // A stream playing from Kick shows its Kick chat.
+  const live = useLiveStatus(view.channels).live;
+  const kickFor = (c: string) => kickSlugFor(live.get(c));
   const [recent, setRecent] = useState<string[]>([]);
 
   // Track recently opened tabs (derived during render; React re-renders once).
@@ -41,6 +47,7 @@ export function ChatPanel() {
             onClick={() => setChat({ channel: c })}
           >
             {c}
+            {kickFor(c) && <KickBadge />}
           </button>
         ))}
         <span style={{ flex: 1 }} />
@@ -53,23 +60,26 @@ export function ChatPanel() {
       </div>
       <div className={styles.frames}>
         {channels.length === 0 && <div className={styles.mock}>Add a stream to see its chat.</div>}
-        {mounted.map((c) =>
-          mock ? (
+        {mounted.map((c) => {
+          const kick = kickFor(c);
+          const key = `${c}:${kick ?? ''}`; // switching platform loads the other chat
+          return mock ? (
             <div
-              key={c}
+              key={key}
               className={`${styles.frame} ${styles.mock} ${c === active ? '' : styles.hidden}`}
+              data-platform={kick ? 'kick' : 'twitch'}
             >
-              Chat for <strong>{c}</strong> would appear here (mock mode).
+              {kick ? 'Kick chat' : 'Chat'} for <strong>{c}</strong> would appear here (mock mode).
             </div>
           ) : (
             <iframe
-              key={c}
-              title={`${c} chat`}
-              src={chatEmbedUrl(c, window.location.hostname)}
+              key={key}
+              title={`${c} ${kick ? 'Kick ' : ''}chat`}
+              src={kick ? kickChatUrl(kick) : chatEmbedUrl(c, window.location.hostname)}
               className={`${styles.frame} ${c === active ? '' : styles.hidden}`}
             />
-          ),
-        )}
+          );
+        })}
       </div>
     </aside>
   );

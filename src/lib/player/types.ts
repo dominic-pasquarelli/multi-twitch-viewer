@@ -47,4 +47,9 @@ export interface CreatePlayerOptions {
 
 export interface PlayerFactory {
   create(host: HTMLElement, options: CreatePlayerOptions): PlayerAdapter;
+  /** What its players support; omitted means everything (like Twitch's). */
+  capabilities?: {
+    /** false: no volume control, so such a player is muted unless it's the one you hear. */
+    volume: boolean;
+  };
 }

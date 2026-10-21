@@ -1,4 +1,4 @@
-import { redirectUri } from '@/config/appConfig';
+import { KICK_DEVELOPER_URL, redirectUri } from '@/config/appConfig';
 import { desktop } from '@/lib/desktop/bridge';
 import { useClientId, useServices } from '@/app/servicesContext';
 import { useAuth } from '@/state/authStore';
@@ -109,6 +109,7 @@ function SettingsForm() {
               </Field>
             </>
           )}
+          <KickSettings />
         </TabPanel>
       )}
       {tab === 'layout' && (
@@ -417,5 +418,60 @@ function AppUpdates() {
         )
       )}
     </div>
+  );
+}
+
+/** Kick fallback for linked channels: your Kick app's credentials and the links. */
+function KickSettings() {
+  const s = useSettings();
+  const { mock } = useServices();
+  return (
+    <>
+      <div className={formStyles.section}>Kick (linked channels)</div>
+      {!mock && (
+        <>
+          <Field
+            label="Kick Client ID"
+            help={
+              <>
+                From an app you create under{' '}
+                <a href={KICK_DEVELOPER_URL} target="_blank" rel="noreferrer">
+                  kick.com → Settings → Developer
+                </a>
+                . Its redirect URL can be <code>{redirectUri()}</code>; only live status is read.
+              </>
+            }
+          >
+            <input
+              className={formStyles.input}
+              value={s.kickClientId}
+              placeholder="Paste your Kick Client ID"
+              onChange={(e) => s.update({ kickClientId: e.target.value.trim() })}
+              data-testid="kick-client-id"
+            />
+          </Field>
+          <Field label="Kick Client Secret" help="Kept only on this computer.">
+            <input
+              className={formStyles.input}
+              type="password"
+              autoComplete="off"
+              value={s.kickClientSecret}
+              placeholder="Paste your Kick Client Secret"
+              onChange={(e) => s.update({ kickClientSecret: e.target.value.trim() })}
+              data-testid="kick-client-secret"
+            />
+          </Field>
+        </>
+      )}
+      <div className={formStyles.row}>
+        <span className={formStyles.help} style={{ flex: 1 }}>
+          Link a Twitch channel to the streamer’s Kick channel to watch them there while they’re
+          offline on Twitch.
+        </span>
+        <Button size="small" onClick={() => useUi.getState().openKickLinks()}>
+          Linked Kick channels…
+        </Button>
+      </div>
+    </>
   );
 }

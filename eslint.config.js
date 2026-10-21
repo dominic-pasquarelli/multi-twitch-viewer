@@ -13,8 +13,8 @@ export default defineConfig([
     languageOptions: { ecmaVersion: 2023, globals: globals.node },
   },
   {
-    // Runs inside the Twitch player frames (and is tested in jsdom).
-    files: ['desktop/playerChrome*.mjs'],
+    // Runs inside the Twitch and Kick player frames (and is tested in jsdom).
+    files: ['desktop/playerChrome*.mjs', 'desktop/kickPlayer*.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {

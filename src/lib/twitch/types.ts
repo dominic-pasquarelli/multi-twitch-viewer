@@ -21,6 +21,10 @@ export interface LiveStream {
   startedAt: string;
   /** Template with {width}/{height} placeholders. */
   thumbnailUrl: string;
+  /** Where it's live: Twitch unless a linked channel is live only on Kick. */
+  platform?: 'twitch' | 'kick';
+  /** The Kick channel playing, when platform is "kick". */
+  kickSlug?: string;
 }
 
 export interface FollowedChannel {

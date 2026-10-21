@@ -13,6 +13,8 @@ export interface MockPlayerOptions {
   hueFor?: (channel: string) => number;
   /** ms before 'ready' fires; 0 = synchronous (tests). */
   readyDelay?: number;
+  /** Shown on the fake video (e.g. "kick" for the stand-in Kick player). */
+  platform?: string;
 }
 
 /**
@@ -29,6 +31,7 @@ export class MockPlayer implements PlayerAdapter {
   private readonly listeners = new Map<PlayerEvent, Set<() => void>>();
   private readonly label: HTMLDivElement;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private platform: string | undefined;
 
   constructor(host: HTMLElement, channel: string, muted: boolean, opts: MockPlayerOptions = {}) {
     this.channel = channel;
@@ -38,6 +41,8 @@ export class MockPlayer implements PlayerAdapter {
     this.el = document.createElement('div');
     this.el.className = 'mock-player';
     this.el.dataset.channel = channel;
+    this.el.dataset.platform = opts.platform ?? 'twitch';
+    this.platform = opts.platform;
     this.el.style.cssText = `position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:#fff;container-type:size;font:600 clamp(11px,7cqw,30px)/1.2 system-ui,sans-serif;text-align:center;overflow:hidden;background:${
       live
         ? `linear-gradient(135deg,hsl(${hue} 65% 38%),hsl(${(hue + 70) % 360} 65% 18%))`
@@ -61,7 +66,8 @@ export class MockPlayer implements PlayerAdapter {
   }
 
   private render() {
-    this.label.textContent = `${this.muted ? '🔇 muted' : `🔊 ${Math.round(this.volume * 100)}%`} · mock player`;
+    const kind = this.platform ? `mock ${this.platform} player` : 'mock player';
+    this.label.textContent = `${this.muted ? '🔇 muted' : `🔊 ${Math.round(this.volume * 100)}%`} · ${kind}`;
     this.el.dataset.muted = String(this.muted);
     this.el.dataset.volume = this.volume.toFixed(2);
     this.el.dataset.paused = String(this.paused);

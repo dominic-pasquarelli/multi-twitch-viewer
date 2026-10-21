@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import type { PlayerStatus } from '@/lib/player/types';
 
-export type DialogName = 'settings' | 'shortcuts' | 'savePreset' | 'setup' | 'favorites' | null;
+export type DialogName =
+  'settings' | 'shortcuts' | 'savePreset' | 'setup' | 'favorites' | 'kick' | null;
 
 /** Transient UI state (never persisted). */
 interface UiStore {
@@ -30,6 +31,9 @@ interface UiStore {
   volumeFlash: { login: string; n: number } | null;
   flashVolume(login: string): void;
   openDialog(d: DialogName): void;
+  /** The Twitch channel to fill in when the Kick links dialog opens. */
+  kickLinkFor: string | null;
+  openKickLinks(login?: string): void;
   setPresetsMenuOpen(open: boolean): void;
   setFullscreen(v: boolean): void;
   requestAddBoxFocus(): void;
@@ -58,6 +62,9 @@ export const useUi = create<UiStore>()((set) => ({
     })),
   flashVolume: (login) => set((s) => ({ volumeFlash: { login, n: (s.volumeFlash?.n ?? 0) + 1 } })),
   openDialog: (dialog) => set({ dialog, presetsMenuOpen: false }),
+  kickLinkFor: null,
+  openKickLinks: (login) =>
+    set({ dialog: 'kick', presetsMenuOpen: false, kickLinkFor: login ?? null }),
   setPresetsMenuOpen: (presetsMenuOpen) => set({ presetsMenuOpen }),
   // Each fullscreen starts with the sidebar tucked away.
   setFullscreen: (fullscreen) => set({ fullscreen, fullscreenSidebar: false }),

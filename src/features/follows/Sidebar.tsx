@@ -21,6 +21,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useServices } from '@/app/servicesContext';
 import { favoritesFirst } from '@/lib/alerts/goLive';
+import { KickBadge } from '../kick/KickBadge';
 import type {
   ChannelSearchResult,
   LiveStream,
@@ -246,6 +247,7 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
             onClick={() => {
               void queryClient.invalidateQueries({ queryKey: ['followed-live'] });
               void queryClient.invalidateQueries({ queryKey: ['streams'] });
+              void queryClient.invalidateQueries({ queryKey: ['kick-live'] });
               void queryClient.invalidateQueries({ queryKey: ['category-streams'] });
             }}
           />
@@ -460,8 +462,8 @@ function ChannelRow({
           {s && <div className={styles.game}>{s.gameName || 'No category'}</div>}
         </span>
         {s && (
-          <span className={styles.viewers}>
-            <span className={styles.dot} />
+          <span className={styles.viewers} data-platform={s.platform ?? 'twitch'}>
+            {s.platform === 'kick' ? <KickBadge /> : <span className={styles.dot} />}
             {formatCount(s.viewerCount)}
           </span>
         )}
@@ -594,7 +596,7 @@ function RailItem({
   return (
     <button
       className={`${styles.railItem} ${inView ? styles.inView : ''}`}
-      title={`${row.displayName}${history ? ' · History' : ''} · ${row.stream ? row.stream.gameName : row.liveKnown === false ? 'Checking live status' : 'Offline'}`}
+      title={`${row.displayName}${history ? ' · History' : ''} · ${row.stream ? `${row.stream.platform === 'kick' ? 'On Kick · ' : ''}${row.stream.gameName}` : row.liveKnown === false ? 'Checking live status' : 'Offline'}`}
       data-testid="rail-channel"
       data-channel={row.login}
       data-history={!!history}
