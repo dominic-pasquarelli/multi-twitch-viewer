@@ -8,7 +8,10 @@ export const SHORTCUTS: { keys: string; description: string }[] = [
   { keys: '[  ]', description: 'Focus layout: main stream smaller / bigger' },
   { keys: '\\', description: 'Focus layout: automatic main size' },
   { keys: '/', description: 'Add channels' },
-  { keys: 'B', description: 'Show/hide the followed sidebar' },
+  {
+    keys: 'B',
+    description: 'Show/hide the followed sidebar (fullscreen: keep it open beside the streams)',
+  },
   { keys: 'C', description: 'Show/hide chat' },
   { keys: 'F', description: 'Fullscreen' },
   { keys: 'P', description: 'Presets menu' },

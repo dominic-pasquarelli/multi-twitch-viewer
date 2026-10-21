@@ -8,6 +8,9 @@ interface UiStore {
   dialog: DialogName;
   presetsMenuOpen: boolean;
   fullscreen: boolean;
+  /** Fullscreen: the sidebar is kept open beside the streams (B), not just peeking. */
+  fullscreenSidebar: boolean;
+  setFullscreenSidebar(v: boolean): void;
   /** Bumped to ask the "add channel" box to take focus. */
   addBoxFocusRequest: number;
   playerStatus: Record<string, PlayerStatus>;
@@ -37,6 +40,8 @@ export const useUi = create<UiStore>()((set) => ({
   dialog: null,
   presetsMenuOpen: false,
   fullscreen: false,
+  fullscreenSidebar: false,
+  setFullscreenSidebar: (fullscreenSidebar) => set({ fullscreenSidebar }),
   addBoxFocusRequest: 0,
   playerStatus: {},
   backgrounded: false,
@@ -54,7 +59,8 @@ export const useUi = create<UiStore>()((set) => ({
   flashVolume: (login) => set((s) => ({ volumeFlash: { login, n: (s.volumeFlash?.n ?? 0) + 1 } })),
   openDialog: (dialog) => set({ dialog, presetsMenuOpen: false }),
   setPresetsMenuOpen: (presetsMenuOpen) => set({ presetsMenuOpen }),
-  setFullscreen: (fullscreen) => set({ fullscreen }),
+  // Each fullscreen starts with the sidebar tucked away.
+  setFullscreen: (fullscreen) => set({ fullscreen, fullscreenSidebar: false }),
   requestAddBoxFocus: () => set((s) => ({ addBoxFocusRequest: s.addBoxFocusRequest + 1 })),
   setPlayerStatus: (login, status) =>
     set((s) => {

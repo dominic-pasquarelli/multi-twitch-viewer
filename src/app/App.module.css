@@ -32,12 +32,39 @@
   min-height: 0;
 }
 
-/* Fullscreen: only the streams (and chat, if open). Hover the top edge for the bar. */
+/* Fullscreen: only the streams (and chat, if open). Hover the top edge for the bar
+   and the left edge for the sidebar, which then slides over the streams; B keeps
+   it open beside them instead (sidePinned). */
 .fullscreen {
   grid-template-rows: 0 minmax(0, 1fr);
 }
-.fullscreen .side {
-  display: none;
+.fullscreen:not(.sidePinned) .side {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 28;
+  box-shadow: var(--shadow);
+  visibility: hidden;
+  transform: translateX(-100%);
+  transition:
+    transform 0.15s ease-out,
+    visibility 0s linear 0.15s;
+}
+.sideHotzone:hover + .side,
+.fullscreen:not(.sidePinned) .side:hover,
+.fullscreen:not(.sidePinned) .side:focus-within {
+  visibility: visible;
+  transform: none;
+  transition: transform 0.15s ease-out;
+}
+.sideHotzone {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 6px;
+  z-index: 27;
 }
 .fullscreen .top {
   position: fixed;

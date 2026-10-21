@@ -75,7 +75,8 @@ channels are live, and watch several streams at once with layouts that actually 
   (`http://localhost:5757/#/chan1/chan2?layout=focus`). Pasting a multitwitch.tv link into the
   add box loads all of its channels.
 - **Also**: tabbed chat (`C`) that follows the stream you're hearing, fullscreen (`F`), undo
-  (`Ctrl+Z`).
+  (`Ctrl+Z`). In fullscreen the sidebar is tucked away: move the pointer to the left edge to slide
+  it out over the streams, or press `B` to keep it open beside them (`B` again hides it).
 - **Quality where it counts**: the main stream plays at source quality, the smaller ones at a
   quality that matches their size (never below 360p), which saves bandwidth and CPU. Change both in
   **Settings → Players**.
