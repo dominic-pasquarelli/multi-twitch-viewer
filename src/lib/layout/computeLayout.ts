@@ -4,7 +4,7 @@ import { computeGridLayout } from './grid';
 import type { LayoutMode, LayoutOptions, Rect, Size } from './types';
 
 export interface LayoutRequest {
-  mode: LayoutMode;
+  mode: Exclude<LayoutMode, 'multi-focus'>;
   count: number;
   container: Size;
   options: LayoutOptions;

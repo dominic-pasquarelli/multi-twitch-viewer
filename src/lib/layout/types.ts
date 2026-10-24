@@ -10,7 +10,7 @@ export interface Point {
 
 export interface Rect extends Point, Size {}
 
-export type LayoutMode = 'grid' | 'focus';
+export type LayoutMode = 'grid' | 'focus' | 'multi-focus';
 
 export interface LayoutOptions {
   /** Space between tiles, in px. */

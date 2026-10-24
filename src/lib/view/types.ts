@@ -28,6 +28,8 @@ export interface ViewState {
     mode: LayoutMode;
     /** Channel shown big in focus mode (defaults to the first channel). */
     main: string | null;
+    /** Up to three large streams in multi-focus mode; absent in older saves. */
+    focused?: string[];
     mainScale: MainScale;
   };
   audio: {

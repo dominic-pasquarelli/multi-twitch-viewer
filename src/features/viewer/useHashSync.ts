@@ -19,7 +19,8 @@ export function useHashSync(): void {
       if (fromHash.mode === 'focus') {
         if (fromHash.main) store.setMain(fromHash.main);
         else store.setLayoutMode('focus');
-      }
+      } else if (fromHash.mode === 'multi-focus') store.setFocusedChannels(fromHash.focused ?? []);
+      else store.setLayoutMode('grid');
     };
     applyHash();
     // Restored session with a clean URL: show it in the address bar too.

@@ -1,5 +1,7 @@
 import { normalizeLogin } from '../channels/parseChannels';
 import type { ViewState } from './types';
+import { focusedChannels } from './operations';
+import type { LayoutMode } from '../layout';
 
 /**
  * multitwitch-style share/bookmark links: #/chan1/chan2?layout=focus&main=chan2
@@ -11,14 +13,19 @@ export function viewToHash(view: ViewState): string {
     params.set('layout', 'focus');
     if (view.layout.main) params.set('main', view.layout.main);
   }
+  if (view.layout.mode === 'multi-focus') {
+    params.set('layout', 'multi-focus');
+    params.set('focus', focusedChannels(view).join(','));
+  }
   const query = params.toString();
   return `#/${view.channels.join('/')}${query ? `?${query}` : ''}`;
 }
 
 export interface HashView {
   channels: string[];
-  mode: 'grid' | 'focus';
+  mode: LayoutMode;
   main: string | null;
+  focused?: string[];
 }
 
 export function hashToView(hash: string): HashView | null {
@@ -35,9 +42,14 @@ export function hashToView(hash: string): HashView | null {
   if (!channels.length) return null;
   const params = new URLSearchParams(query);
   const main = normalizeLogin(params.get('main') ?? '');
+  const multi = params.get('layout') === 'multi-focus';
+  const focused = [...new Set((params.get('focus') ?? '').split(',').map(normalizeLogin))]
+    .filter((c): c is string => !!c && channels.includes(c))
+    .slice(0, 3);
   return {
     channels,
-    mode: params.get('layout') === 'focus' ? 'focus' : 'grid',
+    mode: multi ? 'multi-focus' : params.get('layout') === 'focus' ? 'focus' : 'grid',
     main: main && channels.includes(main) ? main : null,
+    ...(multi ? { focused: params.has('focus') ? focused : channels.slice(0, 2) } : {}),
   };
 }

@@ -143,6 +143,16 @@ Behaviour notes:
 - **App volume is applied last.** The output level multiplies each tile's duck scale before it
   reaches the player, and is divided back out of volume changes made with Twitch's own slider, so
   per-channel volumes and the mix are unchanged.
+- **Multi focus is a set of at most three streams.** `layout.focused` is optional for compatibility
+  with existing sessions/presets. View operations sanitize it, preserve selection through slot
+  replacement/swaps, and prune closed channels. `computeGroupedLayout` gives selected streams
+  equal primary rectangles and lays out the remaining labeled group grids separately. Players
+  stay in the same DOM order. The same visible selection controls primary quality and recovery
+  protection. Changing the focus selection starts Mix with only those channels; silence is preserved.
+  Volume sliders reuse per-channel/balance preferences; single-main volume priority applies only
+  to the original Focus mode. The Multi focus button and Mixer's Equal levels action use
+  `balanceFocusedAudio`; saved sessions retain their adjusted levels. Share links carry
+  `layout=multi-focus&focus=channel1,channel2` but do not share volume preferences.
 - **Groups keep player DOM stable.** Optional groups and the selected tab are part of `ViewState`
   and validated when sessions/presets load. Grid computes separate group sections. Focus places
   one global main video ahead of the remaining labeled clusters; isolated tabs focus within their

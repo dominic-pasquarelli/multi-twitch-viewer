@@ -1,5 +1,6 @@
 import {
   LayoutGrid,
+  Columns3,
   Maximize,
   Minimize,
   MessageSquare,
@@ -28,6 +29,7 @@ import { Mixer } from '../mixer/Mixer';
 import { OutputVolume } from '../mixer/OutputVolume';
 import { PresetsMenu } from '../presets/PresetsMenu';
 import { pauseAll, playAll } from '../viewer/playbackActions';
+import { balanceFocusedAudio } from '../viewer/volume';
 import { AddChannelBox } from './AddChannelBox';
 import { toggleFullscreen } from './fullscreen';
 import styles from './TopBar.module.css';
@@ -85,6 +87,20 @@ export function TopBar() {
           title="Focus: one big stream, the rest around it (L)"
         >
           <Presentation size={15} /> <span className={styles.segLabel}>Focus</span>
+        </button>
+        <button
+          className={styles.seg}
+          aria-label="Multi focus"
+          aria-pressed={mode === 'multi-focus'}
+          disabled={displayedChannels(view).length < 2}
+          onClick={() => {
+            if (mode === 'multi-focus') return;
+            store.setLayoutMode('multi-focus');
+            balanceFocusedAudio();
+          }}
+          title="Multi focus: choose two or three large streams; balance their audio in the Mixer"
+        >
+          <Columns3 size={15} /> <span className={styles.segLabel}>Multi focus</span>
         </button>
         {mode === 'focus' && (
           <label className={styles.scale} title="Zoom: main stream size ([ and ] keys)">

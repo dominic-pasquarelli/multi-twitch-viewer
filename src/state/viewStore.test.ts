@@ -21,6 +21,54 @@ beforeEach(() => {
 });
 
 describe('viewStore', () => {
+  it('multi focus preserves mute all across selection changes and restores the new focus mix', () => {
+    store().addChannels(['a', 'b', 'c', 'd']);
+    store().setLayoutMode('multi-focus');
+    store().toggleMuteAll();
+    store().toggleFocusedChannel('c');
+    store().toggleFocusedChannel('a');
+    expect(store().view.audio.active).toEqual([]);
+    store().toggleMuteAll();
+    expect(store().view.audio.active).toEqual(['b', 'c']);
+    expect(store().view.audio.mode).toBe('mix');
+  });
+
+  it('multi focus uses the isolated group and keeps presets and undo selections', () => {
+    store().addChannels(['a', 'b', 'c', 'd']);
+    const group = store().createGroup('Second pair');
+    store().assignGroup('c', group);
+    store().assignGroup('d', group);
+    store().setActiveGroup(group);
+    store().setLayoutMode('multi-focus');
+    expect(store().view.layout.focused).toEqual(['c', 'd']);
+    expect(store().view.audio.active).toEqual(['c', 'd']);
+    const preset = usePresets.getState().save('Multi', store().view);
+    store().removeChannel('c');
+    expect(store().view.layout.focused).toEqual(['d']);
+    store().undo();
+    expect(store().view.layout.focused).toEqual(['c', 'd']);
+    store().clear();
+    store().loadView(preset.view);
+    expect(store().view.layout.focused).toEqual(['c', 'd']);
+    store().setActiveGroup(null);
+    expect(store().view.layout.focused).toEqual(['c', 'd']);
+  });
+
+  it('multi focus keeps a custom audible subset through mute, background additions and group tabs', () => {
+    store().addChannels(['a', 'b', 'c', 'd']);
+    store().setLayoutMode('multi-focus');
+    store().toggleAudio('b');
+    store().toggleMuteAll();
+    store().addChannels(['e']);
+    const group = store().createGroup('Background');
+    store().assignGroup('c', group);
+    store().setActiveGroup(group);
+    expect(store().view.layout.focused).toEqual(['a', 'b']);
+    store().setActiveGroup(null);
+    store().toggleMuteAll();
+    expect(store().view.audio.active).toEqual(['a']);
+  });
+
   it('undoes a removal', () => {
     store().addChannels(['a', 'b']);
     store().removeChannel('a');

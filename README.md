@@ -7,6 +7,16 @@ channels are live, and watch several streams at once with layouts that actually 
   offline follows. Click to add or remove, **Shift+click** to watch only that one, or drag a
   channel onto a stream to replace it. It collapses to an avatar rail with `B`.
 - **Smart layouts with no wasted space**
+  - **Multi focus** keeps two or three selected streams equally large, with the others in smaller
+    windows beside or below them. Choose **Multi focus** in the top bar, then pin/unpin streams
+    from their hover controls or the **Mixer**. At three, remove a pin before choosing another.
+    Entering the mode starts a Mix of the selected streams at equal levels; other streams start
+    muted. Each mixer/hover slider balances one stream independently, and **Equal levels** resets
+    the selected mix (50% each for two, 33% each for three; relative to the master in Consistent
+    volume mode). These are volume settings, not automatic loudness normalization. Existing audio
+    buttons still let you change what you hear. Mute all stays muted when the selection changes.
+    Focus choices survive session/preset saves and share links. All selected streams receive main
+    video quality and stay protected during bandwidth recovery, even when individually muted.
   - **Grid** picks the arrangement with the biggest videos. For example, 5 streams become
     2 large + 3 smaller instead of a 3×2 grid with a hole.
   - **Focus** makes one stream big and wraps the rest around it. Its automatic size keeps the

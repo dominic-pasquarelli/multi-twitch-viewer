@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_LAYOUT_OPTIONS, type Size } from '@/lib/layout';
 import type { ViewState } from '@/lib/view/types';
 import { streamSections } from '@/lib/view/groups';
-import { addChannels, emptyView, setMain } from '@/lib/view/operations';
+import { addChannels, emptyView, setMain, setFocusedChannels } from '@/lib/view/operations';
 import { computeGroupedLayout, SECTION_LABEL_HEIGHT } from './groupedLayout';
 
 function expectGeometry(view: ViewState, size: Size) {
@@ -22,7 +22,11 @@ function expectGeometry(view: ViewState, size: Size) {
       1,
     );
   }
-  const regions = [...layout.sections, ...(layout.focused ? [layout.focused] : [])];
+  const regions = [
+    ...layout.sections,
+    ...(layout.focused ? [layout.focused] : []),
+    ...(layout.focuses ?? []),
+  ];
   regions.forEach(({ rect: a }, i) =>
     regions.slice(i + 1).forEach(({ rect: b }) => {
       const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
@@ -34,7 +38,9 @@ function expectGeometry(view: ViewState, size: Size) {
     for (const channel of section.channels) {
       const tile = layout.tiles.get(channel)!;
       expect(tile.x).toBeGreaterThanOrEqual(section.rect.x - 1);
-      expect(tile.y).toBeGreaterThanOrEqual(section.rect.y + SECTION_LABEL_HEIGHT - 1);
+      expect(tile.y).toBeGreaterThanOrEqual(
+        section.rect.y + (view.groups?.length ? SECTION_LABEL_HEIGHT : 0) - 1,
+      );
       expect(tile.x + tile.width).toBeLessThanOrEqual(section.rect.x + section.rect.width + 1);
       expect(tile.y + tile.height).toBeLessThanOrEqual(section.rect.y + section.rect.height + 1);
     }
@@ -58,6 +64,54 @@ function expectGeometry(view: ViewState, size: Size) {
 }
 
 describe('grouped viewer geometry', () => {
+  it.each([
+    { width: 1920, height: 1080 },
+    { width: 800, height: 1100 },
+    { width: 640, height: 360 },
+    { width: 360, height: 640 },
+  ])(
+    'fits two and three equal focus peers with smaller non-overlapping backgrounds at %j',
+    (size) => {
+      for (const count of [2, 3, 4, 8, 16]) {
+        const channels = Array.from({ length: count }, (_, i) => `stream${i}`);
+        for (const focusCount of [2, 3].filter((n) => n <= count)) {
+          for (const grouped of [false, true]) {
+            const v = setFocusedChannels(
+              {
+                ...addChannels(emptyView(), channels),
+                ...(grouped
+                  ? {
+                      groups: [
+                        {
+                          id: 'first',
+                          name: 'First',
+                          channels: channels.slice(0, Math.ceil(count / 2)),
+                        },
+                        {
+                          id: 'second',
+                          name: 'Second',
+                          channels: channels.slice(Math.ceil(count / 2)),
+                        },
+                      ],
+                    }
+                  : {}),
+              },
+              channels.slice(0, focusCount),
+            );
+            const layout = expectGeometry(v, size);
+            expect(layout.order.slice(0, focusCount)).toEqual(channels.slice(0, focusCount));
+            const width = layout.tiles.get(channels[0]!)!.width;
+            for (const c of channels.slice(0, focusCount)) {
+              expect(Math.abs(layout.tiles.get(c)!.width - width)).toBeLessThanOrEqual(1);
+            }
+            for (const c of channels.slice(focusCount)) {
+              expect(layout.tiles.get(c)!.width).toBeLessThan(width);
+            }
+          }
+        }
+      }
+    },
+  );
   const view = {
     ...addChannels(emptyView(), ['a', 'b', 'c', 'd', 'e']),
     groups: [
