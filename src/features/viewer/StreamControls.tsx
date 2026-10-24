@@ -3,6 +3,7 @@ import {
   Heart,
   Link2,
   Maximize2,
+  Pin,
   MessageSquare,
   RotateCw,
   Star,
@@ -11,7 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { kickChannelUrl, kickSlugFor } from '@/lib/kick';
-import { audioLevel } from '@/lib/view/operations';
+import { audioLevel, focusedChannels } from '@/lib/view/operations';
 import { formatCount } from '@/lib/utils/format';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
@@ -43,6 +44,8 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
   const kickLink = useChannelPrefs((s) => s.kickLinks[login]);
   const level = audioLevel(view, login, duckLevel);
   const volume = currentVolume(login, volumeModel);
+  const multi = view.layout.mode === 'multi-focus';
+  const focused = focusedChannels(view);
 
   return (
     <div
@@ -101,7 +104,17 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
         </span>
       </div>
       <div className={styles.actions}>
-        {view.channels.length > 1 && !main && (
+        {multi && (
+          <IconButton
+            size="sm"
+            label={main ? 'Remove from multi focus' : 'Add to multi focus'}
+            active={main}
+            disabled={main ? focused.length <= 1 : focused.length >= 3}
+            icon={<Pin size={15} />}
+            onClick={() => store.toggleFocusedChannel(login)}
+          />
+        )}
+        {!multi && view.channels.length > 1 && !main && (
           <IconButton
             size="sm"
             label="Make this the main stream"

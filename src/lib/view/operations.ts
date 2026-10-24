@@ -11,11 +11,17 @@ export function addChannels(view: ViewState, logins: string[]): ViewState {
   if (!fresh.length) return view;
   const channels = [...view.channels, ...fresh].slice(0, MAX_CHANNELS);
   const wasEmpty = view.channels.length === 0;
+  const initialFocus = wasEmpty && view.layout.mode === 'multi-focus' ? channels.slice(0, 2) : null;
   return normalize({
     ...view,
     channels,
+    ...(initialFocus ? { layout: { ...view.layout, focused: initialFocus } } : {}),
     // Starting from nothing, the first stream you add is the one you hear.
-    audio: wasEmpty ? { ...view.audio, active: [channels[0]!] } : view.audio,
+    audio: initialFocus
+      ? { mode: 'mix', active: initialFocus }
+      : wasEmpty
+        ? { ...view.audio, active: [channels[0]!] }
+        : view.audio,
     chat: view.chat.channel ? view.chat : { ...view.chat, channel: channels[0]! },
   });
 }
@@ -50,7 +56,11 @@ export function replaceChannel(view: ViewState, target: string, replacement: str
   return normalize({
     ...view,
     channels: view.channels.map(swap),
-    layout: { ...view.layout, main: view.layout.main && swap(view.layout.main) },
+    layout: {
+      ...view.layout,
+      main: view.layout.main && swap(view.layout.main),
+      ...(view.layout.focused ? { focused: view.layout.focused.map(swap) } : {}),
+    },
     audio: { ...view.audio, active: view.audio.active.map(swap) },
     chat: { ...view.chat, channel: view.chat.channel && swap(view.chat.channel) },
   });
@@ -65,7 +75,20 @@ export function swapChannels(view: ViewState, a: string, b: string): ViewState {
   channels[j] = a;
   // In focus mode the main tile is a slot: swapping with it changes the main.
   const main = view.layout.main === a ? b : view.layout.main === b ? a : view.layout.main;
-  return { ...view, channels, layout: { ...view.layout, main } };
+  const swap = (c: string) => (c === a ? b : c === b ? a : c);
+  return {
+    ...view,
+    channels,
+    layout: {
+      ...view.layout,
+      main,
+      ...(view.layout.focused ? { focused: view.layout.focused.map(swap) } : {}),
+    },
+    audio:
+      view.layout.mode === 'multi-focus'
+        ? { ...view.audio, active: view.audio.active.map(swap) }
+        : view.audio,
+  };
 }
 
 /** Moves a channel to a new index in the display order. */
@@ -78,7 +101,57 @@ export function moveChannel(view: ViewState, login: string, toIndex: number): Vi
 }
 
 export function setLayoutMode(view: ViewState, mode: ViewState['layout']['mode']): ViewState {
+  if (mode === 'multi-focus') {
+    const main = mainChannel(view);
+    return setFocusedChannels(
+      view,
+      [
+        ...(view.layout.focused ?? []),
+        ...(main ? [main] : []),
+        ...view.audio.active,
+        ...view.channels,
+      ]
+        .filter((c, i, all) => view.channels.includes(c) && all.indexOf(c) === i)
+        .slice(0, Math.max(2, view.layout.focused?.length ?? 0)),
+    );
+  }
   return { ...view, layout: { ...view.layout, mode } };
+}
+
+/** The explicitly selected large streams, restricted to the current surface. */
+export function focusedChannels(view: ViewState, visible = view.channels): string[] {
+  if (view.layout.mode === 'grid') return [];
+  if (view.layout.mode === 'focus') {
+    const main = mainChannel(view, visible);
+    return main ? [main] : [];
+  }
+  return [...new Set(view.layout.focused ?? view.channels.slice(0, 2))]
+    .filter((c) => visible.includes(c))
+    .slice(0, 3);
+}
+
+/** Selecting a focus group starts a mix of just those streams; silence stays silent. */
+export function setFocusedChannels(view: ViewState, channels: string[]): ViewState {
+  const focused = [...new Set(channels)].filter((c) => view.channels.includes(c)).slice(0, 3);
+  return {
+    ...view,
+    layout: { ...view.layout, mode: 'multi-focus', focused },
+    audio: { mode: 'mix', active: view.audio.active.length ? focused : [] },
+  };
+}
+
+export function toggleFocusedChannel(view: ViewState, login: string): ViewState {
+  if (!view.channels.includes(login)) return view;
+  const focused = focusedChannels(view);
+  if (focused.includes(login)) {
+    if (focused.length <= 1) return view;
+    return setFocusedChannels(
+      view,
+      focused.filter((c) => c !== login),
+    );
+  }
+  if (focused.length >= 3) return view;
+  return setFocusedChannels(view, [...focused, login]);
 }
 
 export function setMain(view: ViewState, login: string): ViewState {
@@ -140,6 +213,10 @@ export function setChat(view: ViewState, chat: Partial<ViewState['chat']>): View
 
 /** Channel order used for layout slots: in focus mode the main stream goes first. */
 export function slotOrder(view: ViewState, visible: string[] = view.channels): string[] {
+  if (view.layout.mode === 'multi-focus') {
+    const focused = focusedChannels(view, visible);
+    return [...focused, ...visible.filter((c) => !focused.includes(c))];
+  }
   const main = mainChannel(view, visible);
   if (view.layout.mode !== 'focus' || !main) return visible;
   return [main, ...visible.filter((c) => c !== main)];
@@ -157,7 +234,13 @@ export function normalize(view: ViewState): ViewState {
   if (hasSingleFocus(view.audio.mode)) active = active.slice(0, 1);
   return {
     ...view,
-    layout: { ...view.layout, main: has(view.layout.main) ? view.layout.main : null },
+    layout: {
+      ...view.layout,
+      main: has(view.layout.main) ? view.layout.main : null,
+      ...(view.layout.focused
+        ? { focused: [...new Set(view.layout.focused)].filter(has).slice(0, 3) }
+        : {}),
+    },
     audio: { ...view.audio, active },
     chat: {
       ...view.chat,

@@ -13,7 +13,7 @@ import type { PlayerStatus } from '@/lib/player/types';
 import type { ViewState } from '@/lib/view/types';
 import { streamVolume } from '@/lib/audio/volumeModel';
 import { kickSlugFor } from '@/lib/kick/liveMerge';
-import { audioLevel, mainChannel } from '@/lib/view/operations';
+import { audioLevel, mainChannel, focusedChannels } from '@/lib/view/operations';
 import { displayedChannels, streamSections } from '@/lib/view/groups';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
@@ -48,8 +48,8 @@ function closeStream(login: string) {
 
 /** The stream that gets the main-stream quality: the big one in focus layout, else the one you hear. */
 const isPrimary = (view: ViewState, login: string, channels: string[]) =>
-  view.layout.mode === 'focus'
-    ? mainChannel(view, channels) === login
+  view.layout.mode !== 'grid'
+    ? focusedChannels(view, channels).includes(login)
     : view.audio.active.includes(login);
 
 export function Viewer() {
@@ -111,6 +111,13 @@ export function Viewer() {
     view.layout.mode === 'focus'
       ? mainChannel(view, shown)
       : (view.audio.active.find((c) => shown.includes(c)) ?? shown[0] ?? null);
+  const focuses = useMemo(
+    () =>
+      new Set(
+        view.layout.mode === 'grid' ? (focused ? [focused] : []) : focusedChannels(view, shown),
+      ),
+    [view, shown, focused],
+  );
   // Who is shown big, for main stream priority (see viewer/volume.ts).
   const setMainStream = useUi((s) => s.setMainStream);
   const mainStream = view.layout.mode === 'focus' ? focused : null;
@@ -120,7 +127,7 @@ export function Viewer() {
   }, [mainStream, setMainStream]);
   const recovery = usePlaybackRecovery({
     channels: view.channels,
-    focused,
+    focused: focuses,
     muted,
     hidden,
     status: playerStatus,
@@ -142,6 +149,9 @@ export function Viewer() {
       options,
     );
     if (recoveryBannerHeight) {
+      result.focuses?.forEach((focus) => {
+        focus.rect = { ...focus.rect, y: focus.rect.y + recoveryBannerHeight };
+      });
       if (result.focused) {
         result.focused.rect = {
           ...result.focused.rect,
@@ -216,7 +226,11 @@ export function Viewer() {
     if ((statusAtClick ?? useUi.getState().playerStatus[login]) !== 'playing') return;
     const store = useViewStore.getState();
     const { view } = store;
-    if (view.layout.mode === 'focus') {
+    if (view.layout.mode === 'multi-focus') {
+      const focused = focusedChannels(view);
+      if (focused.includes(login) || focused.length >= 3) return;
+      store.toggleFocusedChannel(login);
+    } else if (view.layout.mode === 'focus') {
       if (mainChannel(view) === login) return;
       store.setMain(login);
     } else {
@@ -330,21 +344,24 @@ export function Viewer() {
           </div>
         ))}
 
-      {geometry.focused && (
-        <div
-          className={styles.sectionLabel}
-          style={{
-            left: geometry.focused.rect.x,
-            top: geometry.focused.rect.y,
-            width: geometry.focused.rect.width,
-          }}
-          data-testid="focused-section"
-          data-group={geometry.focused.groupId}
-          data-channel={geometry.focused.channel}
-        >
-          Focused · {geometry.focused.groupName} ·{' '}
-          {liveStatus.live.get(geometry.focused.channel)?.displayName ?? geometry.focused.channel}
-        </div>
+      {[...(geometry.focused ? [geometry.focused] : []), ...(geometry.focuses ?? [])].map(
+        (focus) => (
+          <div
+            key={focus.channel}
+            className={styles.sectionLabel}
+            style={{
+              left: focus.rect.x,
+              top: focus.rect.y,
+              width: focus.rect.width,
+            }}
+            data-testid="focused-section"
+            data-group={focus.groupId}
+            data-channel={focus.channel}
+          >
+            Focused · {focus.groupName} ·{' '}
+            {liveStatus.live.get(focus.channel)?.displayName ?? focus.channel}
+          </div>
+        ),
       )}
 
       {renderOrder.map((login) => {
@@ -358,7 +375,7 @@ export function Viewer() {
             kick={kickSlugFor(liveStatus.live.get(login))}
             rect={rect}
             audible={level.focused}
-            main={view.layout.mode === 'focus' && login === focused}
+            main={view.layout.mode !== 'grid' && focuses.has(login)}
             muted={level.muted}
             volumeScale={level.scale * output}
             volume={streamVolume(volumeModel, login)}

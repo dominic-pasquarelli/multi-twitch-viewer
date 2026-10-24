@@ -7,7 +7,7 @@ import {
   type Size,
 } from '@/lib/layout';
 import type { StreamSection } from '@/lib/view/groups';
-import { mainChannel, slotOrder } from '@/lib/view/operations';
+import { mainChannel, slotOrder, focusedChannels } from '@/lib/view/operations';
 import type { ViewState } from '@/lib/view/types';
 
 export const SECTION_LABEL_HEIGHT = 24;
@@ -18,6 +18,8 @@ export interface PositionedSection extends StreamSection {
 
 export interface GroupedLayout {
   sections: PositionedSection[];
+  /** Separate labels for every large stream in multi-focus. */
+  focuses?: NonNullable<GroupedLayout['focused']>[];
   focused?: {
     channel: string;
     groupId: string;
@@ -43,6 +45,8 @@ export function computeGroupedLayout(
   if (!sections.length || size.width <= 0 || size.height <= 0) {
     return { sections: [], tiles: new Map(), order: [], rects: [] };
   }
+  if (view.layout.mode === 'multi-focus') return computeMultiFocus(view, sections, size, options);
+  const mode = view.layout.mode;
   if (view.layout.mode === 'focus' && sections.length > 1)
     return computeGlobalFocus(view, sections, size, options);
   const candidates: Rect[][] = [];
@@ -86,7 +90,7 @@ export function computeGroupedLayout(
       const rect = regions[i]!;
       const channels = slotOrder(view, section.channels);
       const request = {
-        mode: view.layout.mode,
+        mode,
         count: channels.length,
         container: { width: rect.width, height: Math.max(0, rect.height - labelHeight) },
         options,
@@ -131,6 +135,134 @@ export function computeGroupedLayout(
     }
   }
   return best;
+}
+
+/** Equal-size focus tiles, including label space, centered in the available region. */
+function equalFocusGrid(count: number, size: Size, options: LayoutOptions, label: number): Rect[] {
+  if (!count) return [];
+  let best: Rect[] = [];
+  for (let cols = 1; cols <= count; cols++) {
+    const rows = Math.ceil(count / cols);
+    const width = Math.max(
+      0,
+      Math.min(
+        (size.width - (cols - 1) * options.gap) / cols,
+        ((size.height - (rows - 1) * options.gap) / rows - label) * options.aspect,
+      ),
+    );
+    if (best.length && width <= best[0]!.width) continue;
+    const height = width / options.aspect;
+    best = Array.from({ length: count }, (_, i) => {
+      const row = Math.floor(i / cols);
+      const rowCount = Math.min(cols, count - row * cols);
+      return {
+        x:
+          (size.width - rowCount * width - (rowCount - 1) * options.gap) / 2 +
+          (i % cols) * (width + options.gap),
+        y:
+          (size.height - rows * (height + label) - (rows - 1) * options.gap) / 2 +
+          row * (height + label + options.gap) +
+          label,
+        width,
+        height,
+      };
+    });
+  }
+  return best.map((r) => ({
+    ...r,
+    x: Math.round(r.x),
+    y: Math.round(r.y),
+    width: Math.floor(r.width),
+    height: Math.floor(Math.floor(r.width) / options.aspect),
+  }));
+}
+
+/** Two or three peers share the main region; the other groups remain smaller grids. */
+function computeMultiFocus(
+  view: ViewState,
+  sections: StreamSection[],
+  size: Size,
+  options: LayoutOptions,
+): GroupedLayout {
+  const shown = sections.flatMap((s) => s.channels);
+  const focused = focusedChannels(view, shown);
+  const gridView = { ...view, layout: { ...view.layout, mode: 'grid' as const } };
+  if (!focused.length) return computeGroupedLayout(gridView, sections, size, options);
+  const remaining = sections
+    .map((s) => ({ ...s, channels: s.channels.filter((c) => !focused.includes(c)) }))
+    .filter((s) => s.channels.length);
+  const label = view.groups?.length ? SECTION_LABEL_HEIGHT : 0;
+  let best: GroupedLayout | null = null;
+  let bestScore = -Infinity;
+  for (const below of [false, true]) {
+    for (const share of remaining.length ? [0.5, 0.6, 0.7, 0.8, 0.85] : [1]) {
+      const focusSize = {
+        width: below ? size.width : size.width * share,
+        height: below ? size.height * share : size.height,
+      };
+      const region = below
+        ? {
+            x: 0,
+            y: focusSize.height + options.gap,
+            width: size.width,
+            height: size.height - focusSize.height - options.gap,
+          }
+        : {
+            x: focusSize.width + options.gap,
+            y: 0,
+            width: size.width - focusSize.width - options.gap,
+            height: size.height,
+          };
+      const heroes = equalFocusGrid(focused.length, focusSize, options, label);
+      if (heroes.some((r) => r.width <= 0 || r.height <= 0)) continue;
+      const clusters = computeGroupedLayout(gridView, remaining, region, options);
+      if (clusters.tiles.size !== shown.length - focused.length) continue;
+      const tiles = new Map(focused.map((c, i) => [c, heroes[i]!]));
+      const maxSmallWidth = heroes[0]!.width / 1.5;
+      for (const [c, r] of clusters.tiles) {
+        const width = Math.floor(Math.min(r.width, maxSmallWidth, r.height * options.aspect));
+        const height = Math.floor(width / options.aspect);
+        tiles.set(c, {
+          x: region.x + r.x + (r.width - width) / 2,
+          y: region.y + r.y + (r.height - height) / 2,
+          width,
+          height,
+        });
+      }
+      if ([...tiles.values()].some((r) => r.width <= 0 || r.height <= 0)) continue;
+      const mainArea = heroes[0]!.width * heroes[0]!.height;
+      const smallAreas = clusters.order.map((c) => {
+        const r = tiles.get(c)!;
+        return r.width * r.height;
+      });
+      const score = mainArea ** 2 * (smallAreas.length ? Math.min(...smallAreas) : 1);
+      if (score <= bestScore) continue;
+      bestScore = score;
+      const order = [...focused, ...clusters.order];
+      best = {
+        focuses: label
+          ? focused.map((channel, i) => {
+              const group = sections.find((s) => s.channels.includes(channel))!;
+              const r = heroes[i]!;
+              return {
+                channel,
+                groupId: group.id,
+                groupName: group.name,
+                rect: { ...r, y: r.y - label, height: r.height + label },
+              };
+            })
+          : [],
+        sections: clusters.sections.map((s) => ({
+          ...s,
+          rect: { ...s.rect, x: s.rect.x + region.x, y: s.rect.y + region.y },
+        })),
+        tiles,
+        order,
+        rects: order.map((c) => tiles.get(c)!),
+      };
+    }
+  }
+  return best ?? computeGroupedLayout(gridView, sections, size, options);
 }
 
 /** One main video, with intact labeled group grids beside or beneath it. */

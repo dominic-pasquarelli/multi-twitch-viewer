@@ -38,8 +38,15 @@ export function sanitizeView(input: unknown): ViewState | null {
       ...(Array.isArray(input.groups) ? { groups: sanitizeGroups(input.groups, channels) } : {}),
       ...(typeof input.activeGroup === 'string' ? { activeGroup: input.activeGroup } : {}),
       layout: {
-        mode: layout.mode === 'focus' ? 'focus' : 'grid',
+        mode: layout.mode === 'focus' || layout.mode === 'multi-focus' ? layout.mode : 'grid',
         main,
+        ...(Array.isArray(layout.focused)
+          ? {
+              focused: logins(layout.focused)
+                .filter((c) => channels.includes(c))
+                .slice(0, 3),
+            }
+          : {}),
         mainScale: typeof scale === 'number' && scale > 0 && scale <= 1 ? scale : 'auto',
       },
       audio: {

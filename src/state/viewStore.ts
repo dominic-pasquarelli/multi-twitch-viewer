@@ -51,6 +51,8 @@ interface ViewStore {
 
   setLayoutMode(mode: LayoutMode): void;
   setMain(login: string): void;
+  setFocusedChannels(logins: string[]): void;
+  toggleFocusedChannel(login: string): void;
   setMainScale(scale: MainScale): void;
   createGroup(name: string): string;
   renameGroup(id: string, name: string): void;
@@ -86,7 +88,13 @@ export const useViewStore = create<ViewStore>()(
           history: undoable
             ? [...get().history, { view: before, home: get().home }].slice(-HISTORY_LIMIT)
             : get().history,
-          mutedFrom: after.audio.active.length ? null : get().mutedFrom,
+          mutedFrom: after.audio.active.length
+            ? null
+            : get().mutedFrom &&
+                after.layout.mode === 'multi-focus' &&
+                after.layout.focused?.join(',') !== before.layout.focused?.join(',')
+              ? ops.focusedChannels(after)
+              : get().mutedFrom,
           // An empty view starts over as a temporary one.
           pinned: after.channels.length ? get().pinned : false,
         });
@@ -159,6 +167,14 @@ export const useViewStore = create<ViewStore>()(
         setLayoutMode: (mode) =>
           apply((v) => {
             const next = ops.setLayoutMode(v, mode);
+            if (mode === 'multi-focus') {
+              const visible = groups.displayedChannels(v);
+              const focused = ops.focusedChannels(next, visible);
+              return ops.setFocusedChannels(
+                v,
+                [...new Set([...focused, ...visible])].slice(0, Math.max(2, focused.length)),
+              );
+            }
             const main = ops.mainChannel(next, groups.displayedChannels(next));
             return mode === 'focus' &&
               main &&
@@ -167,6 +183,8 @@ export const useViewStore = create<ViewStore>()(
               ? ops.focusAudio(next, main)
               : next;
           }),
+        setFocusedChannels: (logins) => apply((v) => ops.setFocusedChannels(v, logins)),
+        toggleFocusedChannel: (login) => apply((v) => ops.toggleFocusedChannel(v, login)),
         setMain: (login) =>
           apply((v) => {
             const next = ops.setMain(v, login);
@@ -195,7 +213,13 @@ export const useViewStore = create<ViewStore>()(
           }
           const restore = (mutedFrom ?? []).filter((c) => view.channels.includes(c));
           const fallback = ops.mainChannel(view, groups.displayedChannels(view));
-          const active = restore.length ? restore : fallback ? [fallback] : [];
+          const active = restore.length
+            ? restore
+            : view.layout.mode === 'multi-focus'
+              ? ops.focusedChannels(view, groups.displayedChannels(view))
+              : fallback
+                ? [fallback]
+                : [];
           set({
             view: ops.normalize({ ...view, audio: { ...view.audio, active } }),
             mutedFrom: null,

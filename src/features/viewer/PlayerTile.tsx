@@ -23,7 +23,7 @@ export interface PlayerTileProps {
   rect: Rect;
   /** The stream you're focused on (full volume, highlighted). */
   audible: boolean;
-  /** The one large visible video in focus mode. */
+  /** A large visible video in either focus mode. */
   main: boolean;
   /** Muted entirely (solo mode, or everything muted). */
   muted: boolean;

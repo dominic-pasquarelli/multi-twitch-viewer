@@ -7,7 +7,7 @@ import { playbackRecovery, PlayerReloadBudget } from './playbackRecovery';
 
 export interface PlaybackRecoveryOptions {
   channels: readonly string[];
-  focused: string | null;
+  focused: ReadonlySet<string>;
   muted: ReadonlySet<string>;
   hidden?: ReadonlySet<string>;
   bandwidthSaving?: boolean;
@@ -60,7 +60,7 @@ export function usePlaybackRecovery({
         const entry = playerRegistry.get(login);
         return {
           login,
-          focused: login === focused,
+          focused: focused.has(login),
           muted: muted.has(login) || (entry?.adapter.getVolume() ?? 1) === 0,
           hidden: hidden?.has(login) ?? false,
           status: status[login],

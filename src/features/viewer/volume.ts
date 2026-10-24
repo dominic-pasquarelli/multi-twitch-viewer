@@ -6,6 +6,7 @@ import {
   type VolumeModel,
 } from '@/lib/audio/volumeModel';
 import type { ViewState } from '@/lib/view/types';
+import { focusedChannels } from '@/lib/view/operations';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
 import { useUi } from '@/state/uiStore';
@@ -71,6 +72,15 @@ export function setStreamVolume(login: string, volume: number): void {
 /** A mixer row: this stream's level in the mix (its balance in consistent mode). */
 export function setStreamMix(login: string, volume: number): void {
   useChannelPrefs.getState().applyVolume(setMixVolume(model(), login, volume));
+}
+
+/** Equal starting levels with room for two or three simultaneous streams. */
+export function balanceFocusedAudio(): void {
+  const view = useViewStore.getState().view;
+  const channels = focusedChannels(view);
+  const m = model();
+  const volume = (m.consistent ? m.master : 1) / Math.max(2, channels.length);
+  channels.forEach((login) => setStreamMix(login, volume));
 }
 
 export function setMaster(volume: number): void {
