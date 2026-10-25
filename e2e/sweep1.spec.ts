@@ -89,7 +89,7 @@ test('hover controls overlay full-size videos and focus changes preserve an adju
     await expect(tile(page, login).getByTestId('stream-controls')).toBeHidden();
 });
 
-test('hover outlines clear outside the viewer and volume controls remain usable while focused', async ({
+test('hover controls clear outside the viewer while muted outlines persist and volume stays usable', async ({
   page,
 }) => {
   await page.goto('/#/pixelpaladin/novastrike/cozycartographer?layout=focus');
@@ -101,7 +101,9 @@ test('hover outlines clear outside the viewer and volume controls remain usable 
   await expect(stream).not.toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
   await page.getByTestId('add-channel').hover();
   await expect(controls).toBeHidden();
-  await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await expect(stream).toHaveAttribute('data-hovered', 'false');
+  await expect(stream).toHaveAttribute('data-silent', 'true');
+  await expect(stream).toHaveCSS('outline-style', 'dashed');
 
   await stream.hover();
   await stream.getByRole('slider').focus();

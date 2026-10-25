@@ -186,3 +186,86 @@ test('imports favorites and keeps the DJ visible across isolated groups', async 
   await expect(player(page, 'lunarlatte')).toHaveAttribute('data-muted', 'false');
   await expect(player(page, 'lunarlatte')).toHaveAttribute('data-mount-check', 'original');
 });
+
+test('DJ picker suggests live and offline music, searches follows and preserves chosen order', async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'mtv:channel-prefs',
+      JSON.stringify({ version: 1, state: { favorites: ['pixelpaladin'] } }),
+    ),
+  );
+  await page.goto('/#/pixelpaladin/novastrike');
+  await expect(page.getByTestId('music-button')).toBeVisible();
+  await page.evaluate(() => {
+    const mock = (
+      window as unknown as { mtvMock: { setCategory(login: string, category: string): void } }
+    ).mtvMock;
+    mock.setCategory('synthwavesam', 'Music');
+    mock.setCategory('holoharper', 'DJs');
+  });
+  await page.getByRole('button', { name: 'Refresh now', exact: true }).click();
+  await page.getByTestId('music-button').click();
+  const choice = (login: string) =>
+    page.locator(`[data-testid=music-choice][data-channel=${login}]`);
+  await expect(choice('synthwavesam')).toContainText('Live in Music');
+  await expect(choice('holoharper')).toContainText('Last category: DJs');
+  await expect(choice('pixelpaladin')).toHaveCount(0);
+  await choice('holoharper').getByRole('button').click();
+  await choice('synthwavesam').getByRole('button').click();
+  await expect(choice('synthwavesam').getByRole('button')).toBeDisabled();
+  await expect(page.getByTestId('music-row')).toHaveCount(2);
+  await expect(page.getByTestId('music-row').first()).toHaveAttribute('data-channel', 'holoharper');
+  await expect(page.getByTestId('music-status')).toHaveText('Music is off.');
+  await dialog(page).getByRole('button', { name: 'All followed', exact: true }).click();
+  await dialog(page).getByRole('searchbox').fill('  nova  ');
+  await expect(page.getByTestId('music-choice')).toHaveCount(1);
+  await choice('novastrike').getByRole('button').click();
+  await dialog(page).getByRole('searchbox').fill('');
+  await dialog(page).getByRole('button', { name: 'Followed favorites', exact: true }).click();
+  await expect(page.getByTestId('music-choice')).toHaveCount(1);
+  await expect(choice('pixelpaladin')).toBeVisible();
+  await dialog(page).getByRole('button', { name: 'Done', exact: true }).click();
+  await page.reload(); // Categories return to the demo defaults; local observations survive.
+  await page.getByTestId('music-button').click();
+  await expect(choice('synthwavesam')).toContainText('Previously seen in Music');
+  await expect(choice('holoharper')).toContainText('Previously seen in DJs');
+  await expect(page.getByTestId('music-row')).toHaveCount(3);
+  await expect(page.getByTestId('music-row').first()).toHaveAttribute('data-channel', 'holoharper');
+  await page.setViewportSize({ width: 640, height: 800 });
+  await choice('holoharper').scrollIntoViewIfNeeded();
+  const bounds = (await dialog(page).boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(640);
+  expect(await dialog(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+});
+
+test('muted tiles stay recognizable without hover and update for zero volume and app output', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/novastrike');
+  await expect(tile(page, 'novastrike')).toHaveAttribute('data-silent', 'true');
+  await expect(tile(page, 'novastrike').getByTestId('stream-muted-badge')).toBeVisible();
+  await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-silent', 'false');
+  await player(page, 'pixelpaladin').evaluate((el) =>
+    el.setAttribute('data-mount-check', 'original'),
+  );
+  await page.getByTestId('immersive-mix-toggle').click();
+  const overlay = tile(page, 'pixelpaladin').getByTestId('stream-mix-overlay');
+  await overlay.getByRole('slider').fill('0');
+  await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-silent', 'true');
+  await expect(tile(page, 'pixelpaladin').getByTestId('stream-muted-badge')).toHaveAttribute(
+    'aria-label',
+    'Stream volume is 0%',
+  );
+  await overlay.getByRole('slider').fill('1');
+  await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-silent', 'false');
+  await page.getByRole('slider', { name: 'App volume', exact: true }).fill('0');
+  await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-silent', 'true');
+  await page.getByRole('slider', { name: 'App volume', exact: true }).fill('100');
+  await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-silent', 'false');
+  await page.locator('body').press('m');
+  await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-silent', 'true');
+  await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-mount-check', 'original');
+});

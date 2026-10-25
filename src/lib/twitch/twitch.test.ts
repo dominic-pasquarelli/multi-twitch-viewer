@@ -141,6 +141,24 @@ describe('Helix API', () => {
     expect(fetchMock.mock.calls[0]![0]).toContain('user_login=a&user_login=b');
   });
 
+  it('loads current/last channel categories in batches of 100 and skips empty lookups', async () => {
+    const { api, fetchMock } = setup([
+      json({ data: [{ broadcaster_id: '1', game_name: 'Music' }] }),
+      json({ data: [{ broadcaster_id: '101', game_name: 'DJs' }] }),
+    ]);
+    await expect(api.getChannelInformation([])).resolves.toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    const ids = Array.from({ length: 101 }, (_, i) => String(i + 1));
+    await expect(api.getChannelInformation([...ids, '1'])).resolves.toEqual([
+      { id: '1', gameName: 'Music' },
+      { id: '101', gameName: 'DJs' },
+    ]);
+    const urls = fetchMock.mock.calls.map(([url]) => new URL(url));
+    expect(urls[0]!.pathname).toBe('/helix/channels');
+    expect(urls[0]!.searchParams.getAll('broadcaster_id')).toEqual(ids.slice(0, 100));
+    expect(urls[1]!.searchParams.getAll('broadcaster_id')).toEqual(['101']);
+  });
+
   it('searches category names and maps category artwork', async () => {
     const { api, fetchMock } = setup([
       json({ data: [{ id: '42', name: 'Just Chatting', box_art_url: 'box-art' }] }),

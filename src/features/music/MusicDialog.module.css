@@ -88,3 +88,31 @@
   display: block;
   font-weight: 400;
 }
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+.order {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.order h3 {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  font-size: 14px;
+}
+.order h3 small {
+  font-weight: 400;
+}
+@media (max-width: 760px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

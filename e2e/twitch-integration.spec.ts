@@ -390,7 +390,9 @@ test('controls follow the pointer into and out of cross-origin videos without in
   await page.getByTestId('add-channel').hover();
   await page.getByTestId('add-channel').focus();
   await expect(controls).toBeHidden();
-  await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await expect(stream).toHaveAttribute('data-hovered', 'false');
+  await expect(stream).toHaveAttribute('data-silent', 'true');
+  await expect(stream).toHaveCSS('outline-style', 'dashed');
 
   // Jump directly from one video to the other, without entering parent UI.
   const alphaRect = (await page.locator('iframe[data-fake-twitch=alpha]').boundingBox())!;
@@ -404,13 +406,17 @@ test('controls follow the pointer into and out of cross-origin videos without in
   await expect(controls).toBeVisible();
   await page.getByRole('heading', { name: 'Followed', exact: true }).hover();
   await expect(controls).toBeHidden();
-  await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await expect(stream).toHaveAttribute('data-hovered', 'false');
+  await expect(stream).toHaveAttribute('data-silent', 'true');
+  await expect(stream).toHaveCSS('outline-style', 'dashed');
   await enterVideo();
   await expect(controls).toBeVisible();
   await page.mouse.move(-10, -10);
   await expect(stream).toHaveAttribute('data-hovered', 'false');
   await expect(controls).toBeHidden();
-  await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await expect(stream).toHaveAttribute('data-hovered', 'false');
+  await expect(stream).toHaveAttribute('data-silent', 'true');
+  await expect(stream).toHaveCSS('outline-style', 'dashed');
 });
 
 test('a stream selected with a click keeps playing when Twitch pauses it on that click', async ({
@@ -567,4 +573,45 @@ test("the Mixer stays open while you use Twitch's own volume slider, and follows
   await expect(mixer).toBeHidden();
   await tile.hover({ position: low });
   await expect(tile.getByTestId('stream-volume')).toHaveText('20%');
+});
+
+test('music picker uses offline Helix categories and remains usable when category lookup fails', async ({
+  page,
+}) => {
+  const calls: string[] = [];
+  await stubTwitch(page, calls);
+  let failed = true;
+  const requested: string[][] = [];
+  await page.route('https://api.twitch.tv/helix/channels?**', (route) => {
+    if (route.request().method() === 'OPTIONS')
+      return route.fulfill({ status: 204, headers: cors });
+    requested.push(new URL(route.request().url()).searchParams.getAll('broadcaster_id'));
+    return failed
+      ? route.fulfill({ status: 503, headers: cors, json: { message: 'Unavailable' } })
+      : route.fulfill({
+          headers: cors,
+          json: { data: [{ broadcaster_id: '12', game_name: 'DJs' }] },
+        });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByTestId('music-button').click();
+  const music = page.getByRole('dialog', { name: 'Music', exact: true });
+  await music.getByRole('button', { name: 'All followed', exact: true }).click();
+  await expect(page.getByTestId('music-choice')).toHaveCount(3);
+  await music.getByRole('button', { name: 'Add Alpha to music', exact: true }).click();
+  await expect(page.getByTestId('music-row')).toHaveCount(1);
+  await expect(
+    music.getByRole('button', { name: 'Retry channel lookup', exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  failed = false;
+  await music.getByRole('button', { name: 'Retry channel lookup', exact: true }).click();
+  await music.getByRole('button', { name: 'Music & DJs', exact: true }).click();
+  const charlie = page.locator('[data-testid=music-choice][data-channel=charlie]');
+  await expect(charlie).toContainText('Last category: DJs');
+  await expect(charlie).toContainText('Offline');
+  await charlie.getByRole('button').click();
+  await expect(page.getByTestId('music-row')).toHaveCount(2);
+  expect(requested[0]).toEqual(['10', '11', '12']);
+  expect(calls.some((c) => c.includes('scope=user:read:follows'))).toBe(true);
 });

@@ -1,6 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Play } from 'lucide-react';
+import { Play, VolumeX } from 'lucide-react';
+import { silenceReason } from '@/lib/audio/silence';
 import { useServices } from '@/app/servicesContext';
 import type { Rect } from '@/lib/layout';
 import { PlayerController } from '@/lib/player/PlayerController';
@@ -68,6 +69,12 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
   const services = useServices();
   const playerFactory = kick ? services.kickPlayerFactory : services.playerFactory;
   const muted = playerMuted(props.muted, audible, playerFactory);
+  const silence = silenceReason(
+    muted,
+    volume,
+    volumeScale,
+    playerFactory.capabilities?.volume !== false,
+  );
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<PlayerController | null>(null);
   const reloadKey = useUi((s) => s.reloadRequests[login] ?? 0);
@@ -281,6 +288,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       data-testid="player-tile"
       data-channel={login}
       data-audible={audible}
+      data-silent={!!silence}
       data-main={props.main}
       data-selected={props.selected}
       data-hovered={hovered}
@@ -288,7 +296,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       data-arranging={props.arranging}
       aria-hidden={props.hidden || undefined}
       tabIndex={props.hidden ? -1 : 0}
-      aria-label={`${login} stream`}
+      aria-label={`${login} stream${silence ? ` · ${silence}` : ''}`}
       onFocus={() => props.onSelect(login)}
       draggable={props.arranging && !props.hidden}
       onDragStart={(e) => {
@@ -343,6 +351,12 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
 
       {!hovered && !props.hidden && !props.arranging && (
         <div className={styles.hoverEntry} data-player-entry aria-hidden="true" />
+      )}
+
+      {silence && (
+        <span className={styles.silentBadge} data-testid="stream-muted-badge" aria-label={silence}>
+          <VolumeX size={13} aria-hidden="true" /> Muted
+        </span>
       )}
 
       {props.arranging && !props.hidden && (

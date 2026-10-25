@@ -30,7 +30,7 @@ export function useFollowedLive() {
   return useMemo(() => ({ ...query, data }) as typeof query, [query, data]);
 }
 
-function useTwitchFollowedLive() {
+export function useTwitchFollowedLive() {
   const { api } = useServices();
   const userId = useAuth((s) => s.user?.id);
   const refreshSeconds = useSettings((s) => s.refreshSeconds);

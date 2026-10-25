@@ -1,6 +1,7 @@
 import { Crown, Music2, Volume2, VolumeX } from 'lucide-react';
 import { useServices } from '@/app/servicesContext';
 import { mixPriorities, outputPercent } from '@/lib/audio/mixPreferences';
+import { silenceReason } from '@/lib/audio/silence';
 import { fixedMixRole } from '@/lib/audio/volumeModel';
 import { audioLevel } from '@/lib/view/operations';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
@@ -46,6 +47,7 @@ export function StreamMixOverlay({
   const selected = prefs.enabled && priorities.includes(login);
   const supported =
     (kick ? services.kickPlayerFactory : services.playerFactory).capabilities?.volume !== false;
+  const silence = silenceReason(level.muted, volume, level.scale * output, supported);
   const paused = status === 'paused' || status === 'blocked' || status === 'offline';
   const effective = outputPercent(volume, level.scale, output, level.muted || paused);
   const legacyMain = !role && m.priorityMain === login;
@@ -75,7 +77,7 @@ export function StreamMixOverlay({
       data-testid="stream-mix-overlay"
       data-channel={login}
       data-role={role ?? 'individual'}
-      data-muted={level.muted}
+      data-muted={!!silence}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.stopPropagation()}

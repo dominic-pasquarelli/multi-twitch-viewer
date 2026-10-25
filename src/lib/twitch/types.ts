@@ -52,6 +52,12 @@ export interface TwitchCategory {
   boxArtUrl: string;
 }
 
+/** Current or last selected category, also available for offline channels. */
+export interface ChannelInformation {
+  id: string;
+  gameName: string;
+}
+
 export interface CategoryStreamsPage {
   streams: LiveStream[];
   cursor?: string;
@@ -65,6 +71,7 @@ export interface TwitchApi {
   getMe(): Promise<TwitchUser>;
   getFollowedStreams(userId: string): Promise<LiveStream[]>;
   getFollowedChannels(userId: string): Promise<FollowedChannel[]>;
+  getChannelInformation(ids: string[]): Promise<ChannelInformation[]>;
   getUsersByIds(ids: string[]): Promise<TwitchUser[]>;
   getUsersByLogins(logins: string[]): Promise<TwitchUser[]>;
   getStreamsByLogins(logins: string[]): Promise<LiveStream[]>;

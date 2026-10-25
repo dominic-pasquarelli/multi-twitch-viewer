@@ -27,7 +27,12 @@ channels are live, and watch several streams at once with layouts that actually 
     never reload when they move.
   - Offline channels step aside and give their space to live ones, then come back when they go live.
 - **Music / DJ priority**: open the music-note button in the top bar to add an ordered list of
-  preferred DJs (or import your favorites). **Automatic** plays the first live channel, switches
+  preferred DJs. **Find your DJs** offers a searchable selector for followed channels, with
+  **Music & DJs**, **All followed** and **Followed favorites** filters. Add choices one at a time;
+  names/links and bulk favorite import are still available. Suggestions distinguish live Music/DJs,
+  current or last selected categories for offline channels, and categories previously seen by the
+  app on this device (not a complete streaming history). Observations are account-scoped; category
+  lookups are cached for ten minutes and need no extra Twitch permissions. **Automatic** plays the first live channel, switches
   to a higher-priority DJ when they go live, and falls back when the current DJ goes offline.
   Use the up/down arrows to change priority, or **Pin as music** on a stream to override the list.
   Music has its own volume and keeps playing while visual focus, presets and group tabs change.
@@ -85,6 +90,10 @@ channels are live, and watch several streams at once with layouts that actually 
     In the focus layout the main stream plays at the **main level** (100% unless you move its
     slider) while the others keep their own levels: a small stream set to 20% plays at 100% while
     it's the main one and goes back to 20% after. Turn this off in the Mixer or Settings → Audio.
+  - **Muted indicators**: silent tiles have an amber dashed border and a persistent **Muted**
+    badge, without hovering or enabling Mix. This includes explicit mutes, 0% stream levels and
+    0% App volume. Quiet streams keep their normal appearance; unsupported browser Kick volume
+    adjustments are not presented as silence. Video and native player controls stay usable.
   - **Immersive mix** (overlay button beside the Mixer) keeps a compact slider, mute button,
     priority crown and percentage over every visible stream. It also works with app fullscreen.
     Each card shows its level and the output after App volume; muted streams stay muted when

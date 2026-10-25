@@ -29,6 +29,7 @@ import { GroupBar } from '@/features/groups/GroupBar';
 import styles from './App.module.css';
 import { MusicDialog } from '@/features/music/MusicDialog';
 import { useMusicStream } from '@/features/music/useMusic';
+import { useRememberMusicCategories } from '@/features/music/useMusicDiscovery';
 
 export function App() {
   const clientId = useClientId();
@@ -41,6 +42,7 @@ export function App() {
   useGoLiveAlerts();
   useFavoritesHome();
   useMusicStream();
+  useRememberMusicCategories();
   useEffect(() => installAudioUnlock(), []);
   useEffect(
     () => desktop?.onBackgroundChange((hidden) => useUi.getState().setBackgrounded(hidden)),
