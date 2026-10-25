@@ -1,0 +1,73 @@
+.overlay {
+  position: absolute;
+  z-index: 4;
+  bottom: 40px;
+  left: 8px;
+  right: 8px;
+  max-width: 380px;
+  margin-inline: auto;
+  padding: 5px 8px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 8px;
+  background: rgb(17 18 24 / 0.86);
+  color: #fff;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.25);
+  container-type: inline-size;
+}
+.label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 0 2px 2px;
+}
+.label > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.role {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #d4baff;
+  white-space: nowrap;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.controls input {
+  flex: 1;
+  width: 0;
+  min-width: 30px;
+  accent-color: #b78bfa;
+}
+.percent {
+  width: 35px;
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.output {
+  width: 52px;
+  font-size: 10px;
+  color: #c6c5cf;
+  text-align: right;
+  white-space: nowrap;
+}
+.overlay[data-muted='true'] .percent {
+  color: #aaa9b5;
+}
+@container (max-width: 250px) {
+  .output {
+    display: none;
+  }
+  .label > span:first-child {
+    display: none;
+  }
+}

@@ -26,6 +26,7 @@ import { IconButton } from '@/ui/Button';
 import { LoginButton } from '../auth/LoginPrompt';
 import { HomeButton } from '../favorites/HomeButton';
 import { Mixer } from '../mixer/Mixer';
+import { ImmersiveMixButton } from '../mixer/MixSettings';
 import { OutputVolume } from '../mixer/OutputVolume';
 import { PresetsMenu } from '../presets/PresetsMenu';
 import { pauseAll, playAll } from '../viewer/playbackActions';
@@ -33,6 +34,9 @@ import { balanceFocusedAudio } from '../viewer/volume';
 import { AddChannelBox } from './AddChannelBox';
 import { toggleFullscreen } from './fullscreen';
 import styles from './TopBar.module.css';
+import { MusicButton } from '../music/MusicDialog';
+import { usePlaybackView } from '../music/useMusic';
+import { useMusicStore } from '@/state/musicStore';
 
 const AUDIO_MODES: { mode: AudioMode; label: string; help: string }[] = [
   { mode: 'solo', label: 'Solo', help: 'Solo: hear one stream; the others are muted.' },
@@ -47,16 +51,19 @@ const AUDIO_MODES: { mode: AudioMode; label: string; help: string }[] = [
 export function TopBar() {
   const view = useViewStore((s) => s.view);
   const store = useViewStore.getState();
+  const playback = usePlaybackView();
+  const musicEnabled = useMusicStore((s) => s.mode !== 'off');
+  const musicMuted = useMusicStore((s) => s.muted);
   const fullscreen = useUi((s) => s.fullscreen);
   const arranging = useUi((s) => s.arranging);
   const openDialog = useUi((s) => s.openDialog);
   const { user, status } = useAuth();
   const mode = view.layout.mode;
   const scale = view.layout.mainScale;
-  const muted = view.audio.active.length === 0;
+  const muted = playback.audio.active.length === 0 && (!musicEnabled || musicMuted);
   const stopped = useUi(
     (s) =>
-      displayedChannels(view).filter(
+      displayedChannels(playback).filter(
         (login) => s.playerStatus[login] === 'paused' || s.playerStatus[login] === 'blocked',
       ).length,
   );
@@ -142,10 +149,12 @@ export function TopBar() {
           icon={muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
           active={!muted}
           onClick={() => store.toggleMuteAll()}
-          disabled={!view.channels.length}
+          disabled={!playback.channels.length && !musicEnabled}
         />
         <OutputVolume />
+        <ImmersiveMixButton />
         <Mixer />
+        <MusicButton />
       </div>
 
       <div className={styles.actions}>
@@ -155,7 +164,7 @@ export function TopBar() {
           icon={<Move size={16} />}
           active={arranging}
           onClick={() => useUi.getState().setArranging(!arranging)}
-          disabled={!view.channels.length}
+          disabled={!playback.channels.length}
           data-testid="arrange-toggle"
         />
         <IconButton
@@ -164,7 +173,7 @@ export function TopBar() {
           icon={<Play size={16} />}
           active={stopped > 0}
           onClick={playAll}
-          disabled={!view.channels.length}
+          disabled={!playback.channels.length && !musicEnabled}
           data-testid="play-all"
         />
         <IconButton
@@ -172,7 +181,7 @@ export function TopBar() {
           label="Pause all"
           icon={<Pause size={16} />}
           onClick={pauseAll}
-          disabled={!view.channels.length}
+          disabled={!playback.channels.length && !musicEnabled}
           data-testid="pause-all"
         />
         <IconButton
@@ -180,13 +189,15 @@ export function TopBar() {
           label="Clear all streams"
           icon={<Trash2 size={16} />}
           onClick={() => {
-            const n = view.channels.length;
+            const n = playback.channels.length;
             store.clear();
             toast(`Cleared ${n} stream${n === 1 ? '' : 's'}`, {
-              action: { label: 'Undo', run: () => useViewStore.getState().undo() },
+              action: !musicEnabled
+                ? { label: 'Undo', run: () => useViewStore.getState().undo() }
+                : undefined,
             });
           }}
-          disabled={!view.channels.length}
+          disabled={!playback.channels.length && !musicEnabled}
           data-testid="clear-all"
         />
       </div>

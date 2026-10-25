@@ -24,6 +24,7 @@ src/
 | `view/`        | The "what I'm watching" model (`ViewState`) and pure operations: add, remove, swap, audio focus…     | Adding an operation + test; stores call it.                         |
 |                | `favoritesHome.ts`: which live favorites join the Favorites view and which streams may leave it.     |                                                                     |
 | `audio/`       | Volume model: per-channel volumes, or a master volume with per-channel balance; main stream level.   | Add a mode in `volumeModel.ts` + tests.                             |
+| `music/`       | Validated DJ preferences, ordered live selection, and a non-persisted playback projection.           | Extend `music.ts` + tests.                                          |
 | `history/`     | Log of channels watched without following them (newest first, capped, validated on load).            |                                                                     |
 | `presets/`     | Preset type, export/import file format, validation, merging.                                         | Bump `EXPORT_VERSION` and migrate in `sanitizePreset`.              |
 | `twitch/`      | `TwitchApi` interface, Helix client (auth headers, pagination, 401/429), OAuth helpers, mock API.    | Implement `TwitchApi` (e.g. a caching or proxy variant).            |
@@ -36,14 +37,16 @@ src/
 
 ### `state/`: stores
 
-| Store                   | Persisted as    | Contents                                                                                                |
-| ----------------------- | --------------- | ------------------------------------------------------------------------------------------------------- |
-| `viewStore`             | `session`       | Current `ViewState` (last session), kept/temporary and Favorites-view flags, undo history (memory only) |
-| `presetsStore`          | `presets`       | Saved presets                                                                                           |
-| `settingsStore`         | `settings`      | Preferences (gap, audio behaviour, quality, Client ID, Kick app credentials…)                           |
-| `channelPrefsStore`     | `channel-prefs` | Per-channel volume, favorites, app output volume, Kick links                                            |
-| `authStore`             | `auth`          | Twitch token + user                                                                                     |
-| `uiStore`, `toastStore` | (not saved)     | Open dialogs, fullscreen, player status, toasts                                                         |
+| Store                   | Persisted as    | Contents                                                                                                                               |
+| ----------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `viewStore`             | `session`       | Current `ViewState` (last session), kept/temporary and Favorites-view flags, undo history (memory only)                                |
+| `presetsStore`          | `presets`       | Saved presets                                                                                                                          |
+| `settingsStore`         | `settings`      | Preferences (gap, audio behaviour, quality, Client ID, Kick app credentials…)                                                          |
+| `channelPrefsStore`     | `channel-prefs` | Per-channel volume, favorites, app output volume, Kick links                                                                           |
+| `mixStore`              | `mix`           | Immersive overlay, fixed priority/background levels and automatic/manual audio priority preferences                                    |
+| `musicStore`            | `music`         | DJ priority, off/auto/pinned mode, independent volume/mute and mix preference; current automatic DJ and Pause all hold are memory only |
+| `authStore`             | `auth`          | Twitch token + user                                                                                                                    |
+| `uiStore`, `toastStore` | (not saved)     | Open dialogs, fullscreen, player status, toasts                                                                                        |
 
 Persisted data is re-validated on load (`sanitizeView`, `sanitizePreset`), so a corrupted or
 old entry falls back to defaults instead of crashing the app. All keys are prefixed `mtv:`.
@@ -140,6 +143,16 @@ Behaviour notes:
   `mainLevel`: that stream plays at the main level, and setting its volume anywhere (hover
   slider, Mixer, arrow keys, Twitch's own slider) sets the main level instead of its own, which
   it gets back when another stream is main.
+- **Immersive Mix uses the same volume model as every other control.** `mixStore` persists
+  validated overlay/role preferences under `mtv:mix`. `mixPriorities` chooses up to three visible
+  videos from visual focus or a manual list, excludes the current DJ, and does not use mute state.
+  `uiStore.visibleChannels` carries the Viewer's group/offline-filtered surface. In Mix only,
+  fixed priority/background levels override normal per-channel/consistent/main levels without
+  overwriting them; music keeps its separate level. Overlay, Mixer, hover, keyboard and native
+  player changes route through `setStreamMix`/`setStreamVolume`. Shared-role keyboard adjustments
+  are applied once per role, not once per member. The compact overlay leaves the iframe mounted
+  and its native controls interactive, stops click/context-menu propagation, and reports intended
+  output after mute/playback/app-volume scaling. Fixed levels are percentages, not an audio meter.
 - **App volume is applied last.** The output level multiplies each tile's duck scale before it
   reaches the player, and is divided back out of volume changes made with Twitch's own slider, so
   per-channel volumes and the mix are unchanged.
@@ -153,6 +166,14 @@ Behaviour notes:
   to the original Focus mode. The Multi focus button and Mixer's Equal levels action use
   `balanceFocusedAudio`; saved sessions retain their adjusted levels. Share links carry
   `layout=multi-focus&focus=channel1,channel2` but do not share volume preferences.
+- **Music is projected into playback, not saved into the watched view.** `useMusicStream` uses
+  confirmed `useStreamsFor` results to select the highest-ranked live DJ; errors and placeholder
+  data preserve the current selection. `withMusic` deduplicates an existing watched player or
+  appends one runtime tile, keeps it in isolated groups and suppresses inactive DJs (including in
+  Duck). Viewer, Mixer, audio hotkeys and global playback controls use this projection. Base view
+  state still owns presets, share links and chat following. The music level overrides video master
+  and main-priority levels, then App volume applies normally. Music mute survives automatic
+  switches, and Pause all freezes selection to prevent a replacement player starting unexpectedly.
 - **Groups keep player DOM stable.** Optional groups and the selected tab are part of `ViewState`
   and validated when sessions/presets load. Grid computes separate group sections. Focus places
   one global main video ahead of the remaining labeled clusters; isolated tabs focus within their

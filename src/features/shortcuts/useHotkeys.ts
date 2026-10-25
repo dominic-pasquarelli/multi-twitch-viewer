@@ -7,6 +7,7 @@ import { useViewStore } from '@/state/viewStore';
 import { openHome } from '../favorites/useFavoritesHome';
 import { toggleFullscreen } from '../topbar/fullscreen';
 import { nudgeHeard, VOLUME_STEP } from '../viewer/volume';
+import { getPlaybackView } from '../music/useMusic';
 
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
@@ -22,7 +23,7 @@ export function useStreamHotkeys(visible: string[]): void {
       const digit = /^Digit([1-9])$/.exec(e.code)?.[1];
       if (!digit) return;
       const store = useViewStore.getState();
-      const login = groupedSlotOrder(store.view, visible)[Number(digit) - 1];
+      const login = groupedSlotOrder(getPlaybackView(), visible)[Number(digit) - 1];
       if (!login) return;
       if (e.shiftKey) {
         if (store.view.audio.mode !== 'mix') store.setAudioMode('mix');
@@ -39,7 +40,11 @@ export function useStreamHotkeys(visible: string[]): void {
 export function useHotkeys(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || isTyping(e.target) || e.altKey) return;
+      const rangeMute =
+        e.target instanceof HTMLInputElement &&
+        e.target.type === 'range' &&
+        e.key.toLowerCase() === 'm';
+      if (e.defaultPrevented || (isTyping(e.target) && !rangeMute) || e.altKey) return;
       const view = useViewStore.getState();
       const ui = useUi.getState();
 
@@ -61,9 +66,15 @@ export function useHotkeys(): void {
 
       const actions: Record<string, () => void> = {
         arrowup: () =>
-          nudgeHeard(displayedChannels(view.view, view.view.audio.active), VOLUME_STEP),
+          nudgeHeard(
+            displayedChannels(getPlaybackView(), getPlaybackView().audio.active),
+            VOLUME_STEP,
+          ),
         arrowdown: () =>
-          nudgeHeard(displayedChannels(view.view, view.view.audio.active), -VOLUME_STEP),
+          nudgeHeard(
+            displayedChannels(getPlaybackView(), getPlaybackView().audio.active),
+            -VOLUME_STEP,
+          ),
         m: () => view.toggleMuteAll(),
         l: () => view.setLayoutMode(view.view.layout.mode === 'grid' ? 'focus' : 'grid'),
         '[': () => step(-0.05),

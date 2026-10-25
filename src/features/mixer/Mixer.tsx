@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Pin, SlidersHorizontal, Volume2, VolumeX, X } from 'lucide-react';
+import { Crown, Pin, SlidersHorizontal, Volume2, VolumeX, X } from 'lucide-react';
 import { audioLevel, slotOrder, focusedChannels } from '@/lib/view/operations';
 import { useSettings } from '@/state/settingsStore';
 import { toast } from '@/state/toastStore';
@@ -13,9 +13,18 @@ import {
   currentVolume,
   setMaster,
   setStreamMix,
+  toggleMixPriority,
   useVolumeModel,
 } from '../viewer/volume';
 import styles from './Mixer.module.css';
+import { usePlaybackView, useMusicChannel } from '../music/useMusic';
+import { MixSettings } from './MixSettings';
+import { mixPriorities, outputPercent } from '@/lib/audio/mixPreferences';
+import { fixedMixRole } from '@/lib/audio/volumeModel';
+import { useMixStore } from '@/state/mixStore';
+import { useChannelPrefs } from '@/state/channelPrefsStore';
+import { useUi } from '@/state/uiStore';
+import { displayedChannels } from '@/lib/view/groups';
 
 /**
  * Every stream's level in one place (top-bar popover), for balancing the
@@ -25,7 +34,8 @@ import styles from './Mixer.module.css';
 export function Mixer() {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const view = useViewStore((s) => s.view);
+  const view = usePlaybackView();
+  const musicChannel = useMusicChannel();
   const duckLevel = useSettings((s) => s.duckLevel);
   const update = useSettings((s) => s.update);
   const mainPriority = useSettings((s) => s.mainPriority);
@@ -35,6 +45,14 @@ export function Mixer() {
   const channels = slotOrder(view, view.channels);
   const focused = focusedChannels(view, channels);
   const pct = (v: number) => Math.round(v * 100);
+  const prefs = useMixStore();
+  const base = useViewStore((s) => s.view);
+  const main = useUi((s) => s.mainStream);
+  const visibleChannels = useUi((s) => s.visibleChannels);
+  const status = useUi((s) => s.playerStatus);
+  const output = useChannelPrefs((s) => s.output);
+  const priorities = mixPriorities(base, prefs, musicChannel, main, visibleChannels);
+  const shown = displayedChannels(view);
 
   return (
     <div className={styles.wrap} ref={wrapRef}>
@@ -56,6 +74,7 @@ export function Mixer() {
         closeOnBlur={false}
       >
         <div data-testid="mixer">
+          <MixSettings />
           {multi && (
             <div className={styles.focusControls}>
               <strong>Multi focus · {focused.length}/3</strong>
@@ -72,9 +91,9 @@ export function Mixer() {
             checked={volumeModel.consistent}
             onChange={(v) => update({ consistentVolume: v })}
             label="Consistent volume"
-            help="Every stream you switch to plays at the same master volume. The sliders below then even out a loud or quiet streamer."
+            help="Video streams you switch to play at the same master volume. The sliders below then even out a loud or quiet streamer. Fixed role levels and music keep their separate levels."
           />
-          {!multi && (
+          {!multi && !prefs.enabled && (
             <Checkbox
               checked={mainPriority}
               onChange={(v) => update({ mainPriority: v })}
@@ -101,7 +120,13 @@ export function Mixer() {
             const level = audioLevel(view, login, duckLevel);
             const volume = currentVolume(login, volumeModel);
             const name = live.get(login)?.displayName ?? login;
-            const isMain = volumeModel.priorityMain === login;
+            const isMain = volumeModel.priorityMain === login && musicChannel !== login;
+            const role = fixedMixRole(volumeModel, login);
+            const silent =
+              level.muted ||
+              !shown.includes(login) ||
+              ['paused', 'blocked', 'offline'].includes(status[login] ?? '');
+            const effective = outputPercent(volume, level.scale, output, silent);
             return (
               <div
                 key={login}
@@ -109,6 +134,22 @@ export function Mixer() {
                 data-testid="mixer-row"
                 data-channel={login}
               >
+                {base.audio.mode === 'mix' && musicChannel !== login && (
+                  <IconButton
+                    size="sm"
+                    icon={<Crown size={14} />}
+                    label={
+                      prefs.enabled && priorities.includes(login)
+                        ? `Remove ${name} from audio priority`
+                        : `Make ${name} an audio priority`
+                    }
+                    active={prefs.enabled && priorities.includes(login)}
+                    disabled={
+                      prefs.enabled && !priorities.includes(login) && priorities.length >= 3
+                    }
+                    onClick={() => toggleMixPriority(login)}
+                  />
+                )}
                 {multi && (
                   <IconButton
                     size="sm"
@@ -132,7 +173,19 @@ export function Mixer() {
                 />
                 <span className={styles.name} title={name}>
                   {i < 9 && <kbd>{i + 1}</kbd>} {name}
-                  {(isMain || (multi && focused.includes(login))) && (
+                  {role && (
+                    <span
+                      className={styles.mainTag}
+                      title={
+                        role === 'music'
+                          ? 'Independent DJ level'
+                          : 'Changing this slider updates every stream using this role'
+                      }
+                    >
+                      {role === 'music' ? 'DJ' : `${role} · linked`}
+                    </span>
+                  )}
+                  {!role && (isMain || (multi && focused.includes(login))) && (
                     <span
                       className={styles.mainTag}
                       title={
@@ -151,10 +204,14 @@ export function Mixer() {
                   max={100}
                   value={pct(volume)}
                   onChange={(e) => setStreamMix(login, Number(e.target.value) / 100)}
+                  title={role && role !== 'music' ? `Shared ${role} level` : "This stream's volume"}
                   aria-label={isMain ? `Main stream level (${name})` : `${name} volume`}
                 />
-                <span className={styles.percent} data-testid="mixer-volume">
-                  {pct(volume)}%
+                <span className={styles.readout}>
+                  <span className={styles.percent} data-testid="mixer-volume">
+                    {pct(volume)}%
+                  </span>
+                  <small title="After mute, playback state and App volume">Out {effective}%</small>
                 </span>
                 <IconButton
                   size="sm"
@@ -163,7 +220,10 @@ export function Mixer() {
                   onClick={() => {
                     useViewStore.getState().removeChannel(login);
                     toast(`Removed ${name}`, {
-                      action: { label: 'Undo', run: () => useViewStore.getState().undo() },
+                      action:
+                        musicChannel !== login
+                          ? { label: 'Undo', run: () => useViewStore.getState().undo() }
+                          : undefined,
                     });
                   }}
                 />

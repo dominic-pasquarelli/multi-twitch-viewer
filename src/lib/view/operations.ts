@@ -265,6 +265,7 @@ export interface AudioLevel {
  * playing at `duckLevel` of their volume; muting everything (M) silences all.
  */
 export function audioLevel(view: ViewState, login: string, duckLevel: number): AudioLevel {
+  if (view.audio.suppressed?.includes(login)) return { muted: true, scale: 1, focused: false };
   const focused = view.audio.active.includes(login);
   if (focused) return { muted: false, scale: 1, focused };
   if (view.audio.mode === 'duck' && view.audio.active.length > 0 && duckLevel > 0) {

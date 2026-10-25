@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { PlayerStatus } from '@/lib/player/types';
 
 export type DialogName =
-  'settings' | 'shortcuts' | 'savePreset' | 'setup' | 'favorites' | 'kick' | null;
+  'settings' | 'shortcuts' | 'savePreset' | 'setup' | 'favorites' | 'kick' | 'music' | null;
 
 /** Transient UI state (never persisted). */
 interface UiStore {
@@ -23,6 +23,9 @@ interface UiStore {
   setArranging(v: boolean): void;
   /** The big stream in focus layout, as shown (null in grid). */
   mainStream: string | null;
+  /** Current visible player channels, after group isolation and offline hiding. */
+  visibleChannels: string[] | null;
+  setVisibleChannels(channels: string[]): void;
   setMainStream(login: string | null): void;
   /** The last hovered stream (keyboard shortcuts use it). */
   selected: string | null;
@@ -57,6 +60,11 @@ export const useUi = create<UiStore>()((set) => ({
   setArranging: (arranging) => set({ arranging }),
   volumeFlash: null,
   mainStream: null,
+  visibleChannels: null,
+  setVisibleChannels: (visibleChannels) =>
+    set((s) =>
+      s.visibleChannels?.join(',') === visibleChannels.join(',') ? s : { visibleChannels },
+    ),
   setMainStream: (mainStream) => set((s) => (s.mainStream === mainStream ? s : { mainStream })),
   selected: null,
   setSelected: (selected) => set((s) => (s.selected === selected ? s : { selected })),

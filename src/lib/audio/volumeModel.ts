@@ -15,6 +15,11 @@
  * Pure functions; the stores hold the state.
  */
 export interface VolumeModel {
+  /** Optional fixed player levels in Mix; applied before the app output multiplier. */
+  mix?: { priorities: readonly string[]; priorityLevel: number; backgroundLevel: number | null };
+  /** Music has a separate level, unaffected by video focus or the consistent-volume master. */
+  musicChannel?: string | null;
+  musicVolume?: number;
   consistent: boolean;
   /** Consistent mode: the volume you hear (0–1). */
   master: number;
@@ -40,10 +45,23 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
  * null = no preference yet: leave the player's own volume.
  */
 export function streamVolume(m: VolumeModel, login: string): number | null {
+  if (m.musicChannel === login) return m.musicVolume ?? 0.35;
+  const fixed = fixedMixRole(m, login);
+  if (fixed === 'priority') return m.mix!.priorityLevel;
+  if (fixed === 'background') return m.mix!.backgroundLevel!;
   const main = isPriorityMain(m, login);
   if (m.consistent)
     return round2(clamp(m.master * (main ? mainLevel(m) : (m.balance[login] ?? 1)), 0, 1));
   return main ? mainLevel(m) : (m.volumes[login] ?? null);
+}
+
+export function fixedMixRole(
+  m: VolumeModel,
+  login: string,
+): 'music' | 'priority' | 'background' | null {
+  if (m.musicChannel === login) return 'music';
+  if (m.mix?.priorities.includes(login)) return 'priority';
+  return m.mix && m.mix.backgroundLevel !== null ? 'background' : null;
 }
 
 const isPriorityMain = (m: VolumeModel, login: string) =>

@@ -162,6 +162,110 @@ async function stubTwitch(page: Page, calls: string[], crossOriginPlayers = fals
   await page.route('https://static-cdn.jtvnw.net/**', (route) => route.fulfill({ status: 404 }));
 }
 
+test('music uses live Helix priority, survives failed checks and syncs native player volume', async ({
+  page,
+}) => {
+  await stubTwitch(page, []);
+  let failed = false;
+  let alphaLive = false;
+  await page.route('https://api.twitch.tv/helix/streams?**', (route) => {
+    if (route.request().method() === 'OPTIONS')
+      return route.fulfill({ status: 204, headers: cors });
+    if (failed)
+      return route.fulfill({
+        status: 503,
+        headers: cors,
+        json: { message: 'Temporarily unavailable' },
+      });
+    const logins = new URL(route.request().url()).searchParams.getAll('user_login');
+    return route.fulfill({
+      headers: cors,
+      json: {
+        data: [stream('11', 1200), ...(alphaLive ? [stream('10', 5000)] : [])].filter((s) =>
+          logins.includes(s.user_login),
+        ),
+      },
+    });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByTestId('music-button').click();
+  const music = page.getByRole('dialog', { name: 'Music', exact: true });
+  await music.getByRole('textbox', { name: 'Add music channels' }).fill('alpha bravo');
+  await music.getByRole('button', { name: 'Add', exact: true }).click();
+  await music.getByRole('button', { name: 'Automatic', exact: true }).click();
+  await music.getByRole('button', { name: 'Done', exact: true }).click();
+  const bravo = page.locator('iframe[data-fake-twitch=bravo]');
+  await expect(bravo).toHaveAttribute('data-muted', 'false');
+  await page.evaluate(() => {
+    type Fake = { opts: { channel: string }; setVolume(v: number): void };
+    (window as unknown as { __fakePlayers: Fake[] }).__fakePlayers
+      .find((p) => p.opts.channel === 'bravo')!
+      .setVolume(0.22);
+  });
+  await page.getByTestId('music-button').click();
+  await expect(music.getByRole('slider', { name: 'Music volume' })).toHaveValue('22');
+  await music.getByRole('button', { name: 'Done', exact: true }).click();
+  failed = true;
+  await page.getByRole('button', { name: 'Refresh now' }).click();
+  await page.getByTestId('music-button').click();
+  await expect(page.getByTestId('music-status')).toContainText('Live status unavailable', {
+    timeout: 15000,
+  });
+  await expect(bravo).toHaveAttribute('data-muted', 'false');
+  await music.getByRole('button', { name: 'Done', exact: true }).click();
+  failed = false;
+  alphaLive = true;
+  await page.getByRole('button', { name: 'Refresh now' }).click();
+  await expect(page.locator('iframe[data-fake-twitch=alpha]')).toHaveAttribute(
+    'data-volume',
+    '0.22',
+  );
+  await expect(bravo).toHaveCount(0);
+});
+
+test('immersive mix links native volume changes while keeping cross-origin player controls usable', async ({
+  page,
+}) => {
+  await stubTwitch(page, [], true);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByTestId('channel-row').nth(0).click();
+  await page.getByTestId('channel-row').nth(1).click();
+  await page.getByRole('button', { name: 'Multi focus', exact: true }).click();
+  await page.getByTestId('immersive-mix-toggle').click();
+  await page.getByTestId('mixer-button').click();
+  await page
+    .getByTestId('mixer')
+    .getByRole('checkbox', { name: /Set levels by role/ })
+    .check();
+  await page.keyboard.press('Escape');
+  await page.getByTestId('output-volume').fill('50');
+  const alpha = page.locator('iframe[data-fake-twitch=alpha]');
+  const bravo = page.locator('iframe[data-fake-twitch=bravo]');
+  await expect(alpha).toHaveAttribute('data-volume', '0.35');
+  await expect(bravo).toHaveAttribute('data-volume', '0.35');
+  await page.evaluate(() => {
+    type Fake = { opts: { channel: string }; setVolume(v: number): void };
+    (window as unknown as { __fakePlayers: Fake[] }).__fakePlayers
+      .find((p) => p.opts.channel === 'alpha')!
+      .setVolume(0.3);
+  });
+  const bar = page.locator('[data-testid=stream-mix-overlay][data-channel=alpha]');
+  await expect(bar.getByRole('slider')).toHaveValue('60');
+  await expect(bravo).toHaveAttribute('data-volume', '0.3');
+  // Native iframe controls remain clickable outside the compact volume overlay.
+  const video = page.frameLocator('iframe[data-fake-twitch=alpha]');
+  await page.locator('[data-testid=player-tile][data-channel=alpha]').hover();
+  await video.getByRole('button', { name: 'Native player control' }).click();
+  await expect(video.locator('body')).toHaveAttribute('data-clicks', '1');
+  await expect(bar).toBeVisible();
+  await bar.getByRole('slider').focus();
+  await page.keyboard.press('m');
+  await expect(alpha).toHaveAttribute('data-muted', 'true');
+  await expect(bravo).toHaveAttribute('data-muted', 'true');
+});
+
 test('logs in with Twitch, lists live follows and plays them through the embed API', async ({
   page,
 }) => {

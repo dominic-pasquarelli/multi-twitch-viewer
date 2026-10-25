@@ -1,0 +1,72 @@
+.settings {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 12px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.settings small {
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.roles {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.source {
+  display: grid;
+  gap: 5px;
+  font-weight: 600;
+}
+.source select {
+  min-width: 0;
+  width: 100%;
+  padding: 5px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.priorities {
+  color: var(--accent);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.level {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+}
+.level > span:first-child {
+  flex: 1;
+  min-width: 80px;
+  font-size: 12px;
+}
+.level input[type='range'] {
+  width: 90px;
+  min-width: 40px;
+  flex: 1;
+  accent-color: var(--accent);
+}
+.level input[type='number'] {
+  width: 49px;
+  padding: 3px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.music {
+  display: grid;
+  gap: 8px;
+}
+.musicTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}

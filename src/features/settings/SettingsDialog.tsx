@@ -1,3 +1,4 @@
+import { MixSettings } from '../mixer/MixSettings';
 import { KICK_DEVELOPER_URL, redirectUri } from '@/config/appConfig';
 import { desktop } from '@/lib/desktop/bridge';
 import { useClientId, useServices } from '@/app/servicesContext';
@@ -185,6 +186,7 @@ function SettingsForm() {
       )}
       {tab === 'audio' && (
         <TabPanel id="audio">
+          <MixSettings />
           <Field
             label="When you pick a stream to hear, the others are…"
             help="Also switchable in the top bar."

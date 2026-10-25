@@ -27,6 +27,8 @@ import { useRecordWatchHistory } from '@/features/history/useRecordWatchHistory'
 import { Viewer } from '@/features/viewer/Viewer';
 import { GroupBar } from '@/features/groups/GroupBar';
 import styles from './App.module.css';
+import { MusicDialog } from '@/features/music/MusicDialog';
+import { useMusicStream } from '@/features/music/useMusic';
 
 export function App() {
   const clientId = useClientId();
@@ -38,6 +40,7 @@ export function App() {
   useRecordWatchHistory();
   useGoLiveAlerts();
   useFavoritesHome();
+  useMusicStream();
   useEffect(() => installAudioUnlock(), []);
   useEffect(
     () => desktop?.onBackgroundChange((hidden) => useUi.getState().setBackgrounded(hidden)),
@@ -98,6 +101,7 @@ export function App() {
       <SetupDialog />
       <SavePresetDialog />
       <FavoritesDialog />
+      <MusicDialog />
       <KickLinksDialog />
       <ShortcutsDialog />
       <UpdateBanner />

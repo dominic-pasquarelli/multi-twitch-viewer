@@ -1,9 +1,11 @@
+import { fixedMixRole } from '@/lib/audio/volumeModel';
 import {
   ExternalLink,
   Heart,
   Link2,
   Maximize2,
   Pin,
+  Music2,
   MessageSquare,
   RotateCw,
   Star,
@@ -25,13 +27,16 @@ import { KickBadge } from '../kick/KickBadge';
 import { useFollowChannel } from '../follows/useFollowChannel';
 import { currentVolume, setStreamMix, useVolumeModel, VOLUME_STEP } from './volume';
 import styles from './StreamControls.module.css';
+import { usePlaybackView, useMusicChannel } from '../music/useMusic';
+import { useMusicStore } from '@/state/musicStore';
 
 /**
  * Compact hover controls at the top of the stream. Mix sliders adjust just
  * this channel's balance without changing the other streams' levels.
  */
 export function StreamControls({ login, main }: { login: string; main: boolean }) {
-  const view = useViewStore((s) => s.view);
+  const view = usePlaybackView();
+  const musicChannel = useMusicChannel();
   const duckLevel = useSettings((s) => s.duckLevel);
   const volumeModel = useVolumeModel();
   const live = useLiveStatus(view.channels).live;
@@ -44,6 +49,7 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
   const kickLink = useChannelPrefs((s) => s.kickLinks[login]);
   const level = audioLevel(view, login, duckLevel);
   const volume = currentVolume(login, volumeModel);
+  const role = fixedMixRole(volumeModel, login);
   const multi = view.layout.mode === 'multi-focus';
   const focused = focusedChannels(view);
 
@@ -65,6 +71,7 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
         <div className={styles.chip} data-testid="stream-chip">
           <span className={styles.name}>{stream?.displayName ?? login}</span>
           {kick && <KickBadge />}
+          {musicChannel === login && <Music2 size={14} aria-label="Music stream" />}
           {stream && (
             <span className={styles.meta} title="Viewers">
               {formatCount(stream.viewerCount)}
@@ -86,9 +93,13 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
           value={Math.round(volume * 100)}
           aria-label={`${stream?.displayName ?? login} volume`}
           title={
-            volumeModel.priorityMain === login
-              ? 'Main stream level: whichever stream is main plays at this (scroll to adjust)'
-              : "This stream's mix volume (scroll to adjust)"
+            role === 'priority' || role === 'background'
+              ? `Shared ${role} level: changes every stream using this role`
+              : musicChannel === login
+                ? 'Music volume: stays the same when visual focus changes'
+                : volumeModel.priorityMain === login
+                  ? 'Main stream level: whichever stream is main plays at this (scroll to adjust)'
+                  : "This stream's mix volume (scroll to adjust)"
           }
           onChange={(e) => {
             setStreamMix(login, Number(e.target.value) / 100);
@@ -104,6 +115,17 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
         </span>
       </div>
       <div className={styles.actions}>
+        <IconButton
+          size="sm"
+          label={musicChannel === login ? 'Stop music' : 'Pin as music'}
+          active={musicChannel === login}
+          icon={<Music2 size={15} />}
+          onClick={() =>
+            musicChannel === login
+              ? useMusicStore.getState().setMode('off')
+              : useMusicStore.getState().pin(login)
+          }
+        />
         {multi && (
           <IconButton
             size="sm"
@@ -192,7 +214,10 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
           onClick={() => {
             store.removeChannel(login);
             toast(`Removed ${login}`, {
-              action: { label: 'Undo', run: () => useViewStore.getState().undo() },
+              action:
+                musicChannel !== login
+                  ? { label: 'Undo', run: () => useViewStore.getState().undo() }
+                  : undefined,
             });
           }}
         />
