@@ -108,6 +108,18 @@ export function createHelixApi(options: HelixClientOptions): TwitchApi {
       }));
     },
     getUsersByIds: (ids) => (ids.length ? usersBy('id', ids) : Promise.resolve([])),
+    async getChannelInformation(ids) {
+      const result = [];
+      // Helix accepts at most 100 IDs. Fetch sequentially to avoid a burst for
+      // accounts following thousands of channels; the picker caches the result.
+      for (const part of chunk([...new Set(ids)], 100)) {
+        const page = await client.get<{ broadcaster_id: string; game_name: string }>('/channels', {
+          broadcaster_id: part,
+        });
+        result.push(...page.data.map((c) => ({ id: c.broadcaster_id, gameName: c.game_name })));
+      }
+      return result;
+    },
     getUsersByLogins: (logins) => (logins.length ? usersBy('login', logins) : Promise.resolve([])),
     async getStreamsByLogins(logins) {
       if (!logins.length) return [];

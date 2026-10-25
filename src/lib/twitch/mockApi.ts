@@ -74,6 +74,11 @@ export function setMockLive(login: string, live: boolean): void {
   else extraChannels.set(login, { ...lookup(login), live });
 }
 
+export function setMockCategory(login: string, gameName: string): void {
+  const channel = MOCK_CHANNELS.find((c) => c.login === login);
+  if (channel) channel.gameName = gameName;
+}
+
 /** Simulates following a channel on Twitch (mock mode only). */
 export function mockFollow(login: string): void {
   if (!MOCK_CHANNELS.some((c) => c.login === login)) MOCK_CHANNELS.push(lookup(login));
@@ -165,6 +170,13 @@ export function createMockApi(): TwitchApi {
         })),
       ),
     getUsersByIds: (ids) => delay(MOCK_CHANNELS.filter((c) => ids.includes(c.id)).map(toUser)),
+    getChannelInformation: (ids) =>
+      delay(
+        MOCK_CHANNELS.filter((c) => ids.includes(c.id)).map((c) => ({
+          id: c.id,
+          gameName: c.gameName,
+        })),
+      ),
     getUsersByLogins: (logins) => delay(logins.map((l) => toUser(lookup(l)))),
     getStreamsByLogins: (logins) =>
       delay(

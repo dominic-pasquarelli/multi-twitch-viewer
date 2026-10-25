@@ -48,6 +48,8 @@ export interface DesktopBridge {
   onPlayerContextMenu?(callback: (channel: string) => void): () => void;
   /** Exact decode-error notifications are available only in the desktop app. */
   onPlayerError?(callback: (error: { channel: string; code: 3000 }) => void): () => void;
+  /** OS resume / screen unlock, independent of focus inside player iframes. */
+  onSystemResume?(callback: () => void): () => void;
   /** Called with true when the window is hidden to the tray, false when shown. */
   onBackgroundChange(callback: (hidden: boolean) => void): () => void;
 }

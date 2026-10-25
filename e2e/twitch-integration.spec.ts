@@ -390,7 +390,9 @@ test('controls follow the pointer into and out of cross-origin videos without in
   await page.getByTestId('add-channel').hover();
   await page.getByTestId('add-channel').focus();
   await expect(controls).toBeHidden();
-  await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await expect(stream).toHaveAttribute('data-hovered', 'false');
+  await expect(stream).toHaveAttribute('data-silent', 'true');
+  await expect(stream).toHaveCSS('outline-style', 'dashed');
 
   // Jump directly from one video to the other, without entering parent UI.
   const alphaRect = (await page.locator('iframe[data-fake-twitch=alpha]').boundingBox())!;
@@ -404,13 +406,17 @@ test('controls follow the pointer into and out of cross-origin videos without in
   await expect(controls).toBeVisible();
   await page.getByRole('heading', { name: 'Followed', exact: true }).hover();
   await expect(controls).toBeHidden();
-  await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await expect(stream).toHaveAttribute('data-hovered', 'false');
+  await expect(stream).toHaveAttribute('data-silent', 'true');
+  await expect(stream).toHaveCSS('outline-style', 'dashed');
   await enterVideo();
   await expect(controls).toBeVisible();
   await page.mouse.move(-10, -10);
   await expect(stream).toHaveAttribute('data-hovered', 'false');
   await expect(controls).toBeHidden();
-  await expect(stream).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await expect(stream).toHaveAttribute('data-hovered', 'false');
+  await expect(stream).toHaveAttribute('data-silent', 'true');
+  await expect(stream).toHaveCSS('outline-style', 'dashed');
 });
 
 test('a stream selected with a click keeps playing when Twitch pauses it on that click', async ({
@@ -567,4 +573,327 @@ test("the Mixer stays open while you use Twitch's own volume slider, and follows
   await expect(mixer).toBeHidden();
   await tile.hover({ position: low });
   await expect(tile.getByTestId('stream-volume')).toHaveText('20%');
+});
+
+test('music picker uses offline Helix categories and remains usable when category lookup fails', async ({
+  page,
+}) => {
+  const calls: string[] = [];
+  await stubTwitch(page, calls);
+  let failed = true;
+  const requested: string[][] = [];
+  await page.route('https://api.twitch.tv/helix/channels?**', (route) => {
+    if (route.request().method() === 'OPTIONS')
+      return route.fulfill({ status: 204, headers: cors });
+    requested.push(new URL(route.request().url()).searchParams.getAll('broadcaster_id'));
+    return failed
+      ? route.fulfill({ status: 503, headers: cors, json: { message: 'Unavailable' } })
+      : route.fulfill({
+          headers: cors,
+          json: { data: [{ broadcaster_id: '12', game_name: 'DJs' }] },
+        });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByTestId('music-button').click();
+  const music = page.getByRole('dialog', { name: 'Music', exact: true });
+  await music.getByRole('button', { name: 'All followed', exact: true }).click();
+  await expect(page.getByTestId('music-choice')).toHaveCount(3);
+  await music.getByRole('button', { name: 'Add Alpha to music', exact: true }).click();
+  await expect(page.getByTestId('music-row')).toHaveCount(1);
+  await expect(
+    music.getByRole('button', { name: 'Retry channel lookup', exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  failed = false;
+  await music.getByRole('button', { name: 'Retry channel lookup', exact: true }).click();
+  await music.getByRole('button', { name: 'Music & DJs', exact: true }).click();
+  const charlie = page.locator('[data-testid=music-choice][data-channel=charlie]');
+  await expect(charlie).toContainText('Last category: DJs');
+  await expect(charlie).toContainText('Offline');
+  await charlie.getByRole('button').click();
+  await expect(page.getByTestId('music-row')).toHaveCount(2);
+  expect(requested[0]).toEqual(['10', '11', '12']);
+  expect(calls.some((c) => c.includes('scope=user:read:follows'))).toBe(true);
+});
+
+test('startup and silent pauses recover while an explicit pause survives retries and reloads', async ({
+  page,
+}) => {
+  await stubTwitch(page, []);
+  await page.route('https://player.twitch.tv/js/embed/v1.js', (route) =>
+    route.fulfill({
+      contentType: 'application/javascript',
+      body: FAKE_PLAYER_SCRIPT.replace(
+        "self.emit('ready'); self.emit('playing');",
+        "self.paused = true; self.sync(); self.emit('ready'); self.emit('pause');",
+      ),
+    }),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByTestId('channel-row').nth(0).click();
+  const tile = page.locator('[data-testid=player-tile][data-channel=alpha]');
+  const player = tile.locator('iframe');
+  await expect(player).toHaveAttribute('data-paused', 'false', { timeout: 10000 });
+  await page.evaluate(() => {
+    const p = (
+      window as unknown as {
+        __fakePlayers: { opts: { channel: string }; paused: boolean; sync(): void }[];
+      }
+    ).__fakePlayers.find((p) => p.opts.channel === 'alpha')!;
+    p.paused = true;
+    p.sync(); // No PAUSE event: the periodic watchdog must notice.
+  });
+  await expect(player).toHaveAttribute('data-paused', 'false', { timeout: 10000 });
+  await tile.hover();
+  await tile.getByRole('button', { name: 'Pause alpha', exact: true }).click();
+  await expect(player).toHaveAttribute('data-paused', 'true');
+  await tile.getByRole('button', { name: 'Reload player', exact: true }).click();
+  await expect(player).toHaveAttribute('data-paused', 'true');
+  await page.getByTestId('playback-tools-button').click();
+  await expect(page.locator('[data-testid=health-row][data-channel=alpha]')).toContainText(
+    'Paused by you',
+  );
+  await page.getByRole('button', { name: 'Resume alpha', exact: true }).click();
+  await expect(player).toHaveAttribute('data-paused', 'false');
+});
+
+test('desktop recovery distinguishes stale iframe focus from native pause intent and rejects unrelated messages', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (window as unknown as { mtvDesktop: unknown }).mtvDesktop = {
+      isDesktop: true,
+      version: 'test',
+      playAll: () => {},
+      onBackgroundChange: () => () => {},
+      getUpdateStatus: async () => ({ state: 'dev', current: null }),
+      onUpdateStatus: () => () => {},
+    };
+  });
+  await stubTwitch(page, [], true);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByTestId('channel-row').nth(0).click();
+  const tile = page.locator('[data-testid=player-tile][data-channel=alpha]');
+  const frame = page.frameLocator('iframe[data-fake-twitch=alpha]');
+  await frame.getByRole('button', { name: 'Native player control' }).focus();
+  await page.evaluate(() => {
+    const player = (window as unknown as { __fakePlayers: { pause(): void }[] }).__fakePlayers[0]!;
+    player.pause();
+  });
+  await expect(tile.locator('iframe')).toHaveAttribute('data-paused', 'false', { timeout: 10000 });
+  await frame
+    .locator('body')
+    .evaluate(() => parent.postMessage({ type: 'mtv:playback-intent', paused: true }, '*'));
+  await expect(tile.locator('iframe')).toHaveAttribute('data-paused', 'true');
+  // A parent-window message has the wrong source/origin and must not release the hold.
+  await page.evaluate(() =>
+    window.postMessage({ type: 'mtv:playback-intent', paused: false }, '*'),
+  );
+  await page.getByTestId('playback-tools-button').click();
+  await expect(page.locator('[data-testid=health-row][data-channel=alpha]')).toContainText(
+    'Paused by you',
+  );
+  await page.keyboard.press('Escape');
+  await frame
+    .locator('body')
+    .evaluate(() => parent.postMessage({ type: 'mtv:playback-intent', paused: false }, '*'));
+  await expect(tile.locator('iframe')).toHaveAttribute('data-paused', 'false');
+});
+
+test('fullscreen layout/audio transitions recover buffering pauses and stale audio without losing manual pauses', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (window as unknown as { mtvDesktop: unknown }).mtvDesktop = {
+      isDesktop: true,
+      version: 'test',
+      playAll: () => {},
+      onBackgroundChange: () => () => {},
+      getUpdateStatus: async () => ({ state: 'dev', current: null }),
+      onUpdateStatus: () => () => {},
+    };
+    localStorage.setItem(
+      'mtv:settings',
+      JSON.stringify({ version: 1, state: { clickToFocus: false } }),
+    );
+  });
+  await stubTwitch(page, [], true);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByTestId('channel-row').nth(0).click();
+  await page.getByTestId('channel-row').nth(1).click();
+  const alpha = page.locator('[data-testid=player-tile][data-channel=alpha]');
+  const bravo = page.locator('[data-testid=player-tile][data-channel=bravo]');
+  await page.getByRole('button', { name: 'Multi focus', exact: true }).click();
+  await page.locator('body').press('f');
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  const top = async () => {
+    await page.mouse.move(600, 2);
+  };
+  for (let iteration = 0; iteration < 3; iteration++) {
+    await top();
+    await page.getByTitle(/^Focus:/).click();
+    await top();
+    await page.getByRole('button', { name: 'Solo', exact: true }).click();
+    await top();
+    await page.getByTitle(/^Grid:/).click();
+    await top();
+    await page.getByRole('button', { name: 'Duck', exact: true }).click();
+    await top();
+    await page.getByRole('button', { name: 'Multi focus', exact: true }).click();
+    await top();
+    await page.getByRole('button', { name: 'Mix', exact: true }).click();
+    await page.evaluate(() => {
+      type P = {
+        opts: { channel: string };
+        pause(): void;
+        setMuted(m: boolean): void;
+        setVolume(v: number): void;
+      };
+      const players = (window as unknown as { __fakePlayers: P[] }).__fakePlayers;
+      players.find((p) => p.opts.channel === 'alpha')!.pause();
+      const other = players.find((p) => p.opts.channel === 'bravo')!;
+      other.setMuted(true);
+      other.setVolume(0.1); // delayed Duck-mode command echo
+    });
+    await expect(alpha.locator('iframe')).toHaveAttribute('data-paused', 'false', {
+      timeout: 10000,
+    });
+    await expect(bravo.locator('iframe')).toHaveAttribute('data-muted', 'false', {
+      timeout: 10000,
+    });
+    await expect(bravo.locator('iframe')).toHaveAttribute('data-volume', '0.5', { timeout: 10000 });
+  }
+  await bravo.hover();
+  await bravo.getByRole('button', { name: 'Pause bravo', exact: true }).click();
+  await page.locator('body').press('f');
+  await page.locator('body').press('f');
+  await top();
+  await page.getByTestId('playback-tools-button').click();
+  await page.getByRole('button', { name: 'Rebuild visible players', exact: true }).click();
+  await expect(alpha.locator('iframe')).toHaveAttribute('data-paused', 'false', { timeout: 10000 });
+  await expect(bravo.locator('iframe')).toHaveAttribute('data-paused', 'true');
+  await expect(page.locator('[data-testid=health-row][data-channel=bravo]')).toContainText(
+    'Paused by you',
+  );
+  await expect(page.locator('[data-testid=health-row][data-channel=alpha]')).toContainText(
+    'playing',
+  );
+});
+
+test('DJ level stays independent of Multi focus priorities and rejects stale 100 percent player feedback', async ({
+  page,
+}) => {
+  await stubTwitch(page, []);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByTestId('channel-row').nth(0).click();
+  await page.getByTestId('channel-row').nth(1).click();
+  await page.getByRole('button', { name: 'Multi focus', exact: true }).click();
+  await page.getByTestId('music-button').click();
+  const music = page.getByRole('dialog', { name: 'Music', exact: true });
+  await music.getByRole('textbox', { name: 'Add music channels' }).fill('alpha bravo');
+  await music.getByRole('button', { name: 'Add', exact: true }).click();
+  await music.getByRole('slider', { name: 'Music volume', exact: true }).fill('25');
+  await music.getByRole('checkbox', { name: /Mix with stream audio/ }).check();
+  await music.getByRole('button', { name: 'Done', exact: true }).click();
+  for (const login of ['alpha', 'bravo', 'alpha']) {
+    await page.getByTestId('music-button').click();
+    await page
+      .locator(`[data-testid=music-row][data-channel=${login}]`)
+      .getByRole('button', { name: /^Pin .* as music$/ })
+      .click();
+    await music.getByRole('button', { name: 'Done', exact: true }).click();
+    const frame = page.locator(`iframe[data-fake-twitch=${login}]`);
+    await expect(frame).toHaveAttribute('data-volume', '0.25');
+    await page.getByTitle(/^Focus:/).click();
+    await page.getByRole('button', { name: 'Multi focus', exact: true }).click();
+    await expect(frame).toHaveAttribute('data-volume', '0.25');
+    await page.evaluate((login) => {
+      const players = (
+        window as unknown as {
+          __fakePlayers: { opts: { channel: string }; setVolume(v: number): void }[];
+        }
+      ).__fakePlayers;
+      players.find((p) => p.opts.channel === login)!.setVolume(1);
+    }, login);
+    await expect(frame).toHaveAttribute('data-volume', '0.25', { timeout: 10000 });
+    await page.getByTestId('music-button').click();
+    await expect(music.getByRole('slider', { name: 'Music volume', exact: true })).toHaveValue(
+      '25',
+    );
+    await music.getByRole('button', { name: 'Done', exact: true }).click();
+  }
+});
+
+test('system wake and reconnect rebuild active players, refresh live status and retain explicit pauses and DJ levels', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (window as unknown as { mtvDesktop: unknown }).mtvDesktop = {
+      isDesktop: true,
+      version: 'test',
+      playAll: () => {},
+      onBackgroundChange: () => () => {},
+      getUpdateStatus: async () => ({ state: 'dev', current: null }),
+      onUpdateStatus: () => () => {},
+      onSystemResume: (callback: () => void) => {
+        (window as unknown as { wake: () => void }).wake = callback;
+        return () => {};
+      },
+    };
+  });
+  const calls: string[] = [];
+  await stubTwitch(page, calls);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByTestId('channel-row').nth(0).click();
+  await page.getByTestId('channel-row').nth(1).click();
+  await page.getByRole('button', { name: 'Multi focus', exact: true }).click();
+  await page.getByTestId('music-button').click();
+  const music = page.getByRole('dialog', { name: 'Music', exact: true });
+  await music.getByRole('textbox', { name: 'Add music channels' }).fill('alpha');
+  await music.getByRole('button', { name: 'Add', exact: true }).click();
+  await music
+    .locator('[data-testid=music-row][data-channel=alpha]')
+    .getByRole('button', { name: /^Pin .* as music$/ })
+    .click();
+  await music.getByRole('slider', { name: 'Music volume', exact: true }).fill('25');
+  await music.getByRole('checkbox', { name: /Mix with stream audio/ }).check();
+  await music.getByRole('button', { name: 'Done', exact: true }).click();
+  const alpha = page.locator('iframe[data-fake-twitch=alpha]');
+  const bravo = page.locator('iframe[data-fake-twitch=bravo]');
+  await bravo.evaluate((el) => el.setAttribute('data-pause-mount', 'original'));
+  await page.locator('[data-testid=player-tile][data-channel=bravo]').hover();
+  await page.getByRole('button', { name: 'Pause bravo', exact: true }).click();
+  await alpha.evaluate((el) => el.setAttribute('data-wake-mount', 'old'));
+  const followedCalls = calls.filter((c) => c.startsWith('/helix/streams/followed')).length;
+  await page.evaluate(() => {
+    (window as unknown as { wake(): void }).wake();
+    (window as unknown as { wake(): void }).wake();
+  });
+  await expect(alpha).not.toHaveAttribute('data-wake-mount', 'old');
+  await expect(alpha).toHaveAttribute('data-volume', '0.25');
+  await expect(alpha).toHaveAttribute('data-paused', 'false');
+  await expect(bravo).toHaveAttribute('data-paused', 'true');
+  await expect(bravo).toHaveAttribute('data-pause-mount', 'original');
+  await expect
+    .poll(() => calls.filter((c) => c.startsWith('/helix/streams/followed')).length)
+    .toBeGreaterThan(followedCalls);
+  await alpha.evaluate((el) => el.setAttribute('data-reconnect-mount', 'old'));
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    (window as unknown as { wake(): void }).wake();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    window.dispatchEvent(new Event('online'));
+  });
+  await expect(alpha).not.toHaveAttribute('data-reconnect-mount', 'old', { timeout: 15000 });
+  await expect(alpha).toHaveAttribute('data-volume', '0.25');
+  await expect(bravo).toHaveAttribute('data-paused', 'true');
+  await page.getByTestId('playback-tools-button').click();
+  await expect(
+    page.getByRole('dialog', { name: 'Playback tools', exact: true }).getByRole('status'),
+  ).toContainText('Manual pauses were preserved');
 });

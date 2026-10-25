@@ -37,6 +37,7 @@ export default defineConfig({
         'controls.spec.ts',
         'multi-focus.spec.ts',
         'music.spec.ts',
+        'viewing-tools.spec.ts',
         'immersive-mix.spec.ts',
         'kick.spec.ts',
         'fullscreen.spec.ts',

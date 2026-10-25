@@ -27,7 +27,12 @@ channels are live, and watch several streams at once with layouts that actually 
     never reload when they move.
   - Offline channels step aside and give their space to live ones, then come back when they go live.
 - **Music / DJ priority**: open the music-note button in the top bar to add an ordered list of
-  preferred DJs (or import your favorites). **Automatic** plays the first live channel, switches
+  preferred DJs. **Find your DJs** offers a searchable selector for followed channels, with
+  **Music & DJs**, **All followed** and **Followed favorites** filters. Add choices one at a time;
+  names/links and bulk favorite import are still available. Suggestions distinguish live Music/DJs,
+  current or last selected categories for offline channels, and categories previously seen by the
+  app on this device (not a complete streaming history). Observations are account-scoped; category
+  lookups are cached for ten minutes and need no extra Twitch permissions. **Automatic** plays the first live channel, switches
   to a higher-priority DJ when they go live, and falls back when the current DJ goes offline.
   Use the up/down arrows to change priority, or **Pin as music** on a stream to override the list.
   Music has its own volume and keeps playing while visual focus, presets and group tabs change.
@@ -40,6 +45,13 @@ channels are live, and watch several streams at once with layouts that actually 
   opening its chat keeps it in the watched view too. Live checks use Settings' refresh
   interval; failed checks retain the last selection. Pinning overrides automatic selection until
   you choose **Automatic** again.
+- **DJ rules and transitions**: expand this section in Music to restrict Automatic to live
+  **Music / DJs** categories or keep the current DJ until they go offline. Pinning overrides
+  category rules. **Skip this session** excludes a DJ from Automatic until the skips are reset
+  or the app restarts; it does not remove them from your priority list. A **DJ trim** of 50%
+  plays that channel at half the music level; trims are remembered per DJ and clamp the final
+  player level at 100%. Optional 0.5–5 second fades soften automatic switches and DJ starts;
+  they do not guarantee a gapless handoff while a new player loads.
 - **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar, History and Also
   watching included, or on a stream) to
   keep them at the top. When a favorite goes live you get a Windows notification; click it to start
@@ -70,6 +82,28 @@ channels are live, and watch several streams at once with layouts that actually 
   **All groups** clusters them together; in Focus, one chosen stream stays large across the whole
   view while the others remain clustered by group. Group tabs isolate one group and pause hidden streams.
   Returning restores the same mix and volumes, keeping manual pauses. Groups save with sessions and presets.
+- **Playback intent and recovery**: each tile has explicit Pause/Resume controls. A manual pause
+  stays held until you resume it, including across player reloads and layout/fullscreen changes.
+  The desktop app tracks trusted native Twitch play/pause clicks and playback keys separately
+  from buffering and resize events; browser embeds and other players use recent interaction heuristics.
+  Unexpected startup pauses, interrupted playback and players that silently stop are checked
+  every second and retried at five-second intervals while online and not intentionally held.
+  Known-offline streams wait for confirmed live status. Players still stuck after 30 seconds
+  can be reloaded with a per-channel budget of three automatic reloads per five minutes.
+  Hidden groups and bandwidth-saving holds remain respected. Browser autoplay restrictions can
+  still require a user gesture. Settling mute/volume echoes during fullscreen, layout and audio
+  changes do not overwrite the requested mix. **Mix** supports independently audible watched
+  streams even when those channels are also in your DJ list; explicit mixing keeps the DJ
+  alongside them rather than silently selecting only one channel.
+- **Sleep / wake recovery**: waking or unlocking the desktop, reconnecting, returning to a
+  long-hidden page, or a long scheduler suspension refreshes live data and token validation.
+  Wake repairs reset old connection pressure/reload backoff, and visible players without intentional
+  holds are recreated in sequence to clear stale sockets and decoders. Ordinary network reconnects
+  retain the gradual background-resume policy. Duplicate wake signals are
+  coalesced; offline/hidden windows defer repair until they can run. Manual pauses, hidden groups,
+  expired sleep timers, DJ levels and the saved mix are preserved. Iframe focus is not itself a
+  wake signal. Temporary offline removal gets a fresh grace window after suspension so stale
+  pre-sleep data does not immediately close streams. Playback tools shows the latest recovery.
 - **Connection recovery**: sustained playback starvation reduces background quality to 360p (or
   the lowest available rendition) and temporarily pauses muted streams. After the connection settles,
   streams resume one at a time. Turn off **Automatic bandwidth saving** in **Settings → Players**
@@ -85,6 +119,11 @@ channels are live, and watch several streams at once with layouts that actually 
     In the focus layout the main stream plays at the **main level** (100% unless you move its
     slider) while the others keep their own levels: a small stream set to 20% plays at 100% while
     it's the main one and goes back to 20% after. Turn this off in the Mixer or Settings → Audio.
+  - **Muted indicators**: silent tiles have an amber dashed border and a persistent **Muted**
+    badge, without hovering or enabling Mix. Click a badge for its reason and audio controls
+    (Solo, music-only listening, app mute, or a zero volume setting). This includes explicit mutes, 0% stream levels and
+    0% App volume. Quiet streams keep their normal appearance; unsupported browser Kick volume
+    adjustments are not presented as silence. Video and native player controls stay usable.
   - **Immersive mix** (overlay button beside the Mixer) keeps a compact slider, mute button,
     priority crown and percentage over every visible stream. It also works with app fullscreen.
     Each card shows its level and the output after App volume; muted streams stay muted when
@@ -99,6 +138,10 @@ channels are live, and watch several streams at once with layouts that actually 
     Sliders marked **linked** change every stream using that role; disabling role levels restores
     individual balances. Choosing a priority does not unmute it. These are player volume settings,
     not loudness normalization. Mix preferences are saved globally, separately from presets and links.
+  - **Hold to listen**: hold **Q** for the selected stream, or hold the headphone button on
+    its toolbar, to temporarily hear it while other audible streams fall to 12% of their levels.
+    Release to restore the saved mix. Pointer cancellation, window blur, dialogs, hidden/removed
+    targets and **M** cancel the preview. Your channels, focus, levels and DJ pin are preserved.
   - **App volume** (slider next to Mute all): one level for everything the app plays, on top of
     each stream's own volume and the mix. Scroll over it to adjust; it's remembered.
   - **Mixer** (sliders button next to them): every stream's volume in one list, to balance the
@@ -121,6 +164,27 @@ channels are live, and watch several streams at once with layouts that actually 
   Selecting a category lists its live streams. Filter loaded results by title, tags, category or language.
 - **Presets**: save the current streams, layout, audio and chat as a named preset and load it in
   one click, with a live count for each. Export and import them as a JSON file for backup.
+- **Complete scenes**: the Save preset dialog includes **Save as a complete scene**. Along with
+  channels/layout/audio/chat/groups, this stores DJ order/rules/trims, fixed mix roles and levels,
+  immersive controls, channel levels, app output, audio behavior and player-quality preferences.
+  Loading or updating a scene restores that setup, and Undo restores the prior scene settings.
+  Existing view-only presets remain supported. Sleep timers and momentary listening are excluded.
+- **Playback tools** (activity/timer icon beside Music):
+  - **Playback health** shows status, manual/bandwidth holds, current quality, buffer, FPS,
+    dropped frames, bitrate and estimated live delay. Unavailable fields are shown as —.
+    Individual Resume/Reload actions are available. **Rebuild visible players** recreates embeds
+    in sequence, preserves the scene and explicit pauses, and releases automatic bandwidth holds;
+    use this to repair a stuck player/audio state without restarting the app.
+  - **Sleep timer** fades playback for the final 0/10/30/60 seconds, then pauses all streams.
+    Saved app and channel volumes are untouched. Cancel restores the normal output envelope;
+    Play all resumes after completion. This timer is for the current app session and is canceled
+    by closing/reloading the app or restoring a backup.
+  - **Backup & restore** exports the current view, all presets/scenes, settings, DJ preferences,
+    favorites, linked Kick channels, watch history and locally observed music categories. Sign-ins
+    and API credentials are excluded. Import validates the complete file before changing any
+    state, previews its counts, and replaces preferences only after **Restore these settings**.
+    An Undo restore action is available. Session skips, timers and temporary listening are not
+    included. Existing preset-only exports remain usable through Presets → Import.
 - **Bookmarkable links**: the address bar always matches what you're watching
   (`http://localhost:5757/#/chan1/chan2?layout=focus`). Pasting a multitwitch.tv link into the
   add box loads all of its channels.
@@ -291,7 +355,8 @@ mouse off the player hands focus back.
 
 Everything stays in this browser's local storage for `http://localhost:5757`: presets, settings,
 per-channel volumes, the last session and the Twitch login. Nothing is sent anywhere except
-Twitch. To back up or move presets, use **Presets → Export / Import**.
+Twitch. To back up or move presets, use **Presets → Export / Import**. For all portable app preferences,
+use **Playback tools → Backup & restore**; configure API credentials and sign in again on a new device.
 
 Keep using the same address (`localhost:5757`). Browser storage is per address, so a different
 port or `127.0.0.1` starts with empty presets.

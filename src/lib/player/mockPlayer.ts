@@ -32,9 +32,11 @@ export class MockPlayer implements PlayerAdapter {
   private readonly label: HTMLDivElement;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private platform: string | undefined;
+  private readonly isLive: () => boolean;
 
   constructor(host: HTMLElement, channel: string, muted: boolean, opts: MockPlayerOptions = {}) {
     this.channel = channel;
+    this.isLive = () => opts.isLive?.(channel) ?? true;
     this.muted = muted;
     const live = opts.isLive?.(channel) ?? true;
     const hue = opts.hueFor?.(channel) ?? 265;
@@ -94,6 +96,12 @@ export class MockPlayer implements PlayerAdapter {
     this.el.dataset.quality = q;
   }
   play() {
+    if (!this.isLive()) {
+      this.paused = true;
+      this.render();
+      this.emit('offline');
+      return;
+    }
     this.paused = false;
     this.render();
     this.emit('playing');

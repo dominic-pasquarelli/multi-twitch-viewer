@@ -1,3 +1,7 @@
+import { useSleepTimerPlayback } from '@/features/tools/useSleepTimer';
+import { useWakeRecovery } from '@/features/viewer/useWakeRecovery';
+import { PlaybackToolsDialog } from '@/features/tools/PlaybackTools';
+import { AudioReasonDialog } from '@/features/tools/AudioReasonDialog';
 import { useEffect } from 'react';
 import { desktop } from '@/lib/desktop/bridge';
 import { useClientId } from '@/app/servicesContext';
@@ -29,6 +33,7 @@ import { GroupBar } from '@/features/groups/GroupBar';
 import styles from './App.module.css';
 import { MusicDialog } from '@/features/music/MusicDialog';
 import { useMusicStream } from '@/features/music/useMusic';
+import { useRememberMusicCategories } from '@/features/music/useMusicDiscovery';
 
 export function App() {
   const clientId = useClientId();
@@ -41,6 +46,9 @@ export function App() {
   useGoLiveAlerts();
   useFavoritesHome();
   useMusicStream();
+  useSleepTimerPlayback();
+  useWakeRecovery();
+  useRememberMusicCategories();
   useEffect(() => installAudioUnlock(), []);
   useEffect(
     () => desktop?.onBackgroundChange((hidden) => useUi.getState().setBackgrounded(hidden)),
@@ -102,6 +110,8 @@ export function App() {
       <SavePresetDialog />
       <FavoritesDialog />
       <MusicDialog />
+      <PlaybackToolsDialog />
+      <AudioReasonDialog />
       <KickLinksDialog />
       <ShortcutsDialog />
       <UpdateBanner />

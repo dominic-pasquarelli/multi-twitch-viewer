@@ -88,3 +88,75 @@
   display: block;
   font-weight: 400;
 }
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 24px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+.order {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.order h3 {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  font-size: 14px;
+}
+.order h3 small {
+  font-weight: 400;
+}
+@media (max-width: 760px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.rules {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+.rules summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.rules[open] summary {
+  margin-bottom: 12px;
+}
+.transitionLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.list li {
+  flex-wrap: wrap;
+}
+.djOptions {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-left: 28px;
+  align-items: center;
+}
+.djOptions label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.djOptions input {
+  width: 72px;
+  accent-color: var(--accent);
+}
+.djOptions output {
+  width: 28px;
+}

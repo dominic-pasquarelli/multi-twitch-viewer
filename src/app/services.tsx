@@ -8,6 +8,7 @@ import {
   mockFollow,
   mockHue,
   setMockLive,
+  setMockCategory,
 } from '@/lib/twitch/mockApi';
 import { createKickApi } from '@/lib/kick/kickApi';
 import { createMockKickApi, setMockKickLive } from '@/lib/kick/mockKickApi';
@@ -33,6 +34,7 @@ const kickPlayers = createKickPlayerFactory(
 // Test/demo hooks in mock mode: simulate going live, or a player pausing itself.
 if (IS_MOCK) {
   (window as unknown as { mtvMock: unknown }).mtvMock = {
+    setCategory: setMockCategory,
     // Like Twitch: the channel's status changes, and a player that is showing
     // it reports the stream ended.
     setLive: (login: string, live: boolean) => {

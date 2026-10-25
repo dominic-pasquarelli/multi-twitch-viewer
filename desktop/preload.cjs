@@ -47,6 +47,12 @@ contextBridge.exposeInMainWorld('mtvDesktop', {
     ipcRenderer.on('mtv:player-error', listener);
     return () => ipcRenderer.removeListener('mtv:player-error', listener);
   },
+  /** @param {() => void} callback */
+  onSystemResume: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('mtv:system-resume', listener);
+    return () => ipcRenderer.removeListener('mtv:system-resume', listener);
+  },
   /** @param {(hidden: boolean) => void} callback */
   onBackgroundChange: (callback) => {
     /** @param {unknown} _event @param {unknown} hidden */

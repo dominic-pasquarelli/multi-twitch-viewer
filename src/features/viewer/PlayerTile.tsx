@@ -1,6 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Play } from 'lucide-react';
+import { Play, VolumeX } from 'lucide-react';
+import { silenceReason } from '@/lib/audio/silence';
 import { useServices } from '@/app/servicesContext';
 import type { Rect } from '@/lib/layout';
 import { PlayerController } from '@/lib/player/PlayerController';
@@ -9,8 +10,23 @@ import type { PlayerFactory, PlayerStatus } from '@/lib/player/types';
 import { useUi } from '@/state/uiStore';
 import { IconButton } from '@/ui/Button';
 import { AutoResume } from './autoResume';
+import { PlaybackWatchdog } from './playbackWatchdog';
+import { scheduleReload } from './usePlaybackRecovery';
+import { desktop } from '@/lib/desktop/bridge';
+import {
+  markNativePlayerInput,
+  nativePlayerInputRecent,
+  playbackTransitionActive,
+} from '@/lib/player/transitions';
+import { interactedRecently } from './playerInteraction';
 import { CHANNEL_MIME, setDragging } from './dnd';
-import { markInteraction, pausedByUser, selectedRecently } from './playerInteraction';
+import {
+  markInteraction,
+  pausedByUser,
+  selectedRecently,
+  intentionallyPaused,
+  playerHasFocus,
+} from './playerInteraction';
 import { playerRegistry } from './playerRegistry';
 import { playbackRecovery } from './playbackRecovery';
 import { StreamControls } from './StreamControls';
@@ -18,6 +34,8 @@ import { StreamMixOverlay } from '../mixer/StreamMixOverlay';
 import styles from './PlayerTile.module.css';
 
 export interface PlayerTileProps {
+  muteExplanation?: string;
+  live?: boolean;
   login: string;
   /** The Kick channel to play instead, while this one is live only on Kick. */
   kick: string | null;
@@ -68,6 +86,13 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
   const services = useServices();
   const playerFactory = kick ? services.kickPlayerFactory : services.playerFactory;
   const muted = playerMuted(props.muted, audible, playerFactory);
+  const silent = silenceReason(
+    muted,
+    volume,
+    volumeScale,
+    playerFactory.capabilities?.volume !== false,
+  );
+  const silence = silent === 'Audio muted' ? (props.muteExplanation ?? silent) : silent;
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<PlayerController | null>(null);
   const reloadKey = useUi((s) => s.reloadRequests[login] ?? 0);
@@ -104,6 +129,12 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
     };
     const onParentMove = (event: PointerEvent) => {
       if (!isInside(event)) clearHover();
+      else if (
+        document.hasFocus() &&
+        event.target instanceof Element &&
+        event.target.closest<HTMLElement>('[data-testid="player-tile"]')?.dataset.channel === login
+      )
+        setHovered(true);
     };
     const onViewportLeave = (event: MouseEvent) => {
       // Crossing into the child browsing context can look like leaving the
@@ -132,7 +163,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       document.removeEventListener('pointermove', onParentMove, true);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, []);
+  }, [login]);
 
   // Keyboard volume shortcuts briefly reveal only the adjusted stream's bar.
   // Subscribe to the event instead of keeping it open for a stored selection.
@@ -156,10 +187,12 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
     if (!host) return;
     const p = latest.current;
     const autoResume = new AutoResume();
+    const watchdog = new PlaybackWatchdog();
+    let hasPlayed = false;
     let resumeTimer: ReturnType<typeof setTimeout> | undefined;
     // Start muted so autoplay is allowed; the controller unmutes once ready.
     const adapter = playerFactory.create(host, { channel: kick ?? login, muted: true });
-    const controller = new PlayerController(
+    const controller: PlayerController = new PlayerController(
       adapter,
       {
         muted: playerMuted(p.muted, p.audible, playerFactory),
@@ -172,7 +205,26 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
           // The click that selected this stream may pause it: neither your
           // pause nor a sign of a struggling connection, so undo it promptly.
           const selectionPause = s === 'paused' && selectedRecently(login);
-          if (!selectionPause) playbackRecovery.observeStatus(login, s, pausedByUser(login));
+          // Startup pauses are not a manual request, even if the new frame has focus.
+          if (!selectionPause)
+            playbackRecovery.observeStatus(
+              login,
+              s,
+              hasPlayed &&
+                (intentionallyPaused(login) ||
+                  ((!desktop || !!kick) &&
+                    (nativePlayerInputRecent(login) ||
+                      interactedRecently(login, 3000) ||
+                      (!playbackTransitionActive() && pausedByUser(login))))),
+              !desktop || !!kick,
+            );
+          if (s === 'playing') {
+            hasPlayed = true;
+            if (playbackRecovery.isManagedPause(login)) {
+              adapter.pause();
+              return;
+            }
+          }
           // Keep streams playing unless you paused them yourself.
           clearTimeout(resumeTimer);
           if (
@@ -203,10 +255,37 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         onExternalVolume: (v) =>
           latest.current.onVolume(login, Math.min(1, v / (latest.current.volumeScale || 1))),
       },
+      {
+        adoptExternalChange: (kind, value, recentCommand) => {
+          if (
+            nativePlayerInputRecent(login) ||
+            (!playbackTransitionActive() && interactedRecently(login, 3000))
+          )
+            return true;
+          if (kind === 'volume') return !recentCommand;
+          return value === false || (!playbackTransitionActive() && playerHasFocus(login));
+        },
+      },
     );
     controllerRef.current = controller;
     playerRegistry.set(login, { adapter, controller });
-    const poll = setInterval(() => controller.sync(), 1000);
+    const poll = setInterval(() => {
+      controller.sync();
+      const action = watchdog.check({
+        ready: controller.isReady,
+        status: controller.status,
+        paused: adapter.isPaused?.() ?? controller.status !== 'playing',
+        live: latest.current.live,
+        held: latest.current.hidden || playbackRecovery.isManagedPause(login),
+        online: navigator.onLine,
+      });
+      if (action === 'reload') scheduleReload(login);
+      if (action === 'play') {
+        adapter.play();
+        controller.reapply();
+        desktop?.playAll?.([login]);
+      }
+    }, 1000);
     return () => {
       clearInterval(poll);
       clearTimeout(resumeTimer);
@@ -272,6 +351,17 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
     // Remove the entry surface before the next pointer down. The iframe itself
     // stays interactive, so its native hit-test surface is already registered.
     flushSync(() => setHovered(true));
+    // Closing a modal or resizing the player can deliver a late leave/blur.
+    // Recheck the actual hit state after layout rather than leaving a hovered
+    // video without controls until the pointer exits and re-enters.
+    requestAnimationFrame(() => {
+      if (
+        document.hasFocus() &&
+        !latest.current.hidden &&
+        hostRef.current?.parentElement?.matches(':hover')
+      )
+        setHovered(true);
+    });
     if (event.buttons === 0) props.onSelect(login);
   };
 
@@ -281,6 +371,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       data-testid="player-tile"
       data-channel={login}
       data-audible={audible}
+      data-silent={!!silence}
       data-main={props.main}
       data-selected={props.selected}
       data-hovered={hovered}
@@ -288,7 +379,7 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       data-arranging={props.arranging}
       aria-hidden={props.hidden || undefined}
       tabIndex={props.hidden ? -1 : 0}
-      aria-label={`${login} stream`}
+      aria-label={`${login} stream${silence ? ` · ${silence}` : ''}`}
       onFocus={() => props.onSelect(login)}
       draggable={props.arranging && !props.hidden}
       onDragStart={(e) => {
@@ -336,13 +427,33 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         data-player-host
         // Players that are part of the page (mock mode) report clicks here;
         // real Twitch players are iframes, detected via focus in the Viewer.
-        onPointerDown={() => markInteraction(login)}
+        onPointerDown={() => {
+          markInteraction(login);
+          markNativePlayerInput(login);
+        }}
       />
 
       <StreamMixOverlay login={login} hidden={props.hidden} kick={!!kick} />
 
       {!hovered && !props.hidden && !props.arranging && (
         <div className={styles.hoverEntry} data-player-entry aria-hidden="true" />
+      )}
+
+      {silence && (
+        <button
+          type="button"
+          className={styles.silentBadge}
+          data-testid="stream-muted-badge"
+          aria-label={silence}
+          title={`${silence} · Click for audio controls`}
+          onClick={(e) => {
+            e.stopPropagation();
+            useUi.getState().setSelected(login);
+            useUi.getState().openDialog('streamAudio');
+          }}
+        >
+          <VolumeX size={13} aria-hidden="true" /> Muted
+        </button>
       )}
 
       {props.arranging && !props.hidden && (

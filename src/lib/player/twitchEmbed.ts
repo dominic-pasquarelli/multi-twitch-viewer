@@ -77,6 +77,7 @@ class TwitchEmbedAdapter implements PlayerAdapter {
   private destroyed = false;
   private readonly listeners = new Map<PlayerEvent, Set<() => void>>();
   private pending: ((p: TwitchPlayerInstance) => void)[] = [];
+  private offEvents: (() => void)[] = [];
   private readonly host: HTMLElement;
 
   constructor(host: HTMLElement, channel: string, muted: boolean) {
@@ -109,7 +110,7 @@ class TwitchEmbedAdapter implements PlayerAdapter {
           [Player.PLAYBACK_BLOCKED, 'blocked'],
         ];
         for (const [twitchEvent, event] of map) {
-          player.addEventListener(twitchEvent, () => {
+          const handler = () => {
             if (event === 'ready') {
               this.ready = true;
               const queued = this.pending;
@@ -117,7 +118,9 @@ class TwitchEmbedAdapter implements PlayerAdapter {
               queued.forEach((fn) => fn(player));
             }
             this.listeners.get(event)?.forEach((h) => h());
-          });
+          };
+          player.addEventListener(twitchEvent, handler);
+          this.offEvents.push(() => player.removeEventListener?.(twitchEvent, handler));
         }
       })
       .catch((err) => {
@@ -166,6 +169,8 @@ class TwitchEmbedAdapter implements PlayerAdapter {
   destroy() {
     this.destroyed = true;
     this.listeners.clear();
+    this.offEvents.forEach((off) => safe(off));
+    this.offEvents = [];
     this.pending = [];
     this.player = null;
     this.host.replaceChildren();

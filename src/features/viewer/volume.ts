@@ -62,6 +62,7 @@ const model = (): VolumeModel => {
       : undefined,
     musicChannel: activeMusicChannel(music),
     musicVolume: music.volume,
+    musicTrim: music.trims[activeMusicChannel(music) ?? ''] ?? 1,
   };
 };
 
@@ -78,6 +79,7 @@ export function useVolumeModel(): VolumeModel {
   const visibleChannels = useUi((s) => s.visibleChannels);
   const musicChannel = useMusicStore(activeMusicChannel);
   const musicVolume = useMusicStore((s) => s.volume);
+  const musicTrim = useMusicStore((s) => s.trims[activeMusicChannel(s) ?? ''] ?? 1);
   const priorityMain = priorityMainOf(mainPriority, view, mainStream);
   const prefs = useMixStore();
   const managed = prefs.enabled && view.audio.mode === 'mix';
@@ -97,6 +99,7 @@ export function useVolumeModel(): VolumeModel {
       : undefined,
     musicChannel,
     musicVolume,
+    musicTrim,
   };
 }
 
@@ -121,7 +124,7 @@ export function keepOwnVolume(login: string): void {
 function setFixedVolume(login: string, volume: number, m: VolumeModel): boolean {
   switch (fixedMixRole(m, login)) {
     case 'music':
-      useMusicStore.getState().setVolume(volume);
+      useMusicStore.getState().setVolume(volume / (m.musicTrim ?? 1));
       return true;
     case 'priority':
       useMixStore.getState().update({ priorityLevel: volume });

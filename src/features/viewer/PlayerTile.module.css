@@ -15,6 +15,30 @@
 .tile.audible {
   outline-color: var(--accent);
 }
+.tile[data-silent='true'] {
+  outline: 2px dashed #dfb56d;
+}
+.tile[data-silent='true']:focus-visible {
+  outline: 3px solid #f5d7a6;
+}
+.silentBadge {
+  position: absolute;
+  bottom: 44px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  border: 1px solid #dfb56d;
+  border-radius: 5px;
+  background: rgb(25 19 10 / 0.92);
+  color: #ffe1ad;
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: auto;
+  cursor: pointer;
+}
 .tile.dropTarget {
   outline: 2px dashed var(--text);
 }
@@ -96,4 +120,9 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+/* Keep the reason badge above the persistent mix card and native controls. */
+.tile:has([data-mix-controls]) .silentBadge {
+  bottom: 108px;
 }

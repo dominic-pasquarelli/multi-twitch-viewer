@@ -10,6 +10,8 @@ import { Checkbox } from '@/ui/Form';
 import { Dialog } from '@/ui/Dialog';
 import { useUsersFor } from '../follows/queries';
 import { useMusicStatus } from './useMusic';
+import { MusicChannelPicker } from './MusicChannelPicker';
+import formStyles from '@/ui/Form.module.css';
 import styles from './MusicDialog.module.css';
 
 export function MusicButton() {
@@ -34,7 +36,7 @@ export function MusicButton() {
 export function MusicDialog() {
   const open = useUi((s) => s.dialog === 'music');
   return (
-    <Dialog open={open} title="Music" width={620} onClose={() => useUi.getState().openDialog(null)}>
+    <Dialog open={open} title="Music" width={980} onClose={() => useUi.getState().openDialog(null)}>
       {open && <MusicEditor />}
     </Dialog>
   );
@@ -55,7 +57,7 @@ function MusicEditor() {
     <div className={styles.editor}>
       <p>
         Keep a DJ playing while you watch other streams. Automatic uses the first live channel
-        below, and switches when a higher-priority DJ goes live or the current one goes offline.
+        below. Use DJ rules to control category filtering, interruptions and transitions.
       </p>
       <div className={styles.modes} role="group" aria-label="Music selection">
         <Button aria-pressed={music.mode === 'off'} onClick={() => music.setMode('off')}>
@@ -114,74 +116,141 @@ function MusicEditor() {
         label="Mix with stream audio"
         help="Off: hear only music while watching. On: keep music alongside your Solo, Duck or Mix audio. Music has its own volume; M mutes everything."
       />
-      <form
-        className={styles.add}
-        onSubmit={(e) => {
-          e.preventDefault();
-          music.addChannels(parsed);
-          setText('');
-        }}
-      >
-        <input
-          aria-label="Add music channels"
-          placeholder="DJ names or twitch.tv links"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
+      <details className={styles.rules}>
+        <summary>DJ rules and transitions</summary>
+        <Checkbox
+          checked={music.musicOnly}
+          onChange={(musicOnly) => music.update({ musicOnly })}
+          label="Only automatically select Music or DJs categories"
+          help="Live channels in other categories are ignored. Pinned DJs override this rule."
         />
-        <Button type="submit" disabled={!parsed.length || music.channels.length >= 50}>
-          <Plus size={14} /> Add
-        </Button>
-      </form>
-      <Button
-        size="small"
-        disabled={
-          !favorites.some((c) => !music.channels.includes(c)) || music.channels.length >= 50
-        }
-        onClick={() => music.addChannels(favorites)}
-      >
-        Add from favorites
-      </Button>
-      <ol className={styles.list} aria-label="Music priority" data-testid="music-list">
-        {music.channels.map((c, i) => (
-          <li key={c} data-testid="music-row" data-channel={c} data-current={channel === c}>
-            <span className={styles.rank}>{i + 1}</span>
-            <span className={styles.name}>
-              {name(c)}
-              <small>{live.has(c) ? 'Live' : known ? 'Offline' : 'Checking…'}</small>
-            </span>
-            <IconButton
-              size="sm"
-              icon={<ArrowUp size={15} />}
-              label={`Move ${name(c)} up`}
-              disabled={i === 0}
-              onClick={() => music.moveChannel(c, -1)}
+        <Checkbox
+          checked={music.keepCurrent}
+          onChange={(keepCurrent) => music.update({ keepCurrent })}
+          label="Keep the current DJ until they go offline"
+          help="A higher-priority channel going live will not interrupt your music."
+        />
+        <label className={styles.transitionLabel}>
+          Transition fade{' '}
+          <select
+            className={formStyles.input}
+            aria-label="DJ transition fade"
+            value={music.fadeSeconds}
+            onChange={(e) => music.update({ fadeSeconds: Number(e.target.value) })}
+          >
+            {[0, 0.5, 1, 2, 3, 5].map((n) => (
+              <option key={n} value={n}>
+                {n ? `${n} seconds` : 'Off'}
+              </option>
+            ))}
+          </select>
+        </label>
+        <small>Fades soften transitions; the next live player may still need time to load.</small>
+        {music.skipped.length > 0 && (
+          <Button size="small" onClick={music.resetSkips}>
+            Reset session skips ({music.skipped.length})
+          </Button>
+        )}
+      </details>
+      <div className={styles.columns}>
+        <MusicChannelPicker />
+        <section className={styles.order} aria-label="Your music order">
+          <h3>
+            Your music order <small>{music.channels.length}/50</small>
+          </h3>
+          <form
+            className={styles.add}
+            onSubmit={(e) => {
+              e.preventDefault();
+              music.addChannels(parsed);
+              setText('');
+            }}
+          >
+            <input
+              className={formStyles.input}
+              aria-label="Add music channels"
+              placeholder="DJ names or twitch.tv links"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
             />
-            <IconButton
-              size="sm"
-              icon={<ArrowDown size={15} />}
-              label={`Move ${name(c)} down`}
-              disabled={i === music.channels.length - 1}
-              onClick={() => music.moveChannel(c, 1)}
-            />
-            <IconButton
-              size="sm"
-              icon={<Pin size={15} />}
-              label={`Pin ${name(c)} as music`}
-              active={music.mode === 'pinned' && channel === c}
-              onClick={() => music.pin(c)}
-            />
-            <IconButton
-              size="sm"
-              icon={<X size={15} />}
-              label={`Remove ${name(c)} from music`}
-              onClick={() => music.removeChannel(c)}
-            />
-          </li>
-        ))}
-      </ol>
-      {!music.channels.length && (
-        <p>Add your preferred DJs in priority order, or use “Pin as music” on a stream.</p>
-      )}
+            <Button type="submit" disabled={!parsed.length || music.channels.length >= 50}>
+              <Plus size={14} /> Add
+            </Button>
+          </form>
+          <Button
+            size="small"
+            disabled={
+              !favorites.some((c) => !music.channels.includes(c)) || music.channels.length >= 50
+            }
+            onClick={() => music.addChannels(favorites)}
+          >
+            Add from favorites
+          </Button>
+          <ol className={styles.list} aria-label="Music priority" data-testid="music-list">
+            {music.channels.map((c, i) => (
+              <li key={c} data-testid="music-row" data-channel={c} data-current={channel === c}>
+                <span className={styles.rank}>{i + 1}</span>
+                <span className={styles.name}>
+                  {name(c)}
+                  <small>{live.has(c) ? 'Live' : known ? 'Offline' : 'Checking…'}</small>
+                </span>
+                <IconButton
+                  size="sm"
+                  icon={<ArrowUp size={15} />}
+                  label={`Move ${name(c)} up`}
+                  disabled={i === 0}
+                  onClick={() => music.moveChannel(c, -1)}
+                />
+                <IconButton
+                  size="sm"
+                  icon={<ArrowDown size={15} />}
+                  label={`Move ${name(c)} down`}
+                  disabled={i === music.channels.length - 1}
+                  onClick={() => music.moveChannel(c, 1)}
+                />
+                <IconButton
+                  size="sm"
+                  icon={<Pin size={15} />}
+                  label={`Pin ${name(c)} as music`}
+                  active={music.mode === 'pinned' && channel === c}
+                  onClick={() => music.pin(c)}
+                />
+                <IconButton
+                  size="sm"
+                  icon={<X size={15} />}
+                  label={`Remove ${name(c)} from music`}
+                  onClick={() => music.removeChannel(c)}
+                />
+                <div className={styles.djOptions}>
+                  <label>
+                    DJ trim{' '}
+                    <input
+                      type="range"
+                      min={25}
+                      max={200}
+                      step={5}
+                      value={Math.round((music.trims[c] ?? 1) * 100)}
+                      aria-label={`${name(c)} DJ trim`}
+                      onChange={(e) => music.setTrim(c, Number(e.target.value) / 100)}
+                    />
+                    <output>{Math.round((music.trims[c] ?? 1) * 100)}%</output>
+                  </label>
+                  <Button
+                    size="small"
+                    disabled={music.skipped.includes(c)}
+                    onClick={() => music.skip(c)}
+                  >
+                    {music.skipped.includes(c) ? 'Skipped this session' : 'Skip this session'}
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ol>
+          {!music.channels.length && (
+            <p>Add your preferred DJs in priority order, or use “Pin as music” on a stream.</p>
+          )}
+        </section>
+      </div>
       <small>
         Live status follows the refresh interval in Settings. Pinning a DJ overrides the automatic
         order until you choose Automatic again.

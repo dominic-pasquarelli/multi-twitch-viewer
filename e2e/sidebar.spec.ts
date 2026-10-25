@@ -296,6 +296,9 @@ test('discovery searches categories, filters live metadata, and still searches c
 test('history and also-watching channels can be favorited from their rows', async ({ page }) => {
   await seedHistory(page);
   await page.goto('/');
+  // Follows and history load independently. Wait for offline follows before
+  // moving to a history action, so their initial insertion cannot move it.
+  await expect(row(page, 'bytebard')).toBeVisible();
   // Live status polls every second here: wait until all three history rows are
   // in Live, so none moves and slides the row out from under the pointer.
   await expect(historySection(page, 'live').getByTestId('history-row')).toHaveCount(3);

@@ -199,7 +199,60 @@ export function pressPlay() {
 /** @param {PlayerChrome} options */
 export function playerChromeScript(options) {
   const opts = JSON.stringify(normalizePlayerChrome(options));
-  return `(() => { const pressPlay = ${pressPlay.toString()}; (${applyPlayerTweaks.toString()})(${opts}); })();`;
+  return `(() => { const pressPlay = ${pressPlay.toString()}; const playbackIntent = ${playbackIntent.toString()}; (${trackPlayerInput.toString()})(); (${applyPlayerTweaks.toString()})(${opts}); })();`;
+}
+
+/**
+ * Only a trusted click on playback controls/video, or a playback key, expresses
+ * pause/play intent. Focus and changes made by Twitch or our recovery do not.
+ * @param {Pick<Event, 'isTrusted' | 'target' | 'type'> & {key?: string, button?: number}} event
+ * @returns {boolean | null} Desired paused state, or no playback intent.
+ */
+export function playbackIntent(event) {
+  if (!event.isTrusted || !(event.target instanceof Element)) return null;
+  const target = event.target;
+  if (event.type !== 'pointerdown' && event.type !== 'keydown') return null;
+  if (event.type === 'pointerdown' && event.button !== undefined && event.button !== 0) return null;
+  if (event.type === 'keydown') {
+    if (
+      (![' ', 'k', 'K'].includes(event.key ?? '') &&
+        !(event.key === 'Enter' && target.closest('[data-a-target="player-play-pause-button"]'))) ||
+      target.closest(
+        'input, textarea, select, [role="slider"], [contenteditable="true"], button:not([data-a-target="player-play-pause-button"]):not([data-a-target="player-overlay-play-button"])',
+      )
+    )
+      return null;
+  } else if (
+    !(target instanceof HTMLVideoElement) &&
+    !target.closest(
+      '[data-a-target="player-play-pause-button"], [data-a-target="player-overlay-play-button"]',
+    ) &&
+    !(
+      target.closest('[data-a-target="video-player"]') &&
+      !target.closest('button, a, input, [role="slider"], [data-a-target="player-controls"]')
+    )
+  )
+    return null;
+  const video = document.querySelector('video');
+  return video ? !video.paused : null;
+}
+
+/** Installed inside an isolated Twitch frame, including when chrome tweaks are off. */
+export function trackPlayerInput() {
+  const w = /** @type {any} */ (window);
+  if (w.__mtvPlaybackInput) return;
+  w.__mtvPlaybackInput = true;
+  /** @param {Event} event */
+  const report = (event) => {
+    if (!event.isTrusted) return;
+    window.parent.postMessage({ type: 'mtv:player-interaction' }, '*');
+    // The function is serialized alongside this installer.
+    const paused = playbackIntent(event);
+    if (paused === null) return;
+    setTimeout(() => window.parent.postMessage({ type: 'mtv:playback-intent', paused }, '*'), 50);
+  };
+  document.addEventListener('pointerdown', report, true);
+  document.addEventListener('keydown', report, true);
 }
 
 /**

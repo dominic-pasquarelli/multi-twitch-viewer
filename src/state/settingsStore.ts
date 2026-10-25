@@ -1,3 +1,4 @@
+import { markPlaybackTransition } from '@/lib/player/transitions';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { LiveAlertMode } from '@/lib/alerts/goLive';
@@ -90,7 +91,15 @@ export const useSettings = create<SettingsStore>()(
   persist(
     (set) => ({
       ...DEFAULT_SETTINGS,
-      update: (patch) => set(patch),
+      update: (patch) => {
+        if (
+          ['consistentVolume', 'mainPriority', 'mainQuality', 'otherQuality'].some(
+            (key) => key in patch,
+          )
+        )
+          markPlaybackTransition();
+        set(patch);
+      },
       reset: () => set({ ...DEFAULT_SETTINGS }),
     }),
     {

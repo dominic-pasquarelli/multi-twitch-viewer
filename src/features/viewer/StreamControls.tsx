@@ -29,6 +29,10 @@ import { currentVolume, setStreamMix, useVolumeModel, VOLUME_STEP } from './volu
 import styles from './StreamControls.module.css';
 import { usePlaybackView, useMusicChannel } from '../music/useMusic';
 import { useMusicStore } from '@/state/musicStore';
+import { HoldToListen } from './HoldToListen';
+import { Pause, Play } from 'lucide-react';
+import { playerRegistry } from './playerRegistry';
+import { playbackRecovery } from './playbackRecovery';
 
 /**
  * Compact hover controls at the top of the stream. Mix sliders adjust just
@@ -50,6 +54,7 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
   const level = audioLevel(view, login, duckLevel);
   const volume = currentVolume(login, volumeModel);
   const role = fixedMixRole(volumeModel, login);
+  const status = useUi((s) => s.playerStatus[login]);
   const multi = view.layout.mode === 'multi-focus';
   const focused = focusedChannels(view);
 
@@ -115,6 +120,23 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
         </span>
       </div>
       <div className={styles.actions}>
+        <IconButton
+          size="sm"
+          icon={status === 'paused' ? <Play size={15} /> : <Pause size={15} />}
+          label={status === 'paused' ? `Resume ${login}` : `Pause ${login}`}
+          onClick={() => {
+            const entry = playerRegistry.get(login);
+            if (status === 'paused') {
+              playbackRecovery.allowManualPlay(login);
+              entry?.adapter.play();
+              entry?.controller.reapply();
+            } else {
+              playbackRecovery.pauseManually(login);
+              entry?.adapter.pause();
+            }
+          }}
+        />
+        <HoldToListen login={login} />
         <IconButton
           size="sm"
           label={musicChannel === login ? 'Stop music' : 'Pin as music'}
