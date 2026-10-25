@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 const tile = (page: Page, channel: string) =>
   page.locator(`[data-testid=player-tile][data-channel=${channel}]`);
 const player = (page: Page, channel: string) => tile(page, channel).locator('.mock-player');
-const dialog = (page: Page) => page.getByRole('dialog', { name: 'Music', exact: true });
+const dialog = (page: Page) => page.getByRole('dialog', { name: 'DJ & music', exact: true });
 const row = (page: Page, channel: string) =>
   page.locator(`[data-testid=music-row][data-channel=${channel}]`);
 async function addMusic(page: Page, channels: string) {
@@ -56,10 +56,8 @@ test('music has its own level alongside multi focus, persists, and respects app 
   await page.getByRole('button', { name: 'Multi focus', exact: true }).click();
   await addMusic(page, 'lunarlatte');
   await dialog(page).getByRole('button', { name: 'Automatic', exact: true }).click();
-  await dialog(page).getByRole('slider', { name: 'Music volume' }).fill('24');
-  await dialog(page)
-    .getByRole('checkbox', { name: /Mix with stream audio/ })
-    .check();
+  await dialog(page).getByRole('slider', { name: 'DJ volume' }).fill('24');
+  await dialog(page).getByRole('button', { name: 'DJ + stream audio', exact: true }).click();
   await dialog(page).getByRole('button', { name: 'Done', exact: true }).click();
   for (const c of ['pixelpaladin', 'novastrike', 'lunarlatte'])
     await expect(player(page, c)).toHaveAttribute('data-muted', 'false');
@@ -241,12 +239,30 @@ test('DJ picker suggests live and offline music, searches follows and preserves 
   expect(await dialog(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 });
 
-test('muted tiles stay recognizable without hover and update for zero volume and app output', async ({
+test('muted highlights stay quiet until audio editing, hover, focus or immersive mixing', async ({
   page,
 }) => {
   await page.goto('/#/pixelpaladin/novastrike');
+  await page.mouse.move(0, 0);
   await expect(tile(page, 'novastrike')).toHaveAttribute('data-silent', 'true');
-  await expect(tile(page, 'novastrike').getByTestId('stream-muted-badge')).toBeVisible();
+  const badge = tile(page, 'novastrike').getByTestId('stream-muted-badge');
+  await expect(badge).toBeHidden();
+  await expect(tile(page, 'novastrike')).not.toHaveCSS('outline-style', 'dashed');
+  await tile(page, 'novastrike').hover();
+  await expect(badge).toBeVisible();
+  await expect(tile(page, 'novastrike')).toHaveCSS('outline-style', 'dashed');
+  await page.mouse.move(0, 0);
+  await expect(badge).toBeHidden();
+  await tile(page, 'novastrike').focus();
+  await expect(badge).toBeVisible();
+  await badge.focus();
+  await expect(badge).toBeVisible();
+  await page.getByTestId('music-button').focus();
+  await expect(badge).toBeHidden();
+  await page.getByTestId('mixer-button').click();
+  await expect(badge).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(badge).toBeHidden();
   await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-silent', 'false');
   await player(page, 'pixelpaladin').evaluate((el) =>
     el.setAttribute('data-mount-check', 'original'),
@@ -268,4 +284,79 @@ test('muted tiles stay recognizable without hover and update for zero volume and
   await page.locator('body').press('m');
   await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-silent', 'true');
   await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-mount-check', 'original');
+  await page.getByTestId('immersive-mix-toggle').click();
+  await page.mouse.move(0, 0);
+  await expect(tile(page, 'novastrike').getByTestId('stream-muted-badge')).toBeHidden();
+});
+
+test('muted highlight preference persists, and Off also hides highlights in immersive mix', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/novastrike');
+  const muted = tile(page, 'novastrike');
+  const badge = muted.getByTestId('stream-muted-badge');
+  await page.getByTestId('mixer-button').click();
+  await page
+    .getByRole('combobox', { name: 'Muted stream highlights', exact: true })
+    .selectOption('always');
+  await page.keyboard.press('Escape');
+  await page.mouse.move(0, 0);
+  await expect(badge).toBeVisible();
+  await page.reload();
+  await expect(badge).toBeVisible();
+  await page.getByTestId('mixer-button').click();
+  await page
+    .getByRole('combobox', { name: 'Muted stream highlights', exact: true })
+    .selectOption('off');
+  await expect(badge).toBeHidden();
+  await page.keyboard.press('Escape');
+  await page.getByTestId('immersive-mix-toggle').click();
+  await muted.hover();
+  await expect(badge).toBeHidden();
+  await expect(muted).not.toHaveCSS('outline-style', 'dashed');
+  await expect(muted).toHaveAttribute('data-silent', 'true');
+  await expect(player(page, 'novastrike')).toHaveAttribute('data-muted', 'true');
+  await page.reload();
+  await expect(badge).toBeHidden();
+});
+
+test('DJ choices make manual selection, listening mix, silence and offline waiting explicit', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/novastrike');
+  await expect(page.getByTestId('music-button')).toHaveText('DJ off');
+  await addMusic(page, 'bytebard lunarlatte cozycartographer');
+  await dialog(page)
+    .getByRole('combobox', { name: 'Pick a DJ', exact: true })
+    .selectOption('lunarlatte');
+  await expect(
+    dialog(page).getByRole('button', { name: 'Pick a DJ', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('music-status')).toContainText('Pinned: LunarLatte');
+  await dialog(page).getByRole('button', { name: 'DJ + stream audio', exact: true }).click();
+  await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-muted', 'false');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-muted', 'false');
+  await dialog(page).getByRole('button', { name: 'DJ only', exact: true }).click();
+  await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-muted', 'true');
+  await dialog(page)
+    .getByRole('combobox', { name: 'Pick a DJ', exact: true })
+    .selectOption('bytebard');
+  await expect(dialog(page)).toContainText('This DJ is offline. Waiting for them');
+  await expect(dialog(page)).toContainText('One fixed DJ · no automatic fallback');
+  await dialog(page).getByRole('button', { name: 'Automatic', exact: true }).click();
+  await expect(page.getByTestId('music-status')).toContainText('Selected: LunarLatte');
+  await dialog(page).getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.getByTestId('music-button')).toHaveText('DJ: lunarlatte');
+  await page.locator('body').press('m');
+  await expect(page.getByTestId('music-button')).toHaveText('DJ muted');
+  await page.getByTestId('music-button').click();
+  await expect(dialog(page)).toContainText('All app audio is muted.');
+  await dialog(page).getByRole('button', { name: 'Unmute app', exact: true }).click();
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-muted', 'false');
+  await dialog(page).getByRole('button', { name: 'Off', exact: true }).click();
+  await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-muted', 'false');
+  await expect(page.getByTestId('music-status')).toHaveText('Music is off.');
+  await expect(dialog(page).getByTestId('music-row')).toHaveCount(3);
+  await page.setViewportSize({ width: 480, height: 800 });
+  expect(await dialog(page).evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 });

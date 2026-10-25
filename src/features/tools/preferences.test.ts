@@ -88,9 +88,12 @@ describe('complete scenes and backups', () => {
     expect(useChannelPrefs.getState().output).toBe(0.8);
   });
   it('exports complete portable preferences, preserves device credentials on restore and ignores injected fields', () => {
-    useSettings
-      .getState()
-      .update({ clientId: 'device-client', kickClientSecret: 'private-secret', tileGap: 9 });
+    useSettings.getState().update({
+      clientId: 'device-client',
+      kickClientSecret: 'private-secret',
+      tileGap: 9,
+      mutedHighlights: 'always',
+    });
     useMusicStore.getState().pin('dj');
     useChannelPrefs.getState().addFavorites(['a']);
     const backup = captureBackup();
@@ -98,9 +101,11 @@ describe('complete scenes and backups', () => {
     expect(text).not.toContain('private-secret');
     expect(text).not.toContain('device-client');
     useMusicStore.getState().setMode('off');
-    useSettings.getState().update({ tileGap: 1 });
+    useSettings.getState().update({ tileGap: 1, mutedHighlights: 'off' });
     restoreBackup(parseBackup(text));
     expect(useSettings.getState().tileGap).toBe(9);
+    expect(useSettings.getState().mutedHighlights).toBe('always');
+    expect(sanitizeSettings({ mutedHighlights: 'bad-value' }).mutedHighlights).toBe('editing');
     expect(useSettings.getState().kickClientSecret).toBe('private-secret');
     expect(useMusicStore.getState().pinned).toBe('dj');
     expect(useChannelPrefs.getState().favorites).toEqual(['a']);

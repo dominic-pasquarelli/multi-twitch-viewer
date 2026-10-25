@@ -6,6 +6,9 @@ import { isQualityChoice, type QualityChoice } from '@/lib/player/quality';
 import { zustandStorage } from '@/lib/persistence/zustandStorage';
 
 export type SidebarSort = 'viewers' | 'name' | 'uptime';
+export type MutedHighlights = 'editing' | 'always' | 'off';
+export const isMutedHighlights = (v: unknown): v is MutedHighlights =>
+  v === 'editing' || v === 'always' || v === 'off';
 
 export interface Settings {
   /** Overrides VITE_TWITCH_CLIENT_ID when set. */
@@ -44,6 +47,8 @@ export interface Settings {
   mainPriority: boolean;
   /** Duck audio mode: how loud the background streams play (0–1 of their volume). */
   duckLevel: number;
+  /** Show silent-stream outlines/badges during audio adjustments, always, or never. */
+  mutedHighlights: MutedHighlights;
   /** Focus layout: clicking a small stream makes it the main one. */
   clickToFocus: boolean;
   /** Right-clicking a small stream (not the main one in focus layout) closes it. */
@@ -76,6 +81,7 @@ export const DEFAULT_SETTINGS: Settings = {
   consistentVolume: false,
   mainPriority: true,
   duckLevel: 0.2,
+  mutedHighlights: 'editing',
   clickToFocus: true,
   rightClickCloses: true,
   hideStreamInfo: true,
@@ -112,6 +118,7 @@ export const useSettings = create<SettingsStore>()(
         if (!isQualityChoice(p.mainQuality)) delete p.mainQuality;
         if (!isQualityChoice(p.otherQuality)) delete p.otherQuality;
         if (typeof p.bandwidthSaving !== 'boolean') delete p.bandwidthSaving;
+        if (!isMutedHighlights(p.mutedHighlights)) delete p.mutedHighlights;
         return { ...current, ...p };
       },
     },

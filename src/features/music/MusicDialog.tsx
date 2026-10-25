@@ -2,41 +2,62 @@ import { useState } from 'react';
 import { ArrowDown, ArrowUp, Music2, Pin, Plus, X, Volume2, VolumeX } from 'lucide-react';
 import { parseChannelInput } from '@/lib/channels/parseChannels';
 import { activeMusicChannel } from '@/lib/music/music';
+import { musicCategory } from '@/lib/music/discovery';
 import { useMusicStore } from '@/state/musicStore';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useUi } from '@/state/uiStore';
+import { useViewStore } from '@/state/viewStore';
 import { Button, IconButton } from '@/ui/Button';
 import { Checkbox } from '@/ui/Form';
 import { Dialog } from '@/ui/Dialog';
 import { useUsersFor } from '../follows/queries';
 import { useMusicStatus } from './useMusic';
 import { MusicChannelPicker } from './MusicChannelPicker';
+import { DJListeningMode } from './DJListeningMode';
 import formStyles from '@/ui/Form.module.css';
 import styles from './MusicDialog.module.css';
 
 export function MusicButton() {
   const music = useMusicStore();
   const channel = activeMusicChannel(music);
+  const appMuted = useViewStore((s) => s.mutedFrom !== null);
+  const output = useChannelPrefs((s) => s.output);
+  const label =
+    music.mode === 'off'
+      ? 'DJ off'
+      : music.paused
+        ? 'DJ paused'
+        : music.muted || music.volume === 0 || appMuted || output === 0
+          ? 'DJ muted'
+          : channel
+            ? `DJ: ${channel}`
+            : 'DJ: waiting';
   return (
-    <IconButton
-      size="sm"
-      icon={<Music2 size={16} />}
-      active={music.mode !== 'off'}
-      label={
-        channel
-          ? `Music: ${channel}${music.muted ? ' (muted)' : ''}`
-          : 'Music: choose DJs and priority'
-      }
+    <Button
+      size="small"
+      className={styles.musicButton}
+      aria-label={`DJ & music · ${label}`}
+      aria-haspopup="dialog"
+      data-active={music.mode !== 'off'}
+      title={`${label} · Choose your DJ and how it mixes with stream audio`}
       onClick={() => useUi.getState().openDialog('music')}
       data-testid="music-button"
-    />
+    >
+      <Music2 size={16} aria-hidden="true" />
+      <span>{label}</span>
+    </Button>
   );
 }
 
 export function MusicDialog() {
   const open = useUi((s) => s.dialog === 'music');
   return (
-    <Dialog open={open} title="Music" width={980} onClose={() => useUi.getState().openDialog(null)}>
+    <Dialog
+      open={open}
+      title="DJ & music"
+      width={980}
+      onClose={() => useUi.getState().openDialog(null)}
+    >
       {open && <MusicEditor />}
     </Dialog>
   );
@@ -45,7 +66,9 @@ export function MusicDialog() {
 function MusicEditor() {
   const music = useMusicStore();
   const channel = activeMusicChannel(music);
-  const { live, known, error } = useMusicStatus();
+  const { live, streams, known, error } = useMusicStatus();
+  const appMuted = useViewStore((s) => s.mutedFrom !== null);
+  const appOutput = useChannelPrefs((s) => s.output);
   const users = new Map(
     (useUsersFor(music.channels).data ?? []).map((u) => [u.login, u.displayName]),
   );
@@ -53,45 +76,121 @@ function MusicEditor() {
   const [text, setText] = useState('');
   const parsed = parseChannelInput(text);
   const name = (c: string) => users.get(c) ?? c;
+  const choices = [...new Set([...music.channels, ...(music.pinned ? [music.pinned] : [])])];
+  const status =
+    music.mode === 'off'
+      ? 'Music is off.'
+      : music.paused
+        ? 'Music paused with Pause all.'
+        : channel
+          ? `${music.mode === 'pinned' ? 'Pinned' : 'Selected'}: ${name(channel)}${music.muted ? ' · Muted' : ''}`
+          : error
+            ? 'Could not check live status. Keeping the last selection.'
+            : known
+              ? music.skipped.length || music.musicOnly
+                ? 'No preferred DJs are eligible. Check category rules and session skips below.'
+                : 'No preferred DJs are live. Waiting for one to go live.'
+              : 'Checking which DJs are live…';
   return (
     <div className={styles.editor}>
       <p>
-        Keep a DJ playing while you watch other streams. Automatic uses the first live channel
-        below. Use DJ rules to control category filtering, interruptions and transitions.
+        Choose one DJ for background music, then decide whether to hear your other streams too. Your
+        DJ has a separate volume from priority and background streams.
       </p>
-      <div className={styles.modes} role="group" aria-label="Music selection">
-        <Button aria-pressed={music.mode === 'off'} onClick={() => music.setMode('off')}>
-          Off
-        </Button>
-        <Button
-          aria-pressed={music.mode === 'auto'}
-          disabled={!music.channels.length}
-          onClick={() => music.setMode('auto')}
-        >
-          Automatic
-        </Button>
-        {music.mode === 'pinned' && (
-          <span>
-            <Pin size={14} /> Pinned: {channel && name(channel)}
-          </span>
+      <div className={styles.now}>
+        <div className={styles.nowHeading}>
+          <Music2 size={20} aria-hidden="true" />
+          <strong data-testid="music-status" role="status">
+            {status}
+          </strong>
+        </div>
+        {music.mode !== 'off' && (
+          <small>
+            {music.mode === 'auto' ? 'Automatic selection' : 'One fixed DJ · no automatic fallback'}
+            {' · '}
+            {music.mixWithStreams ? 'DJ + stream audio' : 'DJ only'}
+            {' · '}DJ level {Math.round(music.volume * 100)}%
+          </small>
         )}
-      </div>
-      <div className={styles.now} data-testid="music-status" role="status">
-        {music.mode === 'off'
-          ? 'Music is off.'
-          : music.paused
-            ? 'Music paused with Pause all.'
-            : channel
-              ? `${music.mode === 'pinned' ? 'Pinned' : 'Selected'}: ${name(channel)}${music.muted ? ' · Muted' : ''}`
-              : error
-                ? 'Could not check live status. Keeping the last selection.'
-                : known
-                  ? 'No preferred DJs are live. Waiting for one to go live.'
-                  : 'Checking which DJs are live…'}
         {music.mode === 'auto' && channel && error && (
           <small>Live status unavailable; keeping this DJ.</small>
         )}
+        {music.mode === 'pinned' && channel && known && !live.has(channel) && (
+          <small>
+            This DJ is offline. Waiting for them; choose Automatic to use another live DJ.
+          </small>
+        )}
+        {music.mode !== 'off' && (appMuted || appOutput === 0) && (
+          <div className={styles.notice} role="status">
+            {appMuted && (
+              <>
+                <span>All app audio is muted.</span>
+                <Button size="small" onClick={() => useViewStore.getState().toggleMuteAll()}>
+                  Unmute app
+                </Button>
+              </>
+            )}
+            {appOutput === 0 && (
+              <span>App volume is 0%. Raise App volume in the top bar to hear audio.</span>
+            )}
+          </div>
+        )}
       </div>
+      <h3 className={styles.sectionTitle}>How to choose your DJ</h3>
+      <div className={styles.modes} role="group" aria-label="Music selection">
+        <div className={styles.mode} data-active={music.mode === 'off'}>
+          <Button aria-pressed={music.mode === 'off'} onClick={() => music.setMode('off')}>
+            Off
+          </Button>
+          <small>Use your normal stream audio.</small>
+        </div>
+        <div className={styles.mode} data-active={music.mode === 'auto'}>
+          <Button
+            aria-pressed={music.mode === 'auto'}
+            disabled={!music.channels.length}
+            onClick={() => music.setMode('auto')}
+          >
+            Automatic
+          </Button>
+          <small>Play the first eligible live DJ in your order below.</small>
+        </div>
+        <div className={styles.mode} data-active={music.mode === 'pinned'}>
+          <Button
+            aria-pressed={music.mode === 'pinned'}
+            disabled={!choices.length}
+            onClick={() => {
+              const next =
+                channel ?? music.pinned ?? choices.find((c) => live.has(c)) ?? choices[0];
+              if (next) music.pin(next);
+            }}
+          >
+            Pick a DJ
+          </Button>
+          <small>Keep one DJ until you choose another or turn it off.</small>
+          <select
+            className={formStyles.input}
+            aria-label="Pick a DJ"
+            value={music.mode === 'pinned' ? (music.pinned ?? '') : ''}
+            disabled={!choices.length}
+            onChange={(e) => {
+              if (e.target.value) music.pin(e.target.value);
+            }}
+          >
+            <option value="" disabled>
+              Choose a saved DJ…
+            </option>
+            {choices.map((c) => (
+              <option key={c} value={c}>
+                {name(c)}
+                {live.has(c) ? ' · Live' : known ? ' · Offline' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {!choices.length && <p>Add DJs from your followed channels below to get started.</p>}
+      <h3 className={styles.sectionTitle}>What do you want to hear?</h3>
+      <DJListeningMode />
       <div className={styles.volume}>
         <IconButton
           size="sm"
@@ -99,23 +198,17 @@ function MusicEditor() {
           label={music.muted ? 'Unmute music' : 'Mute music'}
           onClick={() => music.setMuted(!music.muted)}
         />
-        <span>Music volume</span>
+        <span>DJ volume</span>
         <input
           type="range"
           min={0}
           max={100}
           value={Math.round(music.volume * 100)}
-          aria-label="Music volume"
+          aria-label="DJ volume"
           onChange={(e) => music.setVolume(Number(e.target.value) / 100)}
         />
         <output>{Math.round(music.volume * 100)}%</output>
       </div>
-      <Checkbox
-        checked={music.mixWithStreams}
-        onChange={music.setMixWithStreams}
-        label="Mix with stream audio"
-        help="Off: hear only music while watching. On: keep music alongside your Solo, Duck or Mix audio. Music has its own volume; M mutes everything."
-      />
       <details className={styles.rules}>
         <summary>DJ rules and transitions</summary>
         <Checkbox
@@ -156,8 +249,12 @@ function MusicEditor() {
         <MusicChannelPicker />
         <section className={styles.order} aria-label="Your music order">
           <h3>
-            Your music order <small>{music.channels.length}/50</small>
+            Your DJ order <small>{music.channels.length}/50</small>
           </h3>
+          <p className={styles.hint}>
+            Automatic checks from top to bottom. Adding a DJ saves them; use Automatic or Play now
+            to start.
+          </p>
           <form
             className={styles.add}
             onSubmit={(e) => {
@@ -193,6 +290,12 @@ function MusicEditor() {
                 <span className={styles.name}>
                   {name(c)}
                   <small>{live.has(c) ? 'Live' : known ? 'Offline' : 'Checking…'}</small>
+                  {music.skipped.includes(c) && <small>Skipped in Automatic</small>}
+                  {music.musicOnly &&
+                    live.has(c) &&
+                    !streams.some((s) => s.login === c && musicCategory(s.gameName)) && (
+                      <small>Outside Music/DJs · Automatic ignores this DJ</small>
+                    )}
                 </span>
                 <IconButton
                   size="sm"
@@ -208,41 +311,63 @@ function MusicEditor() {
                   disabled={i === music.channels.length - 1}
                   onClick={() => music.moveChannel(c, 1)}
                 />
-                <IconButton
-                  size="sm"
-                  icon={<Pin size={15} />}
-                  label={`Pin ${name(c)} as music`}
-                  active={music.mode === 'pinned' && channel === c}
+                <Button
+                  size="small"
+                  aria-label={`Pin ${name(c)} as music`}
+                  aria-pressed={music.mode === 'pinned' && channel === c}
+                  title="Use this DJ until you choose another or turn DJ mode off"
                   onClick={() => music.pin(c)}
-                />
+                >
+                  {music.mode === 'pinned' && channel === c ? (
+                    <>
+                      <Pin size={13} /> Pinned
+                    </>
+                  ) : (
+                    'Play now'
+                  )}
+                </Button>
                 <IconButton
                   size="sm"
                   icon={<X size={15} />}
                   label={`Remove ${name(c)} from music`}
                   onClick={() => music.removeChannel(c)}
                 />
-                <div className={styles.djOptions}>
-                  <label>
-                    DJ trim{' '}
-                    <input
-                      type="range"
-                      min={25}
-                      max={200}
-                      step={5}
-                      value={Math.round((music.trims[c] ?? 1) * 100)}
-                      aria-label={`${name(c)} DJ trim`}
-                      onChange={(e) => music.setTrim(c, Number(e.target.value) / 100)}
-                    />
-                    <output>{Math.round((music.trims[c] ?? 1) * 100)}%</output>
-                  </label>
-                  <Button
-                    size="small"
-                    disabled={music.skipped.includes(c)}
-                    onClick={() => music.skip(c)}
-                  >
-                    {music.skipped.includes(c) ? 'Skipped this session' : 'Skip this session'}
-                  </Button>
-                </div>
+                <details className={styles.djOptions}>
+                  <summary>
+                    DJ options
+                    {music.trims[c] && music.trims[c] !== 1
+                      ? ` · ${Math.round(music.trims[c]! * 100)}% trim`
+                      : ''}
+                  </summary>
+                  <div>
+                    <label>
+                      Volume trim{' '}
+                      <input
+                        type="range"
+                        min={25}
+                        max={200}
+                        step={5}
+                        value={Math.round((music.trims[c] ?? 1) * 100)}
+                        aria-label={`${name(c)} DJ trim`}
+                        onChange={(e) => music.setTrim(c, Number(e.target.value) / 100)}
+                      />
+                      <output>{Math.round((music.trims[c] ?? 1) * 100)}%</output>
+                    </label>
+                    <Button
+                      size="small"
+                      disabled={
+                        music.mode === 'pinned' && channel === c && !music.skipped.includes(c)
+                      }
+                      onClick={() => (music.skipped.includes(c) ? music.unskip(c) : music.skip(c))}
+                    >
+                      {music.skipped.includes(c) ? 'Include in Automatic' : 'Skip this session'}
+                    </Button>
+                  </div>
+                  <small>
+                    Trim adjusts this DJ relative to DJ volume (100% = unchanged). Session skips
+                    affect Automatic only; a pinned DJ stays selected.
+                  </small>
+                </details>
               </li>
             ))}
           </ol>
@@ -253,7 +378,7 @@ function MusicEditor() {
       </div>
       <small>
         Live status follows the refresh interval in Settings. Pinning a DJ overrides the automatic
-        order until you choose Automatic again.
+        order until you choose Automatic again. M mutes all audio; App volume scales the whole mix.
       </small>
       <Button onClick={() => useUi.getState().openDialog(null)}>Done</Button>
     </div>

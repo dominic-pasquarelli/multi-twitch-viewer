@@ -190,7 +190,7 @@ test('music uses live Helix priority, survives failed checks and syncs native pl
   await page.goto('/');
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await page.getByTestId('music-button').click();
-  const music = page.getByRole('dialog', { name: 'Music', exact: true });
+  const music = page.getByRole('dialog', { name: 'DJ & music', exact: true });
   await music.getByRole('textbox', { name: 'Add music channels' }).fill('alpha bravo');
   await music.getByRole('button', { name: 'Add', exact: true }).click();
   await music.getByRole('button', { name: 'Automatic', exact: true }).click();
@@ -204,12 +204,12 @@ test('music uses live Helix priority, survives failed checks and syncs native pl
       .setVolume(0.22);
   });
   await page.getByTestId('music-button').click();
-  await expect(music.getByRole('slider', { name: 'Music volume' })).toHaveValue('22');
+  await expect(music.getByRole('slider', { name: 'DJ volume' })).toHaveValue('22');
   await music.getByRole('button', { name: 'Done', exact: true }).click();
   failed = true;
   await page.getByRole('button', { name: 'Refresh now' }).click();
   await page.getByTestId('music-button').click();
-  await expect(page.getByTestId('music-status')).toContainText('Live status unavailable', {
+  await expect(music).toContainText('Live status unavailable', {
     timeout: 15000,
   });
   await expect(bravo).toHaveAttribute('data-muted', 'false');
@@ -392,7 +392,7 @@ test('controls follow the pointer into and out of cross-origin videos without in
   await expect(controls).toBeHidden();
   await expect(stream).toHaveAttribute('data-hovered', 'false');
   await expect(stream).toHaveAttribute('data-silent', 'true');
-  await expect(stream).toHaveCSS('outline-style', 'dashed');
+  await expect(stream).not.toHaveCSS('outline-style', 'dashed');
 
   // Jump directly from one video to the other, without entering parent UI.
   const alphaRect = (await page.locator('iframe[data-fake-twitch=alpha]').boundingBox())!;
@@ -408,7 +408,7 @@ test('controls follow the pointer into and out of cross-origin videos without in
   await expect(controls).toBeHidden();
   await expect(stream).toHaveAttribute('data-hovered', 'false');
   await expect(stream).toHaveAttribute('data-silent', 'true');
-  await expect(stream).toHaveCSS('outline-style', 'dashed');
+  await expect(stream).not.toHaveCSS('outline-style', 'dashed');
   await enterVideo();
   await expect(controls).toBeVisible();
   await page.mouse.move(-10, -10);
@@ -416,7 +416,7 @@ test('controls follow the pointer into and out of cross-origin videos without in
   await expect(controls).toBeHidden();
   await expect(stream).toHaveAttribute('data-hovered', 'false');
   await expect(stream).toHaveAttribute('data-silent', 'true');
-  await expect(stream).toHaveCSS('outline-style', 'dashed');
+  await expect(stream).not.toHaveCSS('outline-style', 'dashed');
 });
 
 test('a stream selected with a click keeps playing when Twitch pauses it on that click', async ({
@@ -596,7 +596,7 @@ test('music picker uses offline Helix categories and remains usable when categor
   await page.goto('/');
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await page.getByTestId('music-button').click();
-  const music = page.getByRole('dialog', { name: 'Music', exact: true });
+  const music = page.getByRole('dialog', { name: 'DJ & music', exact: true });
   await music.getByRole('button', { name: 'All followed', exact: true }).click();
   await expect(page.getByTestId('music-choice')).toHaveCount(3);
   await music.getByRole('button', { name: 'Add Alpha to music', exact: true }).click();
@@ -793,11 +793,11 @@ test('DJ level stays independent of Multi focus priorities and rejects stale 100
   await page.getByTestId('channel-row').nth(1).click();
   await page.getByRole('button', { name: 'Multi focus', exact: true }).click();
   await page.getByTestId('music-button').click();
-  const music = page.getByRole('dialog', { name: 'Music', exact: true });
+  const music = page.getByRole('dialog', { name: 'DJ & music', exact: true });
   await music.getByRole('textbox', { name: 'Add music channels' }).fill('alpha bravo');
   await music.getByRole('button', { name: 'Add', exact: true }).click();
-  await music.getByRole('slider', { name: 'Music volume', exact: true }).fill('25');
-  await music.getByRole('checkbox', { name: /Mix with stream audio/ }).check();
+  await music.getByRole('slider', { name: 'DJ volume', exact: true }).fill('25');
+  await music.getByRole('button', { name: 'DJ + stream audio', exact: true }).click();
   await music.getByRole('button', { name: 'Done', exact: true }).click();
   for (const login of ['alpha', 'bravo', 'alpha']) {
     await page.getByTestId('music-button').click();
@@ -821,9 +821,7 @@ test('DJ level stays independent of Multi focus priorities and rejects stale 100
     }, login);
     await expect(frame).toHaveAttribute('data-volume', '0.25', { timeout: 10000 });
     await page.getByTestId('music-button').click();
-    await expect(music.getByRole('slider', { name: 'Music volume', exact: true })).toHaveValue(
-      '25',
-    );
+    await expect(music.getByRole('slider', { name: 'DJ volume', exact: true })).toHaveValue('25');
     await music.getByRole('button', { name: 'Done', exact: true }).click();
   }
 });
@@ -853,15 +851,15 @@ test('system wake and reconnect rebuild active players, refresh live status and 
   await page.getByTestId('channel-row').nth(1).click();
   await page.getByRole('button', { name: 'Multi focus', exact: true }).click();
   await page.getByTestId('music-button').click();
-  const music = page.getByRole('dialog', { name: 'Music', exact: true });
+  const music = page.getByRole('dialog', { name: 'DJ & music', exact: true });
   await music.getByRole('textbox', { name: 'Add music channels' }).fill('alpha');
   await music.getByRole('button', { name: 'Add', exact: true }).click();
   await music
     .locator('[data-testid=music-row][data-channel=alpha]')
     .getByRole('button', { name: /^Pin .* as music$/ })
     .click();
-  await music.getByRole('slider', { name: 'Music volume', exact: true }).fill('25');
-  await music.getByRole('checkbox', { name: /Mix with stream audio/ }).check();
+  await music.getByRole('slider', { name: 'DJ volume', exact: true }).fill('25');
+  await music.getByRole('button', { name: 'DJ + stream audio', exact: true }).click();
   await music.getByRole('button', { name: 'Done', exact: true }).click();
   const alpha = page.locator('iframe[data-fake-twitch=alpha]');
   const bravo = page.locator('iframe[data-fake-twitch=bravo]');

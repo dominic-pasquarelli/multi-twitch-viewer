@@ -4,9 +4,12 @@ import { useMixStore } from '@/state/mixStore';
 import { useMusicStore } from '@/state/musicStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
+import { useSettings, type MutedHighlights } from '@/state/settingsStore';
 import { Button, IconButton } from '@/ui/Button';
-import { Checkbox } from '@/ui/Form';
+import { Checkbox, Field } from '@/ui/Form';
+import formStyles from '@/ui/Form.module.css';
 import { useMusicChannel } from '../music/useMusic';
+import { DJListeningMode } from '../music/DJListeningMode';
 import { setImmersiveMix } from '../viewer/volume';
 import styles from './MixSettings.module.css';
 
@@ -71,6 +74,7 @@ function Level({
 export function MixSettings() {
   const prefs = useMixStore();
   const music = useMusicStore();
+  const mutedHighlights = useSettings((s) => s.mutedHighlights);
   const musicChannel = useMusicChannel();
   const view = useViewStore((s) => s.view);
   const main = useUi((s) => s.mainStream);
@@ -78,6 +82,23 @@ export function MixSettings() {
   const priorities = mixPriorities(view, prefs, musicChannel, main, visibleChannels);
   return (
     <section className={styles.settings} aria-label="Mix controls">
+      <Field
+        label="Muted stream highlights"
+        help="Amber outlines and Muted badges appear on hover, keyboard focus, volume adjustments, in audio/settings panels, or with immersive mix sliders."
+      >
+        <select
+          className={formStyles.input}
+          aria-label="Muted stream highlights"
+          value={mutedHighlights}
+          onChange={(e) =>
+            useSettings.getState().update({ mutedHighlights: e.target.value as MutedHighlights })
+          }
+        >
+          <option value="editing">While adjusting audio</option>
+          <option value="always">Always</option>
+          <option value="off">Off</option>
+        </select>
+      </Field>
       <Checkbox
         checked={prefs.immersive}
         onChange={setImmersiveMix}
@@ -149,19 +170,20 @@ export function MixSettings() {
       )}
       <div className={styles.music}>
         <div className={styles.musicTitle}>
-          <strong>DJ / music</strong>
+          <strong>DJ & music</strong>
           <Button size="small" variant="ghost" onClick={() => useUi.getState().openDialog('music')}>
             Choose DJs
           </Button>
         </div>
+        {music.mode !== 'off' && (
+          <small>
+            {music.mode === 'auto' ? 'Automatic' : 'Pinned'} ·{' '}
+            {musicChannel ?? 'Waiting for a live DJ'}
+          </small>
+        )}
         <Level label="DJ level" value={music.volume} onChange={music.setVolume} />
         {music.mode !== 'off' ? (
-          <Checkbox
-            checked={music.mixWithStreams}
-            onChange={music.setMixWithStreams}
-            label="Mix music with stream audio"
-            help="Off keeps music-only listening. The DJ level follows automatic DJ switches."
-          />
+          <DJListeningMode />
         ) : (
           <small>Music is off. Choose or pin a DJ to use this level.</small>
         )}
