@@ -87,6 +87,65 @@ test('music has its own level alongside multi focus, persists, and respects app 
   expect(session.audio).not.toHaveProperty('suppressed');
 });
 
+test('quick DJ volume follows the selected DJ and preserves output, mute and pause intent', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/novastrike');
+  const quick = page.getByTestId('dj-volume');
+  await expect(quick).toHaveCount(0);
+  await addMusic(page, 'bytebard lunarlatte');
+  await dialog(page).getByRole('button', { name: 'Automatic', exact: true }).click();
+  await dialog(page).getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(quick).toHaveValue('35');
+  await player(page, 'lunarlatte').evaluate((el) =>
+    el.setAttribute('data-mount-check', 'original'),
+  );
+  await quick.fill('20');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-volume', '0.20');
+  await expect(page.getByTestId('output-volume')).toHaveValue('100');
+  await page.getByTestId('output-volume').fill('50');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-volume', '0.10');
+  await quick.fill('0');
+  await expect(quick).toBeVisible();
+  await quick.fill('30');
+  await quick.dispatchEvent('wheel', { deltaY: -100 });
+  await expect(quick).toHaveValue('35');
+  await quick.press('ArrowRight');
+  await expect(quick).toHaveValue('36');
+  await page.getByTestId('music-button').click();
+  await expect(dialog(page).getByRole('slider', { name: 'DJ volume', exact: true })).toHaveValue(
+    '36',
+  );
+  await dialog(page).getByRole('button', { name: 'Done', exact: true }).click();
+  await page.locator('body').press('m');
+  await quick.fill('40');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-muted', 'true');
+  await quick.press('m');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-muted', 'false');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-volume', '0.20');
+  await page.getByTestId('pause-all').click();
+  await quick.fill('50');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-paused', 'true');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-mount-check', 'original');
+  await page.getByTestId('play-all').click();
+  await setLive(page, 'bytebard', true);
+  await expect(player(page, 'bytebard')).toHaveAttribute('data-volume', '0.25');
+  await expect(quick).toHaveValue('50');
+  await page.reload();
+  await expect(quick).toHaveValue('50');
+  await expect(page.getByTestId('output-volume')).toHaveValue('50');
+  await page.setViewportSize({ width: 800, height: 900 });
+  await expect(quick).toBeInViewport();
+  await expect(quick.locator('..').getByText('50%', { exact: true })).toBeVisible();
+  expect((await quick.boundingBox())!.x).toBeGreaterThan(
+    (await page.getByTestId('output-volume').boundingBox())!.x,
+  );
+  await page.getByTestId('music-button').click();
+  await dialog(page).getByRole('button', { name: 'Off', exact: true }).click();
+  await dialog(page).getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(quick).toHaveCount(0);
+});
+
 test('pinning reuses a watched stream, overrides priorities and stops from tile controls', async ({
   page,
 }) => {

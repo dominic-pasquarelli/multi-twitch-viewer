@@ -43,6 +43,9 @@ channels are live, and watch several streams at once with layouts that actually 
   By default you hear only music; choose **DJ + stream audio** to hear your watched streams
   alongside it. The music tile remains visible and reuses an already-watched DJ's player.
   `M` mutes everything, including after an automatic DJ switch; App volume scales music too.
+  While a DJ is selected, a **DJ volume** slider and percentage appear beside App volume in the
+  top bar. Drag, use the arrow keys, or scroll over it to adjust the shared DJ level without opening
+  a menu. It stays available at 0% and while muted/paused; adjusting it preserves mute/pause intent.
   **Pause all** holds playback and automatic selection until **Play all**. **Clear all** or
   closing the selected DJ stops music. The list, mode, volume and mix preference survive restart,
   separately from watched-stream presets and share links. Explicitly arranging/focusing a DJ or
