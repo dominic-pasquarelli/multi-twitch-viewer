@@ -27,7 +27,7 @@ import { LoginButton } from '../auth/LoginPrompt';
 import { HomeButton } from '../favorites/HomeButton';
 import { Mixer } from '../mixer/Mixer';
 import { ImmersiveMixButton } from '../mixer/MixSettings';
-import { OutputVolume } from '../mixer/OutputVolume';
+import { DJVolume, OutputVolume } from '../mixer/OutputVolume';
 import { PresetsMenu } from '../presets/PresetsMenu';
 import { pauseAll, playAll } from '../viewer/playbackActions';
 import { balanceFocusedAudio } from '../viewer/volume';
@@ -154,6 +154,7 @@ export function TopBar() {
           disabled={!playback.channels.length && !musicEnabled}
         />
         <OutputVolume />
+        <DJVolume />
         <ImmersiveMixButton />
         <Mixer />
         <MusicButton />

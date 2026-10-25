@@ -161,6 +161,9 @@ test('Twitch stays the default, while direct Kick lookup opens the same username
   await music.getByRole('slider', { name: 'DJ volume', exact: true }).fill('17');
   await music.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-volume', '0.17');
+  await expect(page.getByTestId('dj-volume')).toHaveValue('17');
+  await page.getByTestId('dj-volume').fill('19');
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-volume', '0.19');
   await tile(page, 'kick:bytebard').hover();
   await tile(page, 'kick:bytebard')
     .getByRole('button', { name: 'Stop music', exact: true })

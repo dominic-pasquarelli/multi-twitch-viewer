@@ -15,6 +15,14 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.djLabel {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+.dj .percent {
+  display: inline;
+}
 /* Narrow windows: the slider stays, the readout moves into its tooltip. */
 @media (max-width: 1700px) {
   .output input {
