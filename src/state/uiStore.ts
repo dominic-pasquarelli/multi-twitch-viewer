@@ -18,6 +18,8 @@ interface UiStore {
   recoveryNotice: string | null;
   dialog: DialogName;
   presetsMenuOpen: boolean;
+  mixerOpen: boolean;
+  setMixerOpen(open: boolean): void;
   fullscreen: boolean;
   /** Fullscreen: the sidebar is kept open beside the streams (B), not just peeking. */
   fullscreenSidebar: boolean;
@@ -60,6 +62,8 @@ export const useUi = create<UiStore>()((set) => ({
   recoveryNotice: null,
   dialog: null,
   presetsMenuOpen: false,
+  mixerOpen: false,
+  setMixerOpen: (mixerOpen) => set({ mixerOpen }),
   fullscreen: false,
   fullscreenSidebar: false,
   setFullscreenSidebar: (fullscreenSidebar) => set({ fullscreenSidebar }),

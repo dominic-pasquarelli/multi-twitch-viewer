@@ -15,6 +15,7 @@ interface MusicStore extends MusicPlayback {
   skipped: string[];
   update(patch: Partial<MusicPreferences>): void;
   skip(channel: string): void;
+  unskip(channel: string): void;
   resetSkips(): void;
   setTrim(channel: string, trim: number): void;
   addChannels(channels: string[]): void;
@@ -38,6 +39,7 @@ export const useMusicStore = create<MusicStore>()(
       skipped: [],
       update: (patch) => set((s) => sanitizeMusic({ ...s, ...patch })),
       skip: (channel) => set((s) => ({ skipped: [...new Set([...s.skipped, channel])] })),
+      unskip: (channel) => set((s) => ({ skipped: s.skipped.filter((c) => c !== channel) })),
       resetSkips: () => set({ skipped: [] }),
       setTrim: (channel, trim) =>
         set((s) => ({ trims: sanitizeMusic({ trims: { ...s.trims, [channel]: trim } }).trims })),

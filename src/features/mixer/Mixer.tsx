@@ -1,5 +1,5 @@
 import { temporaryScale, usePlaybackEffects } from '@/state/playbackEffectsStore';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { Crown, Pin, SlidersHorizontal, Volume2, VolumeX, X } from 'lucide-react';
 import { audioLevel, slotOrder, focusedChannels } from '@/lib/view/operations';
 import { useSettings } from '@/state/settingsStore';
@@ -33,7 +33,8 @@ import { displayedChannels } from '@/lib/view/groups';
  * removes streams (handy for ones you don't follow, which aren't in the sidebar).
  */
 export function Mixer() {
-  const [open, setOpen] = useState(false);
+  const open = useUi((s) => s.mixerOpen);
+  const setOpen = useUi((s) => s.setMixerOpen);
   const wrapRef = useRef<HTMLDivElement>(null);
   const view = usePlaybackView();
   const musicChannel = useMusicChannel();

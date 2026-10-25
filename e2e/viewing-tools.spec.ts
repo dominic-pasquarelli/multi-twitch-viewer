@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 const tile = (page: Page, login: string) =>
   page.locator(`[data-testid=player-tile][data-channel=${login}]`);
 const player = (page: Page, login: string) => tile(page, login).locator('.mock-player');
-const music = (page: Page) => page.getByRole('dialog', { name: 'Music', exact: true });
+const music = (page: Page) => page.getByRole('dialog', { name: 'DJ & music', exact: true });
 const tools = (page: Page) => page.getByRole('dialog', { name: 'Playback tools', exact: true });
 async function addDJs(page: Page, names: string) {
   await page.getByTestId('music-button').click();
@@ -46,12 +46,23 @@ test('DJ rules filter categories, keep the current DJ, skip for the session and 
     .check();
   await music(page).getByRole('button', { name: 'Automatic', exact: true }).click();
   await expect(page.getByTestId('music-status')).toContainText('SynthWaveSam');
-  await music(page).getByRole('slider', { name: 'Music volume', exact: true }).fill('20');
+  await music(page).getByRole('slider', { name: 'DJ volume', exact: true }).fill('20');
+  await page.locator('[data-testid=music-row][data-channel=synthwavesam] summary').click();
   await music(page).getByRole('slider', { name: 'SynthWaveSam DJ trim', exact: true }).fill('50');
   await music(page)
     .getByRole('combobox', { name: 'DJ transition fade', exact: true })
     .selectOption('0.5');
   await expect(player(page, 'synthwavesam')).toHaveAttribute('data-volume', '0.10');
+  await page
+    .locator('[data-testid=music-row][data-channel=synthwavesam]')
+    .getByRole('button', { name: 'Skip this session', exact: true })
+    .click();
+  await expect(page.getByTestId('music-status')).toContainText('No preferred DJs');
+  await page
+    .locator('[data-testid=music-row][data-channel=synthwavesam]')
+    .getByRole('button', { name: 'Include in Automatic', exact: true })
+    .click();
+  await expect(page.getByTestId('music-status')).toContainText('SynthWaveSam');
   await page
     .locator('[data-testid=music-row][data-channel=synthwavesam]')
     .getByRole('button', { name: 'Skip this session', exact: true })
@@ -72,6 +83,7 @@ test('DJ rules filter categories, keep the current DJ, skip for the session and 
   await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.20');
   await page.reload();
   await page.getByTestId('music-button').click();
+  await page.locator('[data-testid=music-row][data-channel=synthwavesam] summary').click();
   await expect(
     music(page).getByRole('slider', { name: 'SynthWaveSam DJ trim', exact: true }),
   ).toHaveValue('50');
@@ -120,7 +132,8 @@ test('complete scenes restore DJs and mix preferences, including through keyboar
   await page.getByRole('slider', { name: 'App volume', exact: true }).fill('40');
   await addDJs(page, 'synthwavesam');
   await music(page).getByRole('button', { name: 'Automatic', exact: true }).click();
-  await music(page).getByRole('slider', { name: 'Music volume', exact: true }).fill('20');
+  await music(page).getByRole('slider', { name: 'DJ volume', exact: true }).fill('20');
+  await page.locator('[data-testid=music-row][data-channel=synthwavesam] summary').click();
   await music(page).getByRole('slider', { name: 'SynthWaveSam DJ trim', exact: true }).fill('50');
   await music(page).getByRole('button', { name: 'Done', exact: true }).click();
   await page.getByTestId('presets-button').click();
@@ -147,6 +160,7 @@ test('muted indicators open actionable reasons and playback health respects manu
   page,
 }) => {
   await page.goto('/#/pixelpaladin/novastrike');
+  await tile(page, 'novastrike').hover();
   await tile(page, 'novastrike').getByTestId('stream-muted-badge').click();
   const audio = page.getByRole('dialog', { name: 'Stream audio', exact: true });
   await expect(audio.getByRole('status')).toHaveText('Muted by Solo');

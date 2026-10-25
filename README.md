@@ -36,7 +36,11 @@ channels are live, and watch several streams at once with layouts that actually 
   to a higher-priority DJ when they go live, and falls back when the current DJ goes offline.
   Use the up/down arrows to change priority, or **Pin as music** on a stream to override the list.
   Music has its own volume and keeps playing while visual focus, presets and group tabs change.
-  By default you hear only music; enable **Mix with stream audio** to hear your watched streams
+  The DJ button shows the selected channel or **DJ off**, **DJ muted**, **DJ paused** or **DJ: waiting**.
+  In **DJ & music**, choose **Off**, **Automatic**, or **Pick a DJ** with the saved-channel dropdown.
+  A pinned DJ waits when offline; Automatic can fall back through your order. Adding a channel saves
+  it without starting playback; **Play now** pins it immediately.
+  By default you hear only music; choose **DJ + stream audio** to hear your watched streams
   alongside it. The music tile remains visible and reuses an already-watched DJ's player.
   `M` mutes everything, including after an automatic DJ switch; App volume scales music too.
   **Pause all** holds playback and automatic selection until **Play all**. **Clear all** or
@@ -45,11 +49,12 @@ channels are live, and watch several streams at once with layouts that actually 
   opening its chat keeps it in the watched view too. Live checks use Settings' refresh
   interval; failed checks retain the last selection. Pinning overrides automatic selection until
   you choose **Automatic** again.
-- **DJ rules and transitions**: expand this section in Music to restrict Automatic to live
+- **DJ rules and transitions**: expand this section in DJ & music to restrict Automatic to live
   **Music / DJs** categories or keep the current DJ until they go offline. Pinning overrides
   category rules. **Skip this session** excludes a DJ from Automatic until the skips are reset
   or the app restarts; it does not remove them from your priority list. A **DJ trim** of 50%
-  plays that channel at half the music level; trims are remembered per DJ and clamp the final
+  plays that channel at half the music level; expand a channel's **DJ options** for trims and session
+  skips. **Include in Automatic** undoes an individual skip. Trims are remembered per DJ and clamp the final
   player level at 100%. Optional 0.5–5 second fades soften automatic switches and DJ starts;
   they do not guarantee a gapless handoff while a new player loads.
 - **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar, History and Also
@@ -119,8 +124,10 @@ channels are live, and watch several streams at once with layouts that actually 
     In the focus layout the main stream plays at the **main level** (100% unless you move its
     slider) while the others keep their own levels: a small stream set to 20% plays at 100% while
     it's the main one and goes back to 20% after. Turn this off in the Mixer or Settings → Audio.
-  - **Muted indicators**: silent tiles have an amber dashed border and a persistent **Muted**
-    badge, without hovering or enabling Mix. Click a badge for its reason and audio controls
+  - **Muted indicators**: by default, silent tiles show an amber dashed border and a **Muted**
+    badge while hovered, keyboard focused, adjusting volume, in audio/settings panels, or with
+    immersive mix enabled. Normal viewing stays clear. **Muted stream highlights** in the Mixer
+    or Settings → Audio also offers **Always** and **Off**. Click a badge for its reason and audio controls
     (Solo, music-only listening, app mute, or a zero volume setting). This includes explicit mutes, 0% stream levels and
     0% App volume. Quiet streams keep their normal appearance; unsupported browser Kick volume
     adjustments are not presented as silence. Video and native player controls stay usable.

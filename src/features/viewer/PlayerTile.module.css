@@ -15,13 +15,19 @@
 .tile.audible {
   outline-color: var(--accent);
 }
-.tile[data-silent='true'] {
+.tile[data-show-muted='true'],
+.tile[data-silent='true'][data-muted-highlights='editing']:is(
+    :focus-visible,
+    :has(.toolbar :focus-visible)
+  ) {
   outline: 2px dashed #dfb56d;
 }
-.tile[data-silent='true']:focus-visible {
+.tile[data-silent='true'][data-muted-highlights='always']:focus-visible,
+.tile[data-silent='true'][data-muted-highlights='editing']:focus-visible {
   outline: 3px solid #f5d7a6;
 }
 .silentBadge {
+  visibility: hidden;
   position: absolute;
   bottom: 44px;
   right: 8px;
@@ -36,8 +42,14 @@
   color: #ffe1ad;
   font-size: 11px;
   font-weight: 600;
-  pointer-events: auto;
+  pointer-events: none;
   cursor: pointer;
+}
+.tile[data-show-muted='true'] .silentBadge,
+.tile[data-muted-highlights='editing']:is(:focus-visible, :has(.toolbar :focus-visible))
+  .silentBadge {
+  visibility: visible;
+  pointer-events: auto;
 }
 .tile.dropTarget {
   outline: 2px dashed var(--text);

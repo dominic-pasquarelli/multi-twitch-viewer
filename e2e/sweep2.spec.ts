@@ -109,7 +109,8 @@ test('one focused stream takes priority across groups while mix and player mount
   for (const login of ['novastrike', 'lunarlatte', 'quickscopequeen']) {
     await expect(tile(page, login)).toHaveAttribute('data-hovered', 'false');
     await expect(tile(page, login)).toHaveAttribute('data-silent', 'true');
-    await expect(tile(page, login)).toHaveCSS('outline-style', 'dashed');
+    await expect(tile(page, login)).not.toHaveCSS('outline-style', 'dashed');
+    await expect(tile(page, login).getByTestId('stream-muted-badge')).toBeHidden();
   }
   await page.screenshot({ path: 'test-results/sweep2-global-focus.png' });
   // An ungrouped stream can also become the one global main tile.

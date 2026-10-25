@@ -8,6 +8,9 @@ import { PlayerController } from '@/lib/player/PlayerController';
 import { pickQuality, type QualityChoice } from '@/lib/player/quality';
 import type { PlayerFactory, PlayerStatus } from '@/lib/player/types';
 import { useUi } from '@/state/uiStore';
+import { useSettings } from '@/state/settingsStore';
+import { useMixStore } from '@/state/mixStore';
+import { useViewStore } from '@/state/viewStore';
 import { IconButton } from '@/ui/Button';
 import { AutoResume } from './autoResume';
 import { PlaybackWatchdog } from './playbackWatchdog';
@@ -98,9 +101,27 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
   const reloadKey = useUi((s) => s.reloadRequests[login] ?? 0);
   const [adjustingVolume, setAdjustingVolume] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [audioFocused, setAudioFocused] = useState(false);
+  const highlights = useSettings((s) => s.mutedHighlights);
+  const audioPanelOpen = useUi(
+    (s) =>
+      s.mixerOpen || s.dialog === 'settings' || s.dialog === 'music' || s.dialog === 'streamAudio',
+  );
+  const immersive = useMixStore((s) => s.immersive);
+  const mix = useViewStore((s) => s.view.audio.mode === 'mix');
+  const showMuted =
+    !!silence &&
+    highlights !== 'off' &&
+    (highlights === 'always' ||
+      hovered ||
+      audioFocused ||
+      adjustingVolume ||
+      audioPanelOpen ||
+      (immersive && mix));
   // Group tabs keep players mounted. Clear transient hover before a hidden
   // tile can be shown again with the pointer somewhere else.
   if (props.hidden && hovered) setHovered(false);
+  if (props.hidden && audioFocused) setAudioFocused(false);
   const latest = useRef(props);
   useLayoutEffect(() => {
     latest.current = props;
@@ -372,6 +393,8 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       data-channel={login}
       data-audible={audible}
       data-silent={!!silence}
+      data-muted-highlights={highlights}
+      data-show-muted={showMuted}
       data-main={props.main}
       data-selected={props.selected}
       data-hovered={hovered}
@@ -380,7 +403,19 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
       aria-hidden={props.hidden || undefined}
       tabIndex={props.hidden ? -1 : 0}
       aria-label={`${login} stream${silence ? ` · ${silence}` : ''}`}
-      onFocus={() => props.onSelect(login)}
+      onFocus={(e) => {
+        // Keep a revealed badge visible while focus moves from the tile onto
+        // its audio controls; CSS visibility alone can cancel that transfer.
+        setAudioFocused(
+          e.target.matches(':focus-visible') ||
+            !!e.target.closest('[data-tile-toolbar], [data-testid="stream-muted-badge"]'),
+        );
+        props.onSelect(login);
+      }}
+      onBlur={(e) => {
+        if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget))
+          setAudioFocused(false);
+      }}
       draggable={props.arranging && !props.hidden}
       onDragStart={(e) => {
         if (!props.arranging || (e.target as Element).closest('button, input, a')) {

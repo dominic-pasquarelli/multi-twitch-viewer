@@ -2,7 +2,7 @@ import { normalizeLogin } from '@/lib/channels/parseChannels';
 import { sanitizeMix } from '@/lib/audio/mixPreferences';
 import { sanitizeMusic } from '@/lib/music/music';
 import { isQualityChoice } from '@/lib/player/quality';
-import { DEFAULT_SETTINGS, type Settings } from '@/state/settingsStore';
+import { DEFAULT_SETTINGS, isMutedHighlights, type Settings } from '@/state/settingsStore';
 
 export type PortableSettings = Omit<Settings, 'clientId' | 'kickClientId' | 'kickClientSecret'>;
 export const record = (input: unknown): Record<string, unknown> =>
@@ -52,6 +52,7 @@ export function sanitizeSettings(input: unknown): PortableSettings {
     Math.round(level(p.refreshSeconds, defaults.refreshSeconds, 600)),
   );
   result.duckLevel = level(p.duckLevel, defaults.duckLevel);
+  if (isMutedHighlights(p.mutedHighlights)) result.mutedHighlights = p.mutedHighlights;
   if (isQualityChoice(p.mainQuality)) result.mainQuality = p.mainQuality;
   if (isQualityChoice(p.otherQuality)) result.otherQuality = p.otherQuality;
   if (p.sidebarSort === 'viewers' || p.sidebarSort === 'name' || p.sidebarSort === 'uptime')

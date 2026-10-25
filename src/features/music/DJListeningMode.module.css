@@ -1,0 +1,19 @@
+.choices {
+  display: grid;
+  gap: 8px;
+}
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.buttons button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.choices p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
