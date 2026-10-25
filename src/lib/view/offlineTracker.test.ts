@@ -33,4 +33,16 @@ describe('OfflineTracker', () => {
     t.update([], live([]), 5);
     expect(t.update(['a'], live([]), 100)).toEqual([]);
   });
+
+  it('keeps live history across unknown status and pauses its grace clock without blocking other sources', () => {
+    const t = new OfflineTracker(10);
+    t.update(['a', 'kick:b'], () => true, 0);
+    t.update(['a', 'kick:b'], () => false, 1);
+    const partial = (login: string) => (login === 'a' ? undefined : false);
+    expect(t.update(['a', 'kick:b'], partial, 5)).toEqual([]);
+    expect(t.update(['a', 'kick:b'], partial, 12)).toEqual(['kick:b']);
+    expect(t.update(['a'], () => false, 20)).toEqual([]);
+    expect(t.update(['a'], () => false, 29)).toEqual([]);
+    expect(t.update(['a'], () => false, 30)).toEqual(['a']);
+  });
 });

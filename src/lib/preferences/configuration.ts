@@ -1,4 +1,4 @@
-import { normalizeLogin } from '@/lib/channels/parseChannels';
+import { normalizeChannel } from '@/lib/channels/parseChannels';
 import { sanitizeMix } from '@/lib/audio/mixPreferences';
 import { sanitizeMusic } from '@/lib/music/music';
 import { isQualityChoice } from '@/lib/player/quality';
@@ -17,7 +17,7 @@ export const channels = (v: unknown): string[] =>
         ...new Set(
           v
             .filter((c): c is string => typeof c === 'string')
-            .map(normalizeLogin)
+            .map(normalizeChannel)
             .filter((c): c is string => !!c),
         ),
       ].slice(0, 5000)
@@ -27,7 +27,7 @@ export const levels = (v: unknown, max = 1): Record<string, number> =>
     Object.entries(record(v))
       .filter(
         ([key, value]) =>
-          normalizeLogin(key) === key && typeof value === 'number' && Number.isFinite(value),
+          normalizeChannel(key) === key && typeof value === 'number' && Number.isFinite(value),
       )
       .slice(0, 5000)
       .map(([key, value]) => [key, level(value, 0, max)]),

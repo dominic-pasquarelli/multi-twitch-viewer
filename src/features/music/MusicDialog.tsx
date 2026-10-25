@@ -266,7 +266,7 @@ function MusicEditor() {
             <input
               className={formStyles.input}
               aria-label="Add music channels"
-              placeholder="DJ names or twitch.tv links"
+              placeholder="Twitch DJs, kick:name, or channel links"
               value={text}
               onChange={(e) => setText(e.target.value)}
             />

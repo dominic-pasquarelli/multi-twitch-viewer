@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { kickChannelUrl, kickSlugFor } from '@/lib/kick';
+import { channelName, kickSlugFromId } from '@/lib/channels/parseChannels';
 import { audioLevel, focusedChannels } from '@/lib/view/operations';
 import { formatCount } from '@/lib/utils/format';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
@@ -49,7 +50,8 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
   const flashN = useUi((s) => (s.volumeFlash?.login === login ? s.volumeFlash.n : 0));
   const store = useViewStore.getState();
   const stream = live.get(login);
-  const kick = kickSlugFor(stream);
+  const directKick = kickSlugFromId(login);
+  const kick = directKick ?? kickSlugFor(stream);
   const kickLink = useChannelPrefs((s) => s.kickLinks[login]);
   const level = audioLevel(view, login, duckLevel);
   const volume = currentVolume(login, volumeModel);
@@ -74,7 +76,7 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
     >
       <div className={styles.heading}>
         <div className={styles.chip} data-testid="stream-chip">
-          <span className={styles.name}>{stream?.displayName ?? login}</span>
+          <span className={styles.name}>{stream?.displayName ?? channelName(login)}</span>
           {kick && <KickBadge />}
           {musicChannel === login && <Music2 size={14} aria-label="Music stream" />}
           {stream && (
@@ -196,18 +198,20 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
             )
           }
         />
-        <IconButton
-          size="sm"
-          label={
-            kickLink
-              ? `Linked to kick.com/${kickLink}: plays from Kick while offline on Twitch`
-              : 'Link a Kick channel: watch there while offline on Twitch'
-          }
-          active={!!kickLink}
-          icon={<Link2 size={15} />}
-          onClick={() => useUi.getState().openKickLinks(login)}
-          data-testid="stream-kick-link"
-        />
+        {!directKick && (
+          <IconButton
+            size="sm"
+            label={
+              kickLink
+                ? `Linked to kick.com/${kickLink}: plays from Kick while offline on Twitch`
+                : 'Link a Kick channel: watch there while offline on Twitch'
+            }
+            active={!!kickLink}
+            icon={<Link2 size={15} />}
+            onClick={() => useUi.getState().openKickLinks(login)}
+            data-testid="stream-kick-link"
+          />
+        )}
         <IconButton
           size="sm"
           label={

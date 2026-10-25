@@ -535,6 +535,134 @@ test('a linked channel offline on Twitch plays through Kick: official API, brows
   expect(kickCalls.filter((c) => c.startsWith('token'))).toHaveLength(1);
 });
 
+test('direct Kick opens and keeps its chat and manual pause without either API account', async ({
+  page,
+}) => {
+  const calls: string[] = [];
+  await stubTwitch(page, calls);
+  await page.route('https://player.kick.com/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<p>Kick player</p>' }),
+  );
+  await page.route('https://kick.com/popout/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<p>Kick chat</p>' }),
+  );
+  await page.goto('/');
+  await page.getByTestId('add-channel').fill('https://kick.com/solo-dj');
+  await page.getByTestId('add-channel').press('Enter');
+  const tile = page.locator('[data-testid=player-tile][data-channel="kick:solo-dj"]');
+  await expect(tile.locator('iframe[data-kick-player="solo-dj"]')).toHaveAttribute(
+    'src',
+    /player\.kick\.com\/solo-dj\?/,
+  );
+  await expect(tile).toHaveAttribute('data-status', 'playing');
+  await tile.hover();
+  await tile.getByRole('button', { name: 'Show chat', exact: true }).click();
+  await expect(page.getByTestId('chat-panel').locator('iframe')).toHaveAttribute(
+    'src',
+    'https://kick.com/popout/solo-dj/chat',
+  );
+  await tile.hover();
+  await tile.getByRole('button', { name: 'Pause kick:solo-dj', exact: true }).click();
+  await expect(tile.locator('iframe')).toHaveCount(0);
+  await page.clock.install();
+  await page.clock.fastForward(95_000);
+  await expect(tile).toBeVisible();
+  await expect(tile).toHaveAttribute('data-status', 'paused');
+  await tile.hover();
+  await tile.getByRole('button', { name: 'Resume kick:solo-dj', exact: true }).click();
+  await expect(tile.locator('iframe')).toHaveAttribute('src', /player\.kick\.com\/solo-dj\?/);
+  expect(calls.filter((c) => c.startsWith('/helix'))).toHaveLength(0);
+});
+
+test('exact Kick lookup handles missing channels and outages without sending Kick names to Twitch', async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'mtv:settings',
+      JSON.stringify({
+        version: 1,
+        state: { kickClientId: 'kick-id', kickClientSecret: 'kick-secret' },
+      }),
+    ),
+  );
+  const calls: string[] = [],
+    twitchNames: string[] = [];
+  await stubTwitch(page, calls);
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.hostname === 'api.twitch.tv')
+      twitchNames.push(
+        ...url.searchParams.getAll('login'),
+        ...url.searchParams.getAll('user_login'),
+      );
+  });
+  let unavailable = false,
+    failures = 0;
+  await page.route('https://id.kick.com/oauth/token', (route) =>
+    route.request().method() === 'OPTIONS'
+      ? route.fulfill({ status: 204, headers: cors })
+      : route.fulfill({ headers: cors, json: { access_token: 'kick-token', expires_in: 3600 } }),
+  );
+  await page.route('https://api.kick.com/public/v1/channels?**', (route) => {
+    if (route.request().method() === 'OPTIONS')
+      return route.fulfill({ status: 204, headers: cors });
+    if (unavailable) {
+      failures++;
+      return route.fulfill({ status: 503, headers: cors, json: { message: 'Unavailable' } });
+    }
+    return route.fulfill({
+      headers: cors,
+      json: {
+        data: new URL(route.request().url()).searchParams
+          .getAll('slug')
+          .filter((s) => s !== 'missing-channel')
+          .map((slug) => ({
+            slug,
+            stream_title: 'Kick set',
+            category: { name: 'Music' },
+            stream: { is_live: true, viewer_count: 10 },
+          })),
+      },
+    });
+  });
+  await page.route('https://player.kick.com/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: 'Kick player' }),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.locator('[data-testid=channel-row][data-channel=alpha]').click();
+  await page.getByRole('combobox', { name: 'Stream platform', exact: true }).selectOption('kick');
+  const input = page.getByTestId('add-channel');
+  await input.fill('missing-channel');
+  await expect(
+    page.getByText('No Kick channel found. Check the exact username.', { exact: true }),
+  ).toBeVisible();
+  await input.press('Enter');
+  await expect(
+    page.locator('[data-testid=player-tile][data-channel="kick:missing-channel"]'),
+  ).toHaveCount(0);
+  await input.fill('dj-one');
+  await page.getByRole('option').filter({ hasText: 'dj-one' }).click();
+  const kick = page.locator('[data-testid=player-tile][data-channel="kick:dj-one"]');
+  await expect(kick.locator('iframe')).toHaveAttribute('data-kick-player', 'dj-one');
+  unavailable = true;
+  await page.getByRole('button', { name: 'Refresh now', exact: true }).click();
+  await expect.poll(() => failures).toBeGreaterThan(0);
+  await expect(kick).toBeVisible();
+  await input.fill('dj-two');
+  await expect(
+    page.getByText('Kick lookup is unavailable. Enter still opens the channel directly.', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await input.press('Enter');
+  await expect(page.locator('iframe[data-kick-player="dj-two"]')).toBeVisible();
+  expect(twitchNames).not.toContain('dj-one');
+  expect(twitchNames).not.toContain('dj-two');
+  expect(twitchNames.some((n) => n.startsWith('kick:'))).toBe(false);
+});
+
 test("the Mixer stays open while you use Twitch's own volume slider, and follows it", async ({
   page,
 }) => {

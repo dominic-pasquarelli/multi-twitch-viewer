@@ -1,4 +1,4 @@
-import { normalizeLogin } from '../channels/parseChannels';
+import { normalizeChannel } from '../channels/parseChannels';
 import { displayedChannels } from '../view/groups';
 import { focusedChannels, mainChannel } from '../view/operations';
 import type { ViewState } from '../view/types';
@@ -35,7 +35,7 @@ export function sanitizeMix(input: unknown): MixPreferences {
     enabled: p.enabled === true,
     prioritySource: p.prioritySource === 'manual' ? 'manual' : 'focus',
     priorities: Array.isArray(p.priorities)
-      ? [...new Set(p.priorities.map((c) => (typeof c === 'string' ? normalizeLogin(c) : null)))]
+      ? [...new Set(p.priorities.map((c) => (typeof c === 'string' ? normalizeChannel(c) : null)))]
           .filter((c): c is string => !!c)
           .slice(0, 3)
       : [],

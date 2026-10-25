@@ -43,6 +43,10 @@ function KickLinksEditor({ onDone }: { onDone(): void }) {
   return (
     <div className={styles.editor}>
       <p>
+        To watch a Kick channel directly, select Kick in the Add channels box, enter a username, or
+        paste a kick.com link. No Twitch link is needed.
+      </p>
+      <p>
         For streamers on both platforms: while a linked channel is offline on Twitch but live on
         Kick, it plays from Kick (in the view, the sidebar and Favorites), then switches back when
         they go live on Twitch.

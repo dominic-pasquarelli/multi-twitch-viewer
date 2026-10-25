@@ -68,7 +68,18 @@ channels are live, and watch several streams at once with layouts that actually 
   row) adds channels by name or link, including ones you don't follow. Loading a preset, a link
   or **Clear all** leaves the view (Undo returns to it); your presets work as before.
   **Settings → Layout → Open on Favorites at launch** starts the app there.
-- **Kick for streamers on both platforms** (optional): link a Twitch channel to the same
+- **Direct Kick channels**: Twitch stays the default in **Add channels**. Select **Kick** to look
+  up an exact username, or paste a `kick.com/name` link / type `kick:name` from either selection.
+  With Kick set up, an exact Kick match also appears after Twitch suggestions. Enter still adds
+  Twitch by default; choose the Kick result explicitly to open it.
+  Kick streams work without a Twitch link or Twitch login, including their Kick chat. Names on the
+  two platforms have separate identities, volumes and favorites; matching usernames are never
+  assumed to belong to the same person. Direct Kick streams save in scenes, sessions, share links,
+  history and backups, and can be pinned as DJs. Favorites join Home and generate alerts when live.
+  Direct opening needs no API credentials; username lookup, live status and automatic selection
+  use the optional [Kick setup](#kick-setup-optional). Missing/error live data is unknown, so it
+  cannot hide or automatically remove a Kick stream.
+- **Twitch-first fallback for streamers on both platforms** (optional): link a Twitch channel to the same
   streamer's Kick channel (🔗 on the stream, or **Settings → Account → Linked Kick channels**).
   While they're offline on Twitch but live on Kick, their stream plays from Kick (marked **Kick**)
   and counts as live in the sidebar, the Favorites view and go-live alerts, with Kick chat in the
@@ -302,14 +313,15 @@ that the app shows **Log in again**, which is one click because Twitch remembers
 
 ### Kick setup (optional)
 
-Only needed for linked Kick channels (**Kick for streamers on both platforms** above). The app
-checks who is live with Kick's official API, which needs your own free Kick app:
+Optional for direct Kick opening, and needed for Kick username lookup, live status, automatic DJ
+selection, favorite alerts and linked fallback. The app uses Kick's official API with your own free Kick app:
 
 1. On [kick.com → Settings → Developer](https://kick.com/settings/developer), create an app.
    Any name works; for the redirect URL use `http://localhost:5757`. No scopes are needed.
 2. Copy its **Client ID** and **Client Secret** into **Settings → Account → Kick**. They stay on
    this computer.
-3. Link channels: 🔗 on a stream's controls, or **Linked Kick channels…** in the same place.
+3. Add Kick channels directly from the top-bar selector. For Twitch-first fallback, optionally
+   link accounts with 🔗 on a Twitch stream's controls, or **Linked Kick channels…** in the same place.
    The Kick name is filled in with the Twitch one; change it if theirs differs.
 
 ## Turbo / no ads
@@ -333,27 +345,27 @@ lack of a "Log in" prompt) is logged in.
 
 ## Using it
 
-| Do this                          | How                                                                                                             |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Add a stream                     | Click it in the sidebar, drag it in, or type names or links in the top box (`/`)                                |
-| Remove a stream                  | Right-click its bar (or its video in the desktop app), click it again in the sidebar, or ✕ above it (then Undo) |
-| Choose what you hear             | `1`–`9`, click the stream (grid with Solo/Duck), the speaker button in the top bar, or unmute it in the player  |
-| Hear the others quietly          | **Duck** in the top bar (background level in Settings)                                                          |
-| Change volume                    | `↑`/`↓`, or scroll over the stream controls in the top bar                                                      |
-| Turn the whole app up or down    | The **App volume** slider next to Mute all                                                                      |
-| Get told when someone goes live  | Star them in the sidebar; allow notifications in Settings → Alerts                                              |
-| Hear several at once             | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                                                        |
-| Balance volumes                  | The Mixer (sliders button in the top bar); **Consistent volume** keeps switching even                           |
-| Pause / unpause streams          | **Pause all** / **Play all** in the top bar; hidden groups stay paused                                          |
-| Watch everyone who's live        | **Watch all** next to _Live_ in the sidebar (only the matches, if you filtered)                                 |
-| Start over with no streams       | 🗑 **Clear all** in the top bar (then Undo if it was a mistake)                                                  |
-| Remove a stream you don't follow | Click it under **Also watching** in the sidebar, or ✕ in the Mixer                                              |
-| Make one stream big              | `L` or **Focus**; click a small playing stream (or ⤢ in the top bar) to make it main                            |
-| Rearrange                        | Enable **Arrange**, then drag a stream window onto another                                                      |
-| Save the current setup           | **Presets** → **Save current…**                                                                                 |
-| See whichever favorites are live | The Home button or `H` (the **★ Favorites** row in Presets); manage the list with ✎ on that row                 |
-| Watch a streamer on Kick         | 🔗 on the stream links their Kick channel; it plays from Kick while they're offline on Twitch                   |
-| Keyboard shortcuts               | `?`                                                                                                             |
+| Do this                          | How                                                                                                                    |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Add a stream                     | Click it in the sidebar, drag it in, or type names or links in the top box (`/`)                                       |
+| Remove a stream                  | Right-click its bar (or its video in the desktop app), click it again in the sidebar, or ✕ above it (then Undo)        |
+| Choose what you hear             | `1`–`9`, click the stream (grid with Solo/Duck), the speaker button in the top bar, or unmute it in the player         |
+| Hear the others quietly          | **Duck** in the top bar (background level in Settings)                                                                 |
+| Change volume                    | `↑`/`↓`, or scroll over the stream controls in the top bar                                                             |
+| Turn the whole app up or down    | The **App volume** slider next to Mute all                                                                             |
+| Get told when someone goes live  | Star them in the sidebar; allow notifications in Settings → Alerts                                                     |
+| Hear several at once             | `Shift+1`–`9`, or switch **Solo audio** to **Mix audio**                                                               |
+| Balance volumes                  | The Mixer (sliders button in the top bar); **Consistent volume** keeps switching even                                  |
+| Pause / unpause streams          | **Pause all** / **Play all** in the top bar; hidden groups stay paused                                                 |
+| Watch everyone who's live        | **Watch all** next to _Live_ in the sidebar (only the matches, if you filtered)                                        |
+| Start over with no streams       | 🗑 **Clear all** in the top bar (then Undo if it was a mistake)                                                         |
+| Remove a stream you don't follow | Click it under **Also watching** in the sidebar, or ✕ in the Mixer                                                     |
+| Make one stream big              | `L` or **Focus**; click a small playing stream (or ⤢ in the top bar) to make it main                                   |
+| Rearrange                        | Enable **Arrange**, then drag a stream window onto another                                                             |
+| Save the current setup           | **Presets** → **Save current…**                                                                                        |
+| See whichever favorites are live | The Home button or `H` (the **★ Favorites** row in Presets); manage the list with ✎ on that row                        |
+| Watch a streamer on Kick         | Select Kick in Add channels, enter `kick:name`, or paste a Kick link; 🔗 on a Twitch stream adds Twitch-first fallback |
+| Keyboard shortcuts               | `?`                                                                                                                    |
 
 Shortcuts pause while a Twitch player has keyboard focus (after you click inside it). Moving the
 mouse off the player hands focus back.

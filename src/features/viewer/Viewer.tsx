@@ -14,6 +14,8 @@ import type { PlayerStatus } from '@/lib/player/types';
 import type { ViewState } from '@/lib/view/types';
 import { streamVolume } from '@/lib/audio/volumeModel';
 import { kickSlugFor } from '@/lib/kick/liveMerge';
+import { kickSlugFromId } from '@/lib/channels/parseChannels';
+import { useServices } from '@/app/servicesContext';
 import { audioLevel, mainChannel, focusedChannels } from '@/lib/view/operations';
 import { displayedChannels, streamSections } from '@/lib/view/groups';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
@@ -65,6 +67,7 @@ const isPrimary = (view: ViewState, login: string, channels: string[]) =>
     : view.audio.active.includes(login);
 
 export function Viewer() {
+  const kickPlaybackKnown = useServices().kickPlayerFactory.capabilities?.playbackState !== false;
   const containerRef = useRef<HTMLDivElement>(null);
   const size = useElementSize(containerRef);
   useLayoutEffect(() => {
@@ -99,10 +102,13 @@ export function Viewer() {
   // Channels shown as tiles: offline ones collapse (if enabled) so live ones get the space.
   const offline = useMemo(
     () =>
-      liveStatus.known
-        ? view.channels.filter((c) => !liveStatus.live.has(c) && playerStatus[c] !== 'playing')
-        : [],
-    [view.channels, liveStatus, playerStatus],
+      view.channels.filter(
+        (c) =>
+          liveStatus.knownFor(c) &&
+          !liveStatus.live.has(c) &&
+          (playerStatus[c] !== 'playing' || (!!kickSlugFromId(c) && !kickPlaybackKnown)),
+      ),
+    [view.channels, liveStatus, playerStatus, kickPlaybackKnown],
   );
   const hiding = hideOffline && !showOffline;
   const visible = useMemo(
@@ -399,10 +405,10 @@ export function Viewer() {
         return (
           <PlayerTile
             key={login}
-            live={liveStatus.known ? liveStatus.live.has(login) : undefined}
+            live={liveStatus.knownFor(login) ? liveStatus.live.has(login) : undefined}
             muteExplanation={muteExplanation(login, baseView, music, appMuted)}
             login={login}
-            kick={kickSlugFor(liveStatus.live.get(login))}
+            kick={kickSlugFromId(login) ?? kickSlugFor(liveStatus.live.get(login))}
             rect={rect}
             audible={level.focused}
             main={view.layout.mode !== 'grid' && focuses.has(login)}

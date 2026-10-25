@@ -1,11 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
-import { parseChannelInput } from '@/lib/channels/parseChannels';
+import {
+  channelName,
+  kickChannelId,
+  kickSlugFromId,
+  parseKickSlug,
+  parseChannelInput,
+  type ChannelPlatform,
+} from '@/lib/channels/parseChannels';
+import { useServices } from '@/app/servicesContext';
+import { useChannelPrefs } from '@/state/channelPrefsStore';
+import { useWatchHistory } from '@/state/historyStore';
+import { KickBadge } from '../kick/KickBadge';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
 import { toast } from '@/state/toastStore';
 import { Avatar } from '@/ui/Avatar';
-import { useChannelSearch, useFollowedChannels, useFollowedLive } from '../follows/queries';
+import {
+  useChannelSearch,
+  useFollowedChannels,
+  useFollowedLive,
+  useKickChannelLookup,
+  useKickLive,
+} from '../follows/queries';
 import styles from './AddChannelBox.module.css';
 
 interface Suggestion {
@@ -14,6 +31,7 @@ interface Suggestion {
   detail: string;
   avatar: string;
   live: boolean;
+  platform?: ChannelPlatform;
 }
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -30,28 +48,40 @@ function useDebounced<T>(value: T, ms: number): T {
  * Enter. Suggestions come from your follows first, then Twitch search.
  */
 export function AddChannelBox() {
+  const { kickApi } = useServices();
+  const [platform, setPlatform] = useState<ChannelPlatform>('twitch');
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   /** Enter only picks a suggestion after you've moved to one with the arrow keys. */
   const [navigated, setNavigated] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const focusRequest = useUi((s) => s.addBoxFocusRequest);
   const inView = useViewStore((s) => s.view.channels);
+  const favorites = useChannelPrefs((s) => s.favorites);
+  const history = useWatchHistory((s) => s.entries);
 
   useEffect(() => {
     if (focusRequest) inputRef.current?.focus();
   }, [focusRequest]);
+  useEffect(() => () => clearTimeout(blurTimer.current), []);
 
   const query = text.trim().toLowerCase();
-  const isSingleName = /^@?[a-z0-9_]*$/i.test(query);
-  const debounced = useDebounced(isSingleName ? query : '', 250);
-  const search = useChannelSearch(debounced);
+  const parsed = parseChannelInput(text, platform);
+  const directKick = parsed.length === 1 ? kickSlugFromId(parsed[0]!) : null;
+  const isSingleName = platform === 'twitch' && !directKick && /^@?[a-z0-9_]*$/i.test(query);
+  const lookupName = directKick ?? parseKickSlug(query);
+  const scoped = `${platform}\n${query}`;
+  const debounced = useDebounced(scoped, 250);
+  const search = useChannelSearch(isSingleName && debounced === scoped ? query : '');
+  const lookup = useKickChannelLookup(debounced === scoped ? lookupName : null);
+  const kickLive = useKickLive();
   const live = useFollowedLive();
   const follows = useFollowedChannels();
 
   const suggestions = useMemo<Suggestion[]>(() => {
-    if (!query || !isSingleName) return [];
+    if (!query || (!isSingleName && !directKick && !lookupName)) return [];
     const q = query.replace(/^@/, '');
     const out: Suggestion[] = [];
     const seen = new Set<string>();
@@ -60,6 +90,34 @@ export function AddChannelBox() {
       seen.add(s.login);
       out.push(s);
     };
+    if (directKick) {
+      if (lookup.data?.slug === directKick)
+        push({
+          login: kickChannelId(directKick),
+          displayName: directKick,
+          detail: lookup.data.isLive
+            ? lookup.data.categoryName || 'Live on Kick'
+            : 'Offline on Kick',
+          avatar: '',
+          live: lookup.data.isLive,
+          platform: 'kick',
+        });
+      for (const id of [...favorites, ...history.map((e) => e.login)]) {
+        const slug = kickSlugFromId(id);
+        if (!slug?.includes(directKick)) continue;
+        const stream = kickLive.get(id);
+        push({
+          login: id,
+          displayName: channelName(id),
+          detail:
+            stream?.gameName || (favorites.includes(id) ? 'Kick favorite' : 'Watched on Kick'),
+          avatar: '',
+          live: !!stream,
+          platform: 'kick',
+        });
+      }
+      return out.slice(0, 10);
+    }
     const avatars = new Map((follows.data ?? []).map((f) => [f.login, f.profileImageUrl]));
     for (const s of live.data ?? []) {
       if (s.login.includes(q) || s.displayName.toLowerCase().includes(q))
@@ -69,6 +127,7 @@ export function AddChannelBox() {
           detail: s.gameName,
           avatar: avatars.get(s.login) ?? '',
           live: true,
+          platform: s.platform,
         });
     }
     for (const f of follows.data ?? []) {
@@ -90,12 +149,48 @@ export function AddChannelBox() {
         live: r.isLive,
       });
     }
+    // An exact Kick match is secondary. Enter still adds Twitch unless the
+    // user explicitly selects Kick, its result, a link or a prefixed name.
+    if (
+      lookup.data &&
+      lookup.data.slug === lookupName &&
+      !inView.includes(kickChannelId(lookup.data.slug))
+    ) {
+      return [
+        ...out.slice(0, 9),
+        {
+          login: kickChannelId(lookup.data.slug),
+          displayName: lookup.data.slug,
+          detail: lookup.data.isLive
+            ? lookup.data.categoryName || 'Live on Kick'
+            : 'Offline on Kick',
+          avatar: '',
+          live: lookup.data.isLive,
+          platform: 'kick' as const,
+        },
+      ];
+    }
     return out.slice(0, 10);
-  }, [query, isSingleName, live.data, follows.data, search.data, inView]);
+  }, [
+    query,
+    isSingleName,
+    directKick,
+    lookupName,
+    lookup.data,
+    favorites,
+    history,
+    kickLive,
+    live.data,
+    follows.data,
+    search.data,
+    inView,
+  ]);
 
   const add = (logins: string[]) => {
     if (!logins.length) {
-      toast('That doesn’t look like a Twitch channel name.', { tone: 'error' });
+      toast('Enter a Twitch name, a Kick name with Kick selected, or a channel link.', {
+        tone: 'error',
+      });
       return;
     }
     useViewStore.getState().addChannels(logins);
@@ -108,17 +203,34 @@ export function AddChannelBox() {
   const submit = () => {
     const pick = suggestions[active];
     if (pick && open && navigated) add([pick.login]);
-    else add(parseChannelInput(text));
+    else if (directKick && lookup.isSuccess && !lookup.data)
+      toast(`No Kick channel found for “${directKick}”. Check the username.`, { tone: 'error' });
+    else add(parsed);
   };
 
   return (
     <div className={styles.wrap}>
+      <select
+        className={styles.platform}
+        aria-label="Stream platform"
+        value={platform}
+        onChange={(e) => {
+          setPlatform(e.target.value as ChannelPlatform);
+          setActive(0);
+          setNavigated(false);
+          setOpen(true);
+          inputRef.current?.focus();
+        }}
+      >
+        <option value="twitch">Twitch</option>
+        <option value="kick">Kick</option>
+      </select>
       <Search size={16} className={styles.icon} />
       <input
         ref={inputRef}
         className={styles.input}
         data-testid="add-channel"
-        placeholder="Add channels…  (/)"
+        placeholder={platform === 'kick' ? 'Kick username or link…' : 'Add channels…  (/)'}
         aria-label="Add channels by name or link"
         value={text}
         onChange={(e) => {
@@ -127,8 +239,16 @@ export function AddChannelBox() {
           setActive(0);
           setNavigated(false);
         }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onFocus={() => {
+          clearTimeout(blurTimer.current);
+          setOpen(true);
+        }}
+        onBlur={() => {
+          clearTimeout(blurTimer.current);
+          blurTimer.current = setTimeout(() => {
+            if (document.activeElement !== inputRef.current) setOpen(false);
+          }, 150);
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') submit();
           else if (e.key === 'Escape') {
@@ -145,8 +265,8 @@ export function AddChannelBox() {
         }}
         onPaste={(e) => {
           const pasted = e.clipboardData.getData('text');
-          const logins = parseChannelInput(pasted);
-          if (logins.length > 1 || /twitch|multi/i.test(pasted)) {
+          const logins = parseChannelInput(pasted, platform);
+          if (logins.length > 1 || /twitch|multi|kick\.com|^kick:/i.test(pasted)) {
             e.preventDefault();
             add(logins);
           }
@@ -168,12 +288,31 @@ export function AddChannelBox() {
                 {s.displayName}
                 <small>{s.detail}</small>
               </span>
+              {s.platform === 'kick' && <KickBadge />}
               {s.live && <span className={styles.badge}>LIVE</span>}
             </button>
           ))}
           <div className={styles.hint}>
-            Enter adds “{text.trim()}” · separate several names with spaces or commas · links work
-            too
+            {directKick ? (
+              <>
+                {inView.includes(kickChannelId(directKick))
+                  ? 'This Kick channel is already open.'
+                  : !kickApi
+                    ? 'Enter opens Kick directly. Set up Kick in Settings → Account for username lookup and live status.'
+                    : debounced !== scoped || lookup.isPending
+                      ? 'Looking up this exact Kick username…'
+                      : lookup.isError
+                        ? 'Kick lookup is unavailable. Enter still opens the channel directly.'
+                        : !lookup.data
+                          ? 'No Kick channel found. Check the exact username.'
+                          : 'Enter opens this Kick channel. Twitch remains your default platform.'}
+              </>
+            ) : (
+              <>
+                Enter adds Twitch “{text.trim()}” · Kick matches appear below when available · use
+                kick:name or a channel link · separate names with spaces or commas
+              </>
+            )}
           </div>
         </div>
       )}

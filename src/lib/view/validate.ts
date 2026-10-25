@@ -1,4 +1,4 @@
-import { normalizeLogin } from '../channels/parseChannels';
+import { normalizeChannel } from '../channels/parseChannels';
 import { MAX_CHANNELS, type ViewState } from './types';
 import { emptyView, normalize } from './operations';
 import { normalizeGroups, sanitizeGroups } from './groups';
@@ -11,7 +11,7 @@ const logins = (v: unknown): string[] =>
     ? [
         ...new Set(
           v
-            .map((x) => (typeof x === 'string' ? normalizeLogin(x) : null))
+            .map((x) => (typeof x === 'string' ? normalizeChannel(x) : null))
             .filter((x): x is string => !!x),
         ),
       ]
@@ -28,8 +28,8 @@ export function sanitizeView(input: unknown): ViewState | null {
   const audio = isObject(input.audio) ? input.audio : {};
   const chat = isObject(input.chat) ? input.chat : {};
   const scale = layout.mainScale;
-  const main = typeof layout.main === 'string' ? normalizeLogin(layout.main) : null;
-  const chatChannel = typeof chat.channel === 'string' ? normalizeLogin(chat.channel) : null;
+  const main = typeof layout.main === 'string' ? normalizeChannel(layout.main) : null;
+  const chatChannel = typeof chat.channel === 'string' ? normalizeChannel(chat.channel) : null;
 
   const channels = logins(input.channels).slice(0, MAX_CHANNELS);
   return normalizeGroups(

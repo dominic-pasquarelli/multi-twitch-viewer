@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const tile = (page: Page, channel: string) =>
-  page.locator(`[data-testid=player-tile][data-channel=${channel}]`);
+  page.locator(`[data-testid=player-tile][data-channel="${channel}"]`);
 const player = (page: Page, channel: string) => tile(page, channel).locator('.mock-player');
 const row = (page: Page, login: string) =>
-  page.locator(`[data-testid=channel-row][data-channel=${login}]`);
+  page.locator(`[data-testid=channel-row][data-channel="${login}"]`);
 type Mock = {
   mtvMock: {
     setLive(login: string, live: boolean): void;
@@ -93,4 +93,109 @@ test('a favorite live only on Kick joins the Favorites view and gets a go-live a
   await refresh(page);
   await expect(page.getByText('ByteBard just went live on Kick')).toBeVisible();
   await expect(player(page, 'bytebard')).toHaveAttribute('data-platform', 'kick');
+});
+
+test('Twitch stays the default, while direct Kick lookup opens the same username independently', async ({
+  page,
+}) => {
+  const input = page.getByTestId('add-channel');
+  const platform = page.getByRole('combobox', { name: 'Stream platform', exact: true });
+  await expect(platform).toHaveValue('twitch');
+  await mock(page, 'setLive', 'bytebard', true);
+  await refresh(page);
+  await input.fill('bytebard');
+  await expect(page.getByRole('option').filter({ hasText: /[Bb]yte[Bb]ard/ })).toHaveCount(2);
+  await expect(
+    page
+      .getByRole('option')
+      .filter({ hasText: /[Bb]yte[Bb]ard/ })
+      .first()
+      .getByTestId('kick-badge'),
+  ).toHaveCount(0);
+  await expect(
+    page
+      .getByRole('option')
+      .filter({ hasText: /[Bb]yte[Bb]ard/ })
+      .last()
+      .getByTestId('kick-badge'),
+  ).toBeVisible();
+  await input.press('Enter');
+  await expect(player(page, 'bytebard')).toHaveAttribute('data-platform', 'twitch');
+  await platform.selectOption('kick');
+  await input.fill('bytebard');
+  await page
+    .getByRole('option')
+    .filter({ hasText: /bytebard/ })
+    .click();
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-platform', 'kick');
+  await expect(page.getByTestId('player-tile')).toHaveCount(2);
+  await tile(page, 'kick:bytebard').hover();
+  await expect(tile(page, 'kick:bytebard').getByTestId('stream-kick-link')).toHaveCount(0);
+  await expect(tile(page, 'kick:bytebard').getByTestId('stream-follow')).toHaveCount(0);
+  await tile(page, 'kick:bytebard').getByRole('slider').fill('22');
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-volume', '0.22');
+  await expect(player(page, 'bytebard')).toHaveAttribute('data-volume', '0.50');
+  await tile(page, 'kick:bytebard').getByRole('button', { name: 'Show chat', exact: true }).click();
+  await expect(page.getByTestId('chat-panel').locator('[data-platform=kick]')).toBeVisible();
+  await tile(page, 'kick:bytebard').hover();
+  await tile(page, 'kick:bytebard').getByTestId('stream-favorite').click();
+  await page.reload();
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-platform', 'kick');
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-volume', '0.22');
+  const prefs = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('mtv:channel-prefs')!).state,
+  );
+  expect(prefs.kickLinks).toEqual({});
+  expect(prefs.favorites).toContain('kick:bytebard');
+  await expect(platform).toHaveValue('twitch');
+  await player(page, 'kick:bytebard').evaluate((el) =>
+    el.setAttribute('data-kick-mount-check', 'original'),
+  );
+  await tile(page, 'kick:bytebard').hover();
+  await tile(page, 'kick:bytebard')
+    .getByRole('button', { name: 'Pin as music', exact: true })
+    .click();
+  await page.getByTestId('music-button').click();
+  const music = page.getByRole('dialog', { name: 'DJ & music', exact: true });
+  await expect(music.getByTestId('music-status')).toContainText('kick:bytebard');
+  await music.getByRole('slider', { name: 'DJ volume', exact: true }).fill('17');
+  await music.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-volume', '0.17');
+  await tile(page, 'kick:bytebard').hover();
+  await tile(page, 'kick:bytebard')
+    .getByRole('button', { name: 'Stop music', exact: true })
+    .click();
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-volume', '0.22');
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-kick-mount-check', 'original');
+});
+
+test('direct Kick favorites join home and alert without a Twitch link; history and scenes preserve them', async ({
+  page,
+}) => {
+  await page.getByTestId('add-channel').fill('kick:bytebard');
+  await page.getByTestId('add-channel').press('Enter');
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-platform', 'kick');
+  await tile(page, 'kick:bytebard').hover();
+  await tile(page, 'kick:bytebard').getByTestId('stream-favorite').click();
+  await page.getByTestId('presets-button').click();
+  await page.getByRole('button', { name: 'Save current…', exact: true }).click();
+  await page.getByTestId('preset-name').fill('Kick desk');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByTestId('clear-all').click();
+  await expect(
+    page.locator('[data-testid=history-row][data-channel="kick:bytebard"]'),
+  ).toBeVisible();
+  await page.getByTestId('presets-button').click();
+  await page.getByTestId('preset-load').filter({ hasText: 'Kick desk' }).click();
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-platform', 'kick');
+  await page.getByTestId('clear-all').click();
+  await page.locator('body').press('h');
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-platform', 'kick');
+  await mock(page, 'setKickLive', 'bytebard', false);
+  await refresh(page);
+  await expect(tile(page, 'kick:bytebard')).toHaveCount(0, { timeout: 10000 });
+  await mock(page, 'setKickLive', 'bytebard', true);
+  await refresh(page);
+  await expect(page.getByText('bytebard just went live on Kick', { exact: true })).toBeVisible();
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-platform', 'kick');
 });

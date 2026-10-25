@@ -28,11 +28,11 @@ src/
 | `history/`     | Log of channels watched without following them (newest first, capped, validated on load).            |                                                                     |
 | `presets/`     | Preset type, export/import file format, validation, merging.                                         | Bump `EXPORT_VERSION` and migrate in `sanitizePreset`.              |
 | `twitch/`      | `TwitchApi` interface, Helix client (auth headers, pagination, 401/429), OAuth helpers, mock API.    | Implement `TwitchApi` (e.g. a caching or proxy variant).            |
-| `kick/`        | Linked Kick channels: `KickApi` (official API, app token), links, URLs, merging Kick-live streams.   | Implement `KickApi` (another source of Kick live status).           |
+| `kick/`        | Direct Kick and Twitch-first fallback: official API, account links, URLs and merged live streams.    | Implement `KickApi` (another source of Kick live status).           |
 | `player/`      | `PlayerAdapter` interface, Twitch and Kick embed adapters, mock player, `PlayerController`, quality. | Implement `PlayerAdapter` for another player.                       |
 | `persistence/` | `KeyValueStore` interface (localStorage with memory fallback) and the zustand adapter.               | Implement `KeyValueStore` (file, sync service…).                    |
 | `alerts/`      | Which streams just went live (for notifications), favorites-first sorting.                           |                                                                     |
-| `channels/`    | Parse names, `@names`, twitch.tv, player and multitwitch links.                                      |                                                                     |
+| `channels/`    | Platform identities and parsing names, `kick:name`, Twitch/Kick/player and multitwitch links.        |                                                                     |
 | `utils/`       | Formatting helpers (viewer counts, uptime, thumbnails).                                              |                                                                     |
 
 ### `state/`: stores
@@ -130,10 +130,17 @@ Behaviour notes:
   stays closed), and `useDropOfflineStreams` always lets favorites leave once offline, with other
   streams following the temporary-view rule. Undo entries record the flag, so undoing a preset
   load returns to it.
-- **Kick is a fallback, not a second source of truth.** `useFollowedLive` and `useStreamsFor`
+- **Twitch is primary; direct Kick channels have explicit identities.** Unprefixed channel IDs
+  remain Twitch logins for backward compatibility; `kick:slug` identifies a direct Kick stream.
+  `lib/channels/parseChannels.ts` normalizes these identities, and persistence/import/share-link
+  boundaries retain them. Twitch API queries filter out direct Kick IDs. Kick API requests batch
+  linked, watched, saved DJ, favorite and history slugs. Exact lookup is optional; player/chat
+  routing uses the explicit identity even when neither API is available. `LiveStatus.knownFor`
+  keeps unknown/error status for one platform from hiding or dropping another platform's streams.
+  `useFollowedLive` and `useStreamsFor`
   merge linked channels live only on Kick into their results as `LiveStream`s with
   `platform: 'kick'` (`lib/kick/liveMerge.ts`; Twitch always wins), so the sidebar, Favorites,
-  alerts, offline hiding and hover info need no Kick code. A tile whose stream is on Kick creates
+  alerts, offline hiding and hover info can share the same live model. A tile on Kick creates
   the Kick player instead (a platform switch reloads it). Kick players report
   `capabilities.volume`: in the desktop app the main process controls the frame's video and the
   app's mute/volume are re-applied every second (Kick's player restores its own volume after an

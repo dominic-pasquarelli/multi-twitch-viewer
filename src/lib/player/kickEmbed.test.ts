@@ -11,7 +11,7 @@ describe('Kick player (browser: no remote control)', () => {
   it('loads with the first mute state, reloads to change it and unloads to pause', async () => {
     const host = document.createElement('div');
     const factory = createKickPlayerFactory();
-    expect(factory.capabilities).toEqual({ volume: false });
+    expect(factory.capabilities).toEqual({ volume: false, playbackState: false });
     const player = factory.create(host, { channel: 'xqc', muted: true });
     const statuses: string[] = [];
     // The controller applies the app's state on ready, before the frame loads.
@@ -56,7 +56,7 @@ describe('Kick player (desktop: frame control)', () => {
     });
     const host = document.createElement('div');
     const factory = createKickPlayerFactory(control);
-    expect(factory.capabilities).toEqual({ volume: true });
+    expect(factory.capabilities).toEqual({ volume: true, playbackState: true });
     const player = factory.create(host, { channel: 'xqc', muted: true });
     player.setMuted(false);
     player.setVolume(0.4);

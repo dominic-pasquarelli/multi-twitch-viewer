@@ -17,15 +17,17 @@ export function createMockKickApi(): KickApi {
         setTimeout(
           () =>
             resolve(
-              slugs.map((slug): KickChannel => ({
-                slug,
-                isLive: live.get(slug) ?? false,
-                title: `${slug} on Kick`,
-                categoryName: 'IRL',
-                viewerCount: 321,
-                startedAt: new Date(Date.now() - 20 * 60_000).toISOString(),
-                thumbnailUrl: '',
-              })),
+              slugs
+                .filter((slug) => live.has(slug))
+                .map((slug): KickChannel => ({
+                  slug,
+                  isLive: live.get(slug) ?? false,
+                  title: `${slug} on Kick`,
+                  categoryName: 'IRL',
+                  viewerCount: 321,
+                  startedAt: new Date(Date.now() - 20 * 60_000).toISOString(),
+                  thumbnailUrl: '',
+                })),
             ),
           120,
         ),

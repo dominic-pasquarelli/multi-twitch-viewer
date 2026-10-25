@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useServices } from '@/app/servicesContext';
 import { kickChatUrl, kickSlugFor } from '@/lib/kick';
+import { channelName, kickSlugFromId } from '@/lib/channels/parseChannels';
 import { chatEmbedUrl } from '@/lib/twitch/embedUrls';
 import { displayedChannels } from '@/lib/view/groups';
 import { useViewStore } from '@/state/viewStore';
@@ -26,7 +27,7 @@ export function ChatPanel() {
   const setChat = useViewStore((s) => s.setChat);
   // A stream playing from Kick shows its Kick chat.
   const live = useLiveStatus(view.channels).live;
-  const kickFor = (c: string) => kickSlugFor(live.get(c));
+  const kickFor = (c: string) => kickSlugFromId(c) ?? kickSlugFor(live.get(c));
   const [recent, setRecent] = useState<string[]>([]);
 
   // Track recently opened tabs (derived during render; React re-renders once).
@@ -46,7 +47,7 @@ export function ChatPanel() {
             className={styles.tab}
             onClick={() => setChat({ channel: c })}
           >
-            {c}
+            {channelName(c)}
             {kickFor(c) && <KickBadge />}
           </button>
         ))}

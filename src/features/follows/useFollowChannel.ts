@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useServices } from '@/app/servicesContext';
 import { toast } from '@/state/toastStore';
 import { useFollowedChannels } from './queries';
+import { isValidLogin } from '@/lib/channels/parseChannels';
 
 /**
  * Following needs Twitch itself (its API no longer lets apps follow for you):
@@ -15,6 +16,7 @@ export function useFollowChannel() {
   const followed = new Set((follows.data ?? []).map((f) => f.login));
 
   const follow = async (login: string) => {
+    if (!isValidLogin(login)) return;
     await openFollowPage(login);
     await queryClient.invalidateQueries({ queryKey: ['followed-channels'] });
     await queryClient.invalidateQueries({ queryKey: ['followed-live'] });
@@ -26,7 +28,7 @@ export function useFollowChannel() {
 
   return {
     /** Known (follow list loaded) and not followed. */
-    canFollow: (login: string) => follows.isSuccess && !followed.has(login),
+    canFollow: (login: string) => isValidLogin(login) && follows.isSuccess && !followed.has(login),
     follow,
   };
 }
