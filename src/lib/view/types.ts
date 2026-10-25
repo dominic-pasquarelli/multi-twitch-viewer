@@ -36,6 +36,8 @@ export interface ViewState {
     mode: AudioMode;
     /** Channels that are unmuted. */
     active: string[];
+    /** Runtime-only playback exclusions (e.g. inactive DJs); never persisted by music. */
+    suppressed?: string[];
   };
   chat: {
     open: boolean;

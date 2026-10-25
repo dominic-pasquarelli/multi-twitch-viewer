@@ -15,6 +15,9 @@
  * Pure functions; the stores hold the state.
  */
 export interface VolumeModel {
+  /** Music has a separate level, unaffected by video focus or the consistent-volume master. */
+  musicChannel?: string | null;
+  musicVolume?: number;
   consistent: boolean;
   /** Consistent mode: the volume you hear (0–1). */
   master: number;
@@ -40,6 +43,7 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
  * null = no preference yet: leave the player's own volume.
  */
 export function streamVolume(m: VolumeModel, login: string): number | null {
+  if (m.musicChannel === login) return m.musicVolume ?? 0.35;
   const main = isPriorityMain(m, login);
   if (m.consistent)
     return round2(clamp(m.master * (main ? mainLevel(m) : (m.balance[login] ?? 1)), 0, 1));

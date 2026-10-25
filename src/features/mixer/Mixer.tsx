@@ -16,6 +16,7 @@ import {
   useVolumeModel,
 } from '../viewer/volume';
 import styles from './Mixer.module.css';
+import { usePlaybackView, useMusicChannel } from '../music/useMusic';
 
 /**
  * Every stream's level in one place (top-bar popover), for balancing the
@@ -25,7 +26,8 @@ import styles from './Mixer.module.css';
 export function Mixer() {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const view = useViewStore((s) => s.view);
+  const view = usePlaybackView();
+  const musicChannel = useMusicChannel();
   const duckLevel = useSettings((s) => s.duckLevel);
   const update = useSettings((s) => s.update);
   const mainPriority = useSettings((s) => s.mainPriority);
@@ -72,7 +74,7 @@ export function Mixer() {
             checked={volumeModel.consistent}
             onChange={(v) => update({ consistentVolume: v })}
             label="Consistent volume"
-            help="Every stream you switch to plays at the same master volume. The sliders below then even out a loud or quiet streamer."
+            help="Video streams you switch to play at the same master volume. The sliders below then even out a loud or quiet streamer. Music keeps its separate level."
           />
           {!multi && (
             <Checkbox
@@ -101,7 +103,7 @@ export function Mixer() {
             const level = audioLevel(view, login, duckLevel);
             const volume = currentVolume(login, volumeModel);
             const name = live.get(login)?.displayName ?? login;
-            const isMain = volumeModel.priorityMain === login;
+            const isMain = volumeModel.priorityMain === login && musicChannel !== login;
             return (
               <div
                 key={login}
@@ -132,6 +134,7 @@ export function Mixer() {
                 />
                 <span className={styles.name} title={name}>
                   {i < 9 && <kbd>{i + 1}</kbd>} {name}
+                  {musicChannel === login && <span className={styles.mainTag}>Music</span>}
                   {(isMain || (multi && focused.includes(login))) && (
                     <span
                       className={styles.mainTag}
@@ -163,7 +166,10 @@ export function Mixer() {
                   onClick={() => {
                     useViewStore.getState().removeChannel(login);
                     toast(`Removed ${name}`, {
-                      action: { label: 'Undo', run: () => useViewStore.getState().undo() },
+                      action:
+                        musicChannel !== login
+                          ? { label: 'Undo', run: () => useViewStore.getState().undo() }
+                          : undefined,
                     });
                   }}
                 />

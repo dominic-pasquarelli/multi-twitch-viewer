@@ -72,7 +72,7 @@ export function useFollowedChannels() {
  * Live status of specific channels (e.g. the ones on screen that you don't
  * follow), including linked ones live only on Kick.
  */
-export function useStreamsFor(logins: string[]) {
+export function useStreamsFor(logins: string[], pollInBackground = false) {
   const { api } = useServices();
   const refreshSeconds = useSettings((s) => s.refreshSeconds);
   const key = [...logins].sort();
@@ -81,6 +81,7 @@ export function useStreamsFor(logins: string[]) {
     queryFn: () => api!.getStreamsByLogins(key),
     enabled: !!api && key.length > 0,
     refetchInterval: refreshSeconds * 1000,
+    refetchIntervalInBackground: pollInBackground,
     placeholderData: keepPreviousData,
   });
   const kick = useKickLive();

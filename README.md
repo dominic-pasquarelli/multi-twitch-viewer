@@ -26,6 +26,20 @@ channels are live, and watch several streams at once with layouts that actually 
   - Turn on **Arrange**, then drag anywhere on a stream onto another to swap them. Streams
     never reload when they move.
   - Offline channels step aside and give their space to live ones, then come back when they go live.
+- **Music / DJ priority**: open the music-note button in the top bar to add an ordered list of
+  preferred DJs (or import your favorites). **Automatic** plays the first live channel, switches
+  to a higher-priority DJ when they go live, and falls back when the current DJ goes offline.
+  Use the up/down arrows to change priority, or **Pin as music** on a stream to override the list.
+  Music has its own volume and keeps playing while visual focus, presets and group tabs change.
+  By default you hear only music; enable **Mix with stream audio** to hear your watched streams
+  alongside it. The music tile remains visible and reuses an already-watched DJ's player.
+  `M` mutes everything, including after an automatic DJ switch; App volume scales music too.
+  **Pause all** holds playback and automatic selection until **Play all**. **Clear all** or
+  closing the selected DJ stops music. The list, mode, volume and mix preference survive restart,
+  separately from watched-stream presets and share links. Explicitly arranging/focusing a DJ or
+  opening its chat keeps it in the watched view too. Live checks use Settings' refresh
+  interval; failed checks retain the last selection. Pinning overrides automatic selection until
+  you choose **Automatic** again.
 - **Favorites and go-live alerts**: star channels (☆ on hover in the sidebar, History and Also
   watching included, or on a stream) to
   keep them at the top. When a favorite goes live you get a Windows notification; click it to start

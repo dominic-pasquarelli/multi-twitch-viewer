@@ -7,6 +7,8 @@ import { sanitizeView } from '@/lib/view/validate';
 import type { AudioMode, ViewState } from '@/lib/view/types';
 import type { LayoutMode, MainScale } from '@/lib/layout';
 import { useSettings } from './settingsStore';
+import { useMusicStore } from './musicStore';
+import { activeMusicChannel, withMusic } from '@/lib/music/music';
 
 const HISTORY_LIMIT = 20;
 
@@ -72,6 +74,14 @@ interface ViewStore {
 export const useViewStore = create<ViewStore>()(
   persist(
     (set, get) => {
+      // Explicitly arranging, focusing or opening chat makes an extra DJ part of
+      // the watched view. Automatic playback alone never changes that view.
+      const watchMusic = (view: ViewState, logins: (string | null | undefined)[]) => {
+        const channel = activeMusicChannel(useMusicStore.getState());
+        if (!channel || !logins.includes(channel) || view.channels.includes(channel)) return view;
+        const next = ops.addChannels(view, [channel]);
+        return view.activeGroup ? groups.assignGroup(next, channel, view.activeGroup) : next;
+      };
       /** Applies a change; `undoable` changes are recorded for undo. */
       const apply = (fn: (v: ViewState) => ViewState, undoable = false) => {
         const before = get().view;
@@ -123,7 +133,11 @@ export const useViewStore = create<ViewStore>()(
           apply((v) => ({ ...ops.watchOnly(v, logins), groups: [], activeGroup: null }), true);
           set({ home: true, pinned: false });
         },
-        removeChannel: (login) => apply((v) => ops.removeChannel(v, login), true),
+        removeChannel: (login) => {
+          if (activeMusicChannel(useMusicStore.getState()) === login)
+            useMusicStore.getState().setMode('off');
+          apply((v) => ops.removeChannel(v, login), true);
+        },
         removeChannels: (logins) =>
           apply((v) => logins.reduce((acc, l) => ops.removeChannel(acc, l), v), true),
         setPinned: (pinned) => set({ pinned }),
@@ -138,16 +152,28 @@ export const useViewStore = create<ViewStore>()(
           apply((v) => ({ ...ops.watchOnly(v, logins), groups: [], activeGroup: null }), true);
           set({ home: false });
         },
-        replaceChannel: (t, r) =>
+        replaceChannel: (t, r) => {
+          if (
+            !get().view.channels.includes(t) &&
+            activeMusicChannel(useMusicStore.getState()) === t
+          ) {
+            useMusicStore.getState().pin(r);
+            return;
+          }
           apply((v) => {
             const next = ops.replaceChannel(v, t, r);
             return v.channels.includes(r)
               ? groups.swapGroupChannels(next, t, r)
               : groups.replaceGroupChannel(next, t, r);
-          }, true),
+          }, true);
+        },
         swapChannels: (a, b) =>
-          apply((v) => groups.swapGroupChannels(ops.swapChannels(v, a, b), a, b), true),
+          apply(
+            (v) => groups.swapGroupChannels(ops.swapChannels(watchMusic(v, [a, b]), a, b), a, b),
+            true,
+          ),
         clear: () => {
+          useMusicStore.getState().setMode('off');
           apply((v) => ({ ...ops.watchOnly(v, []), groups: [], activeGroup: null }), true);
           set({ home: false });
         },
@@ -184,10 +210,11 @@ export const useViewStore = create<ViewStore>()(
               : next;
           }),
         setFocusedChannels: (logins) => apply((v) => ops.setFocusedChannels(v, logins)),
-        toggleFocusedChannel: (login) => apply((v) => ops.toggleFocusedChannel(v, login)),
+        toggleFocusedChannel: (login) =>
+          apply((v) => ops.toggleFocusedChannel(watchMusic(v, [login]), login)),
         setMain: (login) =>
           apply((v) => {
-            const next = ops.setMain(v, login);
+            const next = ops.setMain(watchMusic(v, [login]), login);
             return ops.hasSingleFocus(next.audio.mode) && useSettings.getState().audioFollowsMain
               ? ops.focusAudio(next, login)
               : next;
@@ -203,14 +230,48 @@ export const useViewStore = create<ViewStore>()(
         assignGroup: (login, id) => apply((v) => groups.assignGroup(v, login, id), true),
         setActiveGroup: (id) => apply((v) => ({ ...v, activeGroup: id })),
 
-        toggleAudio: (login) => apply((v) => ops.toggleAudio(v, login)),
-        focusAudio: (login) => apply((v) => ops.focusAudio(v, login)),
+        toggleAudio: (login) => {
+          const music = useMusicStore.getState();
+          if (activeMusicChannel(music) === login) {
+            music.setMuted(!music.muted);
+            return;
+          }
+          if (music.mode !== 'off' && music.channels.includes(login)) {
+            music.pin(login);
+            music.setMuted(false);
+            return;
+          }
+          if (music.mode !== 'off' && !music.mixWithStreams) {
+            music.setMixWithStreams(true);
+            apply((v) => ops.focusAudio(v, login));
+          } else apply((v) => ops.toggleAudio(v, login));
+        },
+        focusAudio: (login) => {
+          const music = useMusicStore.getState();
+          if (
+            music.mode !== 'off' &&
+            (activeMusicChannel(music) === login || music.channels.includes(login))
+          ) {
+            if (activeMusicChannel(music) !== login) music.pin(login);
+            music.setMuted(false);
+            music.setMixWithStreams(false);
+            return;
+          }
+          if (music.mode !== 'off') music.setMixWithStreams(true);
+          apply((v) => ops.focusAudio(v, login));
+        },
         toggleMuteAll: () => {
           const { view, mutedFrom } = get();
-          if (view.audio.active.length) {
+          const music = useMusicStore.getState();
+          if (
+            withMusic(view, music).audio.active.length ||
+            (music.mode !== 'off' && !music.muted)
+          ) {
+            music.setMuted(true);
             set({ view: ops.muteAll(view), mutedFrom: view.audio.active });
             return;
           }
+          music.setMuted(false);
           const restore = (mutedFrom ?? []).filter((c) => view.channels.includes(c));
           const fallback = ops.mainChannel(view, groups.displayedChannels(view));
           const active = restore.length
@@ -226,9 +287,24 @@ export const useViewStore = create<ViewStore>()(
           });
         },
         setAudioMode: (mode) => apply((v) => ops.setAudioMode(v, mode)),
-        externalMuteChange: (login, muted) => apply((v) => ops.externalMuteChange(v, login, muted)),
+        externalMuteChange: (login, muted) => {
+          const music = useMusicStore.getState();
+          if (activeMusicChannel(music) === login) {
+            music.setMuted(muted);
+            return;
+          }
+          if (!muted && music.mode !== 'off') {
+            if (music.channels.includes(login)) {
+              music.pin(login);
+              music.setMuted(false);
+              return;
+            }
+            music.setMixWithStreams(true);
+          }
+          apply((v) => ops.externalMuteChange(v, login, muted));
+        },
 
-        setChat: (chat) => apply((v) => ops.setChat(v, chat)),
+        setChat: (chat) => apply((v) => ops.setChat(watchMusic(v, [chat.channel]), chat)),
       };
     },
     {

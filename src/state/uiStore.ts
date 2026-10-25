@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { PlayerStatus } from '@/lib/player/types';
 
 export type DialogName =
-  'settings' | 'shortcuts' | 'savePreset' | 'setup' | 'favorites' | 'kick' | null;
+  'settings' | 'shortcuts' | 'savePreset' | 'setup' | 'favorites' | 'kick' | 'music' | null;
 
 /** Transient UI state (never persisted). */
 interface UiStore {

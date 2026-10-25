@@ -34,15 +34,17 @@ import { PlayerTile } from './PlayerTile';
 import { useElementSize } from './useElementSize';
 import { keepOwnVolume, setStreamVolume, useVolumeModel } from './volume';
 import styles from './Viewer.module.css';
+import { getPlaybackView, usePlaybackView, useMusicChannel } from '../music/useMusic';
 
-/** Closes any reachable stream surface consistently, with Undo. */
+/** Closes any reachable stream surface; ordinary removals support Undo. */
 function closeStream(login: string) {
   if (!useSettings.getState().rightClickCloses) return;
   const store = useViewStore.getState();
-  if (!store.view.channels.includes(login)) return;
+  if (!getPlaybackView().channels.includes(login)) return;
+  const wasWatched = store.view.channels.includes(login);
   store.removeChannel(login);
   toast(`Closed ${login}`, {
-    action: { label: 'Undo', run: () => useViewStore.getState().undo() },
+    action: wasWatched ? { label: 'Undo', run: () => useViewStore.getState().undo() } : undefined,
   });
 }
 
@@ -55,7 +57,8 @@ const isPrimary = (view: ViewState, login: string, channels: string[]) =>
 export function Viewer() {
   const containerRef = useRef<HTMLDivElement>(null);
   const size = useElementSize(containerRef);
-  const view = useViewStore((s) => s.view);
+  const view = usePlaybackView();
+  const musicChannel = useMusicChannel();
   const actions = useViewStore.getState();
   const {
     tileGap,
@@ -86,8 +89,11 @@ export function Viewer() {
   );
   const hiding = hideOffline && !showOffline;
   const visible = useMemo(
-    () => (hiding ? view.channels.filter((c) => !offline.includes(c)) : view.channels),
-    [hiding, view.channels, offline],
+    () =>
+      hiding
+        ? view.channels.filter((c) => c === musicChannel || !offline.includes(c))
+        : view.channels,
+    [hiding, view.channels, offline, musicChannel],
   );
   useStreamHotkeys(visible);
   const groupChannels = useMemo(() => displayedChannels(view), [view]);

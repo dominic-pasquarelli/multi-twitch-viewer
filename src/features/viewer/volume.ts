@@ -12,6 +12,8 @@ import { useSettings } from '@/state/settingsStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
 import { playerRegistry } from './playerRegistry';
+import { activeMusicChannel } from '@/lib/music/music';
+import { useMusicStore } from '@/state/musicStore';
 
 export const VOLUME_STEP = 0.05;
 
@@ -31,7 +33,17 @@ const model = (): VolumeModel => {
     useViewStore.getState().view,
     useUi.getState().mainStream,
   );
-  return { consistent: consistentVolume, volumes, master, balance, mainLevel, priorityMain };
+  const music = useMusicStore.getState();
+  return {
+    consistent: consistentVolume,
+    volumes,
+    master,
+    balance,
+    mainLevel,
+    priorityMain,
+    musicChannel: activeMusicChannel(music),
+    musicVolume: music.volume,
+  };
 };
 
 /** The volume model, for components (re-renders when any part changes). */
@@ -44,8 +56,19 @@ export function useVolumeModel(): VolumeModel {
   const mainLevel = useChannelPrefs((s) => s.mainLevel);
   const view = useViewStore((s) => s.view);
   const mainStream = useUi((s) => s.mainStream);
+  const musicChannel = useMusicStore(activeMusicChannel);
+  const musicVolume = useMusicStore((s) => s.volume);
   const priorityMain = priorityMainOf(mainPriority, view, mainStream);
-  return { consistent, volumes, master, balance, mainLevel, priorityMain };
+  return {
+    consistent,
+    volumes,
+    master,
+    balance,
+    mainLevel,
+    priorityMain,
+    musicChannel,
+    musicVolume,
+  };
 }
 
 /** What a stream plays at: its set volume, else what its player reports, else 50%. */
@@ -59,6 +82,7 @@ export function currentVolume(login: string, m: VolumeModel = model()): number {
  */
 export function keepOwnVolume(login: string): void {
   const m = model();
+  if (m.musicChannel === login) return;
   if (m.consistent || m.volumes[login] !== undefined || m.priorityMain === login) return;
   const own = playerRegistry.get(login)?.adapter.getVolume();
   if (own !== undefined) useChannelPrefs.getState().setVolume(login, own);
@@ -66,11 +90,19 @@ export function keepOwnVolume(login: string): void {
 
 /** "Hear this stream at `volume`" (moves the master volume in consistent mode). */
 export function setStreamVolume(login: string, volume: number): void {
+  if (activeMusicChannel(useMusicStore.getState()) === login) {
+    useMusicStore.getState().setVolume(volume);
+    return;
+  }
   useChannelPrefs.getState().applyVolume(setHeardVolume(model(), login, volume));
 }
 
 /** A mixer row: this stream's level in the mix (its balance in consistent mode). */
 export function setStreamMix(login: string, volume: number): void {
+  if (activeMusicChannel(useMusicStore.getState()) === login) {
+    useMusicStore.getState().setVolume(volume);
+    return;
+  }
   useChannelPrefs.getState().applyVolume(setMixVolume(model(), login, volume));
 }
 
@@ -80,7 +112,9 @@ export function balanceFocusedAudio(): void {
   const channels = focusedChannels(view);
   const m = model();
   const volume = (m.consistent ? m.master : 1) / Math.max(2, channels.length);
-  channels.forEach((login) => setStreamMix(login, volume));
+  channels
+    .filter((login) => login !== m.musicChannel)
+    .forEach((login) => setStreamMix(login, volume));
 }
 
 export function setMaster(volume: number): void {
@@ -99,6 +133,11 @@ export function nudgeVolume(login: string, delta: number): void {
 
 /** ↑/↓: louder or quieter for what you're hearing (once, in consistent mode). */
 export function nudgeHeard(logins: string[], delta: number): void {
+  const musicChannel = activeMusicChannel(useMusicStore.getState());
+  if (musicChannel && logins.includes(musicChannel)) {
+    nudgeVolume(musicChannel, delta);
+    logins = logins.filter((c) => c !== musicChannel);
+  }
   if (!logins.length) return;
   if (!useSettings.getState().consistentVolume) {
     logins.forEach((login) => nudgeVolume(login, delta));

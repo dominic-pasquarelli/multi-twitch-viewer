@@ -36,6 +36,7 @@ export default defineConfig({
         'favorites.spec.ts',
         'controls.spec.ts',
         'multi-focus.spec.ts',
+        'music.spec.ts',
         'kick.spec.ts',
         'fullscreen.spec.ts',
       ],
