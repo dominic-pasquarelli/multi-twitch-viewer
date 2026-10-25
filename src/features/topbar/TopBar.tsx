@@ -26,6 +26,7 @@ import { IconButton } from '@/ui/Button';
 import { LoginButton } from '../auth/LoginPrompt';
 import { HomeButton } from '../favorites/HomeButton';
 import { Mixer } from '../mixer/Mixer';
+import { ImmersiveMixButton } from '../mixer/MixSettings';
 import { OutputVolume } from '../mixer/OutputVolume';
 import { PresetsMenu } from '../presets/PresetsMenu';
 import { pauseAll, playAll } from '../viewer/playbackActions';
@@ -151,6 +152,7 @@ export function TopBar() {
           disabled={!playback.channels.length && !musicEnabled}
         />
         <OutputVolume />
+        <ImmersiveMixButton />
         <Mixer />
         <MusicButton />
       </div>

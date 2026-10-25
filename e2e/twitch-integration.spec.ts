@@ -224,6 +224,48 @@ test('music uses live Helix priority, survives failed checks and syncs native pl
   await expect(bravo).toHaveCount(0);
 });
 
+test('immersive mix links native volume changes while keeping cross-origin player controls usable', async ({
+  page,
+}) => {
+  await stubTwitch(page, [], true);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByTestId('channel-row').nth(0).click();
+  await page.getByTestId('channel-row').nth(1).click();
+  await page.getByRole('button', { name: 'Multi focus', exact: true }).click();
+  await page.getByTestId('immersive-mix-toggle').click();
+  await page.getByTestId('mixer-button').click();
+  await page
+    .getByTestId('mixer')
+    .getByRole('checkbox', { name: /Set levels by role/ })
+    .check();
+  await page.keyboard.press('Escape');
+  await page.getByTestId('output-volume').fill('50');
+  const alpha = page.locator('iframe[data-fake-twitch=alpha]');
+  const bravo = page.locator('iframe[data-fake-twitch=bravo]');
+  await expect(alpha).toHaveAttribute('data-volume', '0.35');
+  await expect(bravo).toHaveAttribute('data-volume', '0.35');
+  await page.evaluate(() => {
+    type Fake = { opts: { channel: string }; setVolume(v: number): void };
+    (window as unknown as { __fakePlayers: Fake[] }).__fakePlayers
+      .find((p) => p.opts.channel === 'alpha')!
+      .setVolume(0.3);
+  });
+  const bar = page.locator('[data-testid=stream-mix-overlay][data-channel=alpha]');
+  await expect(bar.getByRole('slider')).toHaveValue('60');
+  await expect(bravo).toHaveAttribute('data-volume', '0.3');
+  // Native iframe controls remain clickable outside the compact volume overlay.
+  const video = page.frameLocator('iframe[data-fake-twitch=alpha]');
+  await page.locator('[data-testid=player-tile][data-channel=alpha]').hover();
+  await video.getByRole('button', { name: 'Native player control' }).click();
+  await expect(video.locator('body')).toHaveAttribute('data-clicks', '1');
+  await expect(bar).toBeVisible();
+  await bar.getByRole('slider').focus();
+  await page.keyboard.press('m');
+  await expect(alpha).toHaveAttribute('data-muted', 'true');
+  await expect(bravo).toHaveAttribute('data-muted', 'true');
+});
+
 test('logs in with Twitch, lists live follows and plays them through the embed API', async ({
   page,
 }) => {

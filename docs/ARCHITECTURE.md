@@ -43,6 +43,7 @@ src/
 | `presetsStore`          | `presets`       | Saved presets                                                                                                                          |
 | `settingsStore`         | `settings`      | Preferences (gap, audio behaviour, quality, Client ID, Kick app credentials…)                                                          |
 | `channelPrefsStore`     | `channel-prefs` | Per-channel volume, favorites, app output volume, Kick links                                                                           |
+| `mixStore`              | `mix`           | Immersive overlay, fixed priority/background levels and automatic/manual audio priority preferences                                    |
 | `musicStore`            | `music`         | DJ priority, off/auto/pinned mode, independent volume/mute and mix preference; current automatic DJ and Pause all hold are memory only |
 | `authStore`             | `auth`          | Twitch token + user                                                                                                                    |
 | `uiStore`, `toastStore` | (not saved)     | Open dialogs, fullscreen, player status, toasts                                                                                        |
@@ -142,6 +143,16 @@ Behaviour notes:
   `mainLevel`: that stream plays at the main level, and setting its volume anywhere (hover
   slider, Mixer, arrow keys, Twitch's own slider) sets the main level instead of its own, which
   it gets back when another stream is main.
+- **Immersive Mix uses the same volume model as every other control.** `mixStore` persists
+  validated overlay/role preferences under `mtv:mix`. `mixPriorities` chooses up to three visible
+  videos from visual focus or a manual list, excludes the current DJ, and does not use mute state.
+  `uiStore.visibleChannels` carries the Viewer's group/offline-filtered surface. In Mix only,
+  fixed priority/background levels override normal per-channel/consistent/main levels without
+  overwriting them; music keeps its separate level. Overlay, Mixer, hover, keyboard and native
+  player changes route through `setStreamMix`/`setStreamVolume`. Shared-role keyboard adjustments
+  are applied once per role, not once per member. The compact overlay leaves the iframe mounted
+  and its native controls interactive, stops click/context-menu propagation, and reports intended
+  output after mute/playback/app-volume scaling. Fixed levels are percentages, not an audio meter.
 - **App volume is applied last.** The output level multiplies each tile's duck scale before it
   reaches the player, and is divided back out of volume changes made with Twitch's own slider, so
   per-channel volumes and the mix are unchanged.

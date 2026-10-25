@@ -40,7 +40,11 @@ export function useStreamHotkeys(visible: string[]): void {
 export function useHotkeys(): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || isTyping(e.target) || e.altKey) return;
+      const rangeMute =
+        e.target instanceof HTMLInputElement &&
+        e.target.type === 'range' &&
+        e.key.toLowerCase() === 'm';
+      if (e.defaultPrevented || (isTyping(e.target) && !rangeMute) || e.altKey) return;
       const view = useViewStore.getState();
       const ui = useUi.getState();
 

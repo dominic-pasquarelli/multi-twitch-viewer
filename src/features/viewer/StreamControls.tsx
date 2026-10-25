@@ -1,3 +1,4 @@
+import { fixedMixRole } from '@/lib/audio/volumeModel';
 import {
   ExternalLink,
   Heart,
@@ -48,6 +49,7 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
   const kickLink = useChannelPrefs((s) => s.kickLinks[login]);
   const level = audioLevel(view, login, duckLevel);
   const volume = currentVolume(login, volumeModel);
+  const role = fixedMixRole(volumeModel, login);
   const multi = view.layout.mode === 'multi-focus';
   const focused = focusedChannels(view);
 
@@ -91,11 +93,13 @@ export function StreamControls({ login, main }: { login: string; main: boolean }
           value={Math.round(volume * 100)}
           aria-label={`${stream?.displayName ?? login} volume`}
           title={
-            musicChannel === login
-              ? 'Music volume: stays the same when visual focus changes'
-              : volumeModel.priorityMain === login
-                ? 'Main stream level: whichever stream is main plays at this (scroll to adjust)'
-                : "This stream's mix volume (scroll to adjust)"
+            role === 'priority' || role === 'background'
+              ? `Shared ${role} level: changes every stream using this role`
+              : musicChannel === login
+                ? 'Music volume: stays the same when visual focus changes'
+                : volumeModel.priorityMain === login
+                  ? 'Main stream level: whichever stream is main plays at this (scroll to adjust)'
+                  : "This stream's mix volume (scroll to adjust)"
           }
           onChange={(e) => {
             setStreamMix(login, Number(e.target.value) / 100);

@@ -85,6 +85,20 @@ channels are live, and watch several streams at once with layouts that actually 
     In the focus layout the main stream plays at the **main level** (100% unless you move its
     slider) while the others keep their own levels: a small stream set to 20% plays at 100% while
     it's the main one and goes back to 20% after. Turn this off in the Mixer or Settings → Audio.
+  - **Immersive mix** (overlay button beside the Mixer) keeps a compact slider, mute button,
+    priority crown and percentage over every visible stream. It also works with app fullscreen.
+    Each card shows its level and the output after App volume; muted streams stay muted when
+    adjusting sliders. `M` works even while a slider has keyboard focus. Switch to Solo/Duck or
+    toggle the overlay off to hide it; the preference survives restart.
+  - **Set levels by role** (Mixer or Settings → Audio) gives up to three priority streams a
+    shared percentage. Follow the large streams in Focus/Multi focus, or use crowns to select
+    audio priorities independently of layout. Grid follows the first visible stream.
+    Optionally give other audible streams a shared **Background level**, and set **DJ level**
+    directly in the same panel. For example: priority 70%, background 15%, DJ 25%.
+    Fixed percentages apply before App volume and bypass the Consistent-volume master.
+    Sliders marked **linked** change every stream using that role; disabling role levels restores
+    individual balances. Choosing a priority does not unmute it. These are player volume settings,
+    not loudness normalization. Mix preferences are saved globally, separately from presets and links.
   - **App volume** (slider next to Mute all): one level for everything the app plays, on top of
     each stream's own volume and the mix. Scroll over it to adjust; it's remembered.
   - **Mixer** (sliders button next to them): every stream's volume in one list, to balance the

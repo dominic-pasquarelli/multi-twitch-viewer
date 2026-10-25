@@ -14,6 +14,7 @@ import { markInteraction, pausedByUser, selectedRecently } from './playerInterac
 import { playerRegistry } from './playerRegistry';
 import { playbackRecovery } from './playbackRecovery';
 import { StreamControls } from './StreamControls';
+import { StreamMixOverlay } from '../mixer/StreamMixOverlay';
 import styles from './PlayerTile.module.css';
 
 export interface PlayerTileProps {
@@ -337,6 +338,8 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
         // real Twitch players are iframes, detected via focus in the Viewer.
         onPointerDown={() => markInteraction(login)}
       />
+
+      <StreamMixOverlay login={login} hidden={props.hidden} kick={!!kick} />
 
       {!hovered && !props.hidden && !props.arranging && (
         <div className={styles.hoverEntry} data-player-entry aria-hidden="true" />

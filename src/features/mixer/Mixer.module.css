@@ -7,7 +7,7 @@
   top: 38px;
   left: 0;
   z-index: 40;
-  width: 410px;
+  width: 460px;
   max-width: calc(100vw - 24px);
   max-height: 70vh;
   overflow-y: auto;
@@ -45,7 +45,8 @@
   color: var(--text-muted);
 }
 .row input[type='range'] {
-  width: 140px;
+  width: 115px;
+  min-width: 45px;
   accent-color: var(--accent);
 }
 .percent {
@@ -86,4 +87,16 @@
   .row input[type='range'] {
     width: clamp(70px, 22vw, 140px);
   }
+}
+
+.readout {
+  display: grid;
+  justify-items: end;
+  width: 42px;
+  flex-shrink: 0;
+}
+.readout small {
+  font-size: 9px;
+  color: var(--text-muted);
+  white-space: nowrap;
 }

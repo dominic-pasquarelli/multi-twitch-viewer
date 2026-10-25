@@ -99,6 +99,7 @@ export function Viewer() {
   const groupChannels = useMemo(() => displayedChannels(view), [view]);
   const shown = useMemo(() => displayedChannels(view, visible), [view, visible]);
   const sections = useMemo(() => streamSections(view, visible), [view, visible]);
+  useEffect(() => useUi.getState().setVisibleChannels(shown), [shown]);
   const hidden = useMemo(
     () => new Set(view.channels.filter((c) => !groupChannels.includes(c))),
     [view.channels, groupChannels],
