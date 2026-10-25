@@ -18,6 +18,12 @@ export interface PlayerControllerCallbacks {
 }
 
 export interface PlayerControllerOptions {
+  /** Keep delayed app-command echoes from rewriting the selected mix. */
+  adoptExternalChange?: (
+    kind: 'mute' | 'volume',
+    value: number | boolean,
+    recentCommand: boolean,
+  ) => boolean;
   /** Ignore differences this soon after we sent a command (it may not have applied yet). */
   graceMs?: number;
   now?: () => number;
@@ -38,6 +44,9 @@ export class PlayerController {
   private readonly now: () => number;
   private readonly adapter: PlayerAdapter;
   private readonly callbacks: PlayerControllerCallbacks;
+  private readonly adoptExternalChange: NonNullable<PlayerControllerOptions['adoptExternalChange']>;
+  // Common embed defaults are not evidence that a user changed a configured level.
+  private previousVolumes: number[] = [0, 0.5, 1];
   private recoveryQualityCap: number | null = null;
   private appliedQuality: string | undefined;
   status: PlayerStatus = 'loading';
@@ -50,6 +59,7 @@ export class PlayerController {
   ) {
     this.adapter = adapter;
     this.callbacks = callbacks;
+    this.adoptExternalChange = options.adoptExternalChange ?? (() => true);
     this.desired = { ...initial };
     this.graceMs = options.graceMs ?? 1500;
     this.now = options.now ?? (() => Date.now());
@@ -90,9 +100,22 @@ export class PlayerController {
 
   private apply(state: Partial<DesiredPlayerState>) {
     this.lastCommandAt = this.now();
-    if (state.volume !== undefined && state.volume !== null) this.adapter.setVolume(state.volume);
+    if (state.volume !== undefined && state.volume !== null) {
+      this.rememberVolume(state.volume);
+      this.adapter.setVolume(state.volume);
+    }
     if (state.muted !== undefined) this.adapter.setMuted(state.muted);
     if (state.quality !== undefined || this.recoveryQualityCap !== null) this.applyQuality();
+  }
+
+  private rememberVolume(value: number) {
+    // Retain the old output levels for this embed. A late 100%/duck-level echo
+    // must not rewrite a new DJ or priority setting merely because time elapsed.
+    this.previousVolumes = this.previousVolumes.filter(
+      (previous) => Math.abs(previous - value) > 0.01,
+    );
+    this.previousVolumes.push(value);
+    this.previousVolumes = this.previousVolumes.slice(-128);
   }
 
   /** Temporarily limits bandwidth without replacing the user's quality preference. */
@@ -121,13 +144,28 @@ export class PlayerController {
     if (!this.ready || this.now() - this.lastCommandAt < this.graceMs) return;
     const muted = this.adapter.getMuted();
     if (muted !== this.desired.muted) {
-      this.desired.muted = muted;
-      this.callbacks.onExternalMute?.(muted);
+      if (this.adoptExternalChange('mute', muted, false)) {
+        this.desired.muted = muted;
+        this.callbacks.onExternalMute?.(muted);
+      } else this.apply({ muted: this.desired.muted });
     }
     const volume = this.adapter.getVolume();
+    if (!Number.isFinite(volume) || volume < 0 || volume > 1) return;
     if (this.desired.volume === null || Math.abs(volume - this.desired.volume) > 0.01) {
+      if (
+        this.desired.volume !== null &&
+        !this.adoptExternalChange(
+          'volume',
+          volume,
+          this.previousVolumes.some((previous) => Math.abs(previous - volume) <= 0.01),
+        )
+      ) {
+        this.apply({ volume: this.desired.volume });
+        return;
+      }
       const wasUnset = this.desired.volume === null;
       this.desired.volume = volume;
+      this.rememberVolume(volume);
       if (!wasUnset || volume > 0) this.callbacks.onExternalVolume?.(volume);
     }
   }

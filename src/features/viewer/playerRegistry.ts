@@ -66,6 +66,11 @@ export function playAll(): void {
   const allowed: string[] = [];
   const view = withMusic(useViewStore.getState().view, useMusicStore.getState());
   const shown = new Set(displayedChannels(view));
+  for (const login of view.channels) {
+    clearInteraction(login);
+    playbackRecovery.setGroupHidden(login, !shown.has(login));
+    playbackRecovery.allowManualPlay(login);
+  }
   playerRegistry.forEach(({ adapter, controller }, login) => {
     clearInteraction(login);
     if (view.channels.includes(login)) playbackRecovery.setGroupHidden(login, !shown.has(login));
@@ -82,6 +87,8 @@ export function playAll(): void {
 export function pauseAll(): void {
   useMusicStore.getState().setPaused(true);
   if (document.activeElement instanceof HTMLIFrameElement) document.activeElement.blur();
+  const view = withMusic(useViewStore.getState().view, useMusicStore.getState());
+  for (const login of view.channels) playbackRecovery.pauseManually(login);
   playerRegistry.forEach(({ adapter }, login) => {
     clearInteraction(login);
     playbackRecovery.pauseManually(login);

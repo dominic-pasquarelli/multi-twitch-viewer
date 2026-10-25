@@ -25,6 +25,8 @@ export function useDropOfflineStreams(): void {
   const enabled = useSettings((s) => s.dropOfflineStreams);
   const liveStatus = useLiveStatus(channels);
   const tracker = useRef(new OfflineTracker());
+  const resumeGraceUntil = useRef(0);
+  const lastChecked = useRef<number | null>(null);
 
   const rules = { home, favorites, temporary: enabled && !pinned };
   const latest = useRef({ channels, liveStatus, rules });
@@ -33,7 +35,23 @@ export function useDropOfflineStreams(): void {
   });
 
   useEffect(() => {
+    const onResume = () => {
+      tracker.current = new OfflineTracker();
+      resumeGraceUntil.current = Date.now() + 15_000;
+    };
+    window.addEventListener('mtv:resume', onResume);
+    return () => window.removeEventListener('mtv:resume', onResume);
+  }, []);
+
+  useEffect(() => {
     const check = () => {
+      const now = Date.now();
+      if (lastChecked.current !== null && now - lastChecked.current >= 30_000) {
+        tracker.current = new OfflineTracker();
+        resumeGraceUntil.current = now + 15_000;
+      }
+      lastChecked.current = now;
+      if (now < resumeGraceUntil.current) return;
       const { channels, liveStatus, rules } = latest.current;
       if (!liveStatus.known) return;
       tracker.current.graceMs = offlineDrop.graceMs;

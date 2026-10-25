@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { usePresets } from '@/state/presetsStore';
-import { useViewStore } from '@/state/viewStore';
+import { loadPreset } from '../presets/scenes';
 import { Button } from '@/ui/Button';
 import styles from './EmptyState.module.css';
 
@@ -35,7 +35,7 @@ export function EmptyState({ title, action }: EmptyStateProps) {
             <p>Or load a saved preset:</p>
             <div className={styles.presets}>
               {presets.map((p) => (
-                <Button key={p.id} onClick={() => useViewStore.getState().loadView(p.view)}>
+                <Button key={p.id} onClick={() => loadPreset(p)}>
                   {p.name}
                 </Button>
               ))}

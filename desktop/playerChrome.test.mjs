@@ -11,6 +11,7 @@ import {
   pressPlay,
   inspectPlayerError,
   scanPlayerErrors,
+  playbackIntent,
 } from './playerChrome.mjs';
 
 // A cut-down Twitch player: video, stream-info overlay on top, controls below.
@@ -260,4 +261,33 @@ describe('which frames are touched', () => {
     applyPlayerChrome(null, { hideStreamInfo: true });
     expect(ran).toHaveLength(1);
   });
+});
+
+it('recognizes trusted playback intent without treating focus, volume changes or recovery clicks as a pause request', () => {
+  document.body.innerHTML =
+    '<div data-a-target="video-player"><video></video><div id="surface"></div><div data-a-target="player-controls"><button data-a-target="player-play-pause-button">Pause</button><input type="range" /></div></div>';
+  const video = document.querySelector('video');
+  const button = document.querySelector('button');
+  Object.defineProperty(video, 'paused', { value: false, configurable: true });
+  expect(playbackIntent({ isTrusted: true, target: button, type: 'pointerdown' })).toBe(true);
+  expect(
+    playbackIntent({
+      isTrusted: true,
+      target: document.querySelector('#surface'),
+      type: 'pointerdown',
+    }),
+  ).toBe(true);
+  expect(playbackIntent({ isTrusted: false, target: button, type: 'pointerdown' })).toBeNull();
+  expect(
+    playbackIntent({
+      isTrusted: true,
+      target: document.querySelector('input'),
+      type: 'pointerdown',
+    }),
+  ).toBeNull();
+  expect(playbackIntent({ isTrusted: true, target: video, type: 'focus' })).toBeNull();
+  Object.defineProperty(video, 'paused', { value: true, configurable: true });
+  expect(playbackIntent({ isTrusted: true, target: button, type: 'keydown', key: 'Enter' })).toBe(
+    false,
+  );
 });

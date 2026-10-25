@@ -1,10 +1,5 @@
 import type { PlayerPlaybackStats, PlayerStatus } from '@/lib/player/types';
-import {
-  interactedRecently,
-  interactionVersion,
-  playerHasFocus,
-  setIntentionalPause,
-} from './playerInteraction';
+import { interactedRecently, interactionVersion, setIntentionalPause } from './playerInteraction';
 
 export interface RecoverySample {
   login: string;
@@ -37,7 +32,7 @@ export class PlaybackRecovery {
   private lastResumeAt = -Infinity;
   private degraded = false;
   private bandwidthSaving = true;
-  private manualPauseInteraction = new Map<string, { version: number; time: number }>();
+  private manualPauseInteraction = new Map<string, { version: number }>();
 
   constructor(private readonly now: () => number = Date.now) {}
 
@@ -57,6 +52,22 @@ export class PlaybackRecovery {
     return Boolean(this.holds.get(login)?.size);
   }
 
+  pauseReasons(login: string): readonly string[] {
+    return [...(this.holds.get(login) ?? [])];
+  }
+
+  releaseAutomaticHold(login: string) {
+    this.release(login, 'bandwidth');
+  }
+
+  resetNetworkPressure() {
+    this.stalledSince.clear();
+    this.unexpectedPauses = [];
+    this.lastPressureAt = -Infinity;
+    this.lastResumeAt = -Infinity;
+    this.degraded = false;
+  }
+
   /** Used by Play all to honor a tab switch before the next recovery tick. */
   setGroupHidden(login: string, hidden: boolean) {
     if (hidden) this.addHold(login, 'group');
@@ -67,7 +78,6 @@ export class PlaybackRecovery {
     this.addHold(login, 'manual');
     this.manualPauseInteraction.set(login, {
       version: interactionVersion(login),
-      time: this.now(),
     });
     setIntentionalPause(login, true);
   }
@@ -78,17 +88,21 @@ export class PlaybackRecovery {
     setIntentionalPause(login, false);
   }
 
-  observeStatus(login: string, status: PlayerStatus, userPause: boolean) {
+  observeStatus(
+    login: string,
+    status: PlayerStatus,
+    userPause: boolean,
+    acceptInteractionResume = true,
+  ) {
     const manual = this.manualPauseInteraction.get(login);
     // The interaction which paused a stream cannot also authorize an autoplay
-    // after its iframe remounts. A new click, or play inside the focused iframe,
-    // does authorize it.
+    // after its iframe remounts. Only a new interaction (or the desktop native
+    // play-intent message) authorizes it; stale iframe focus is not consent.
     const userPlayed =
       manual &&
-      ((interactionVersion(login) > manual.version &&
-        interactedRecently(login, 3000, this.now())) ||
-        (playerHasFocus(login) && this.now() - manual.time >= 300));
-    if (status === 'playing' && userPlayed) {
+      interactionVersion(login) > manual.version &&
+      interactedRecently(login, 3000, this.now());
+    if (status === 'playing' && acceptInteractionResume && userPlayed) {
       this.allowManualPlay(login);
     }
     if (status !== 'paused' || this.isManagedPause(login)) return;
@@ -241,6 +255,9 @@ export const playbackRecovery = new PlaybackRecovery();
 export class PlayerReloadBudget {
   private attempts = new Map<string, number[]>();
   constructor(private readonly now: () => number = Date.now) {}
+  reset() {
+    this.attempts.clear();
+  }
 
   nextDelay(login: string): number | null {
     const now = this.now();

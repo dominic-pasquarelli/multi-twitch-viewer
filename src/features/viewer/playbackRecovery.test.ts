@@ -299,3 +299,34 @@ it('Play all follows an immediate tab switch and closing clears prior pause inte
     useViewStore.setState({ view: previous });
   }
 });
+
+it('does not treat stale iframe focus as consent to resume a manually paused player', () => {
+  let now = 0;
+  const recovery = new PlaybackRecovery(() => now);
+  const tile = document.createElement('div');
+  tile.dataset.testid = 'player-tile';
+  tile.dataset.channel = 'held-focus';
+  const frame = document.createElement('iframe');
+  tile.append(frame);
+  document.body.append(tile);
+  frame.focus();
+  recovery.pauseManually('held-focus');
+  now = 5000;
+  recovery.observeStatus('held-focus', 'playing', false);
+  expect(recovery.isManagedPause('held-focus')).toBe(true);
+  recovery.forget('held-focus');
+  tile.remove();
+});
+
+it('can require an explicit native play intent rather than a generic new interaction', () => {
+  let now = 0;
+  const recovery = new PlaybackRecovery(() => now);
+  recovery.pauseManually('native-held');
+  now = 1000;
+  markInteraction('native-held', now);
+  recovery.observeStatus('native-held', 'playing', false, false);
+  expect(recovery.isManagedPause('native-held')).toBe(true);
+  recovery.allowManualPlay('native-held');
+  expect(recovery.isManagedPause('native-held')).toBe(false);
+  recovery.forget('native-held');
+});

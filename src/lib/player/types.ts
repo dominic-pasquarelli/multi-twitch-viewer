@@ -8,6 +8,8 @@ export interface PlayerQuality {
 
 /** Documented Twitch playback telemetry; individual fields may be unavailable. */
 export interface PlayerPlaybackStats {
+  hlsLatencyBroadcaster?: number;
+  videoResolution?: string;
   bufferSize?: number;
   fps?: number;
   skippedFrames?: number;

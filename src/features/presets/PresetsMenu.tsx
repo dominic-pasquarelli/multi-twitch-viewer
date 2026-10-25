@@ -12,6 +12,7 @@ import { goHome, useLiveFavorites } from '../favorites/useFavoritesHome';
 import { useFollowedLive } from '../follows/queries';
 import { downloadText, pickTextFile } from './fileIO';
 import styles from './PresetsMenu.module.css';
+import { captureScene, loadPreset } from './scenes';
 
 export function PresetsMenu() {
   const open = useUi((s) => s.presetsMenuOpen);
@@ -137,7 +138,7 @@ function PresetRow({
         className={styles.load}
         data-testid="preset-load"
         onClick={() => {
-          useViewStore.getState().loadView(preset.view);
+          loadPreset(preset);
           toast(`Loaded “${preset.name}”`, {
             action: { label: 'Undo', run: () => useViewStore.getState().undo() },
           });
@@ -149,6 +150,7 @@ function PresetRow({
         <small>
           {preset.view.channels.length} stream{preset.view.channels.length === 1 ? '' : 's'} ·{' '}
           {preset.view.layout.mode}
+          {preset.scene && ' · Complete scene'}
           {liveLogins.size > 0 && (
             <>
               {' '}
@@ -163,7 +165,11 @@ function PresetRow({
           label="Update with the current streams and layout"
           icon={<Save size={14} />}
           onClick={() => {
-            store.overwrite(preset.id, useViewStore.getState().view);
+            store.overwrite(
+              preset.id,
+              useViewStore.getState().view,
+              preset.scene ? captureScene() : undefined,
+            );
             toast(`Updated “${preset.name}”`);
           }}
         />

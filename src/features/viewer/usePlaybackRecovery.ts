@@ -4,6 +4,8 @@ import type { PlayerStatus } from '@/lib/player/types';
 import { useUi } from '@/state/uiStore';
 import { playerRegistry } from './playerRegistry';
 import { playbackRecovery, PlayerReloadBudget } from './playbackRecovery';
+import { selectedRecently } from './playerInteraction';
+import { markNativePlayerInput } from '@/lib/player/transitions';
 
 export interface PlaybackRecoveryOptions {
   channels: readonly string[];
@@ -17,7 +19,19 @@ export interface PlaybackRecoveryOptions {
 const reloadBudget = new PlayerReloadBudget();
 const pendingReloads = new Map<string, ReturnType<typeof setTimeout>>();
 
-function scheduleReload(login: string): boolean {
+export function resetAutomaticReloads() {
+  pendingReloads.forEach(clearTimeout);
+  pendingReloads.clear();
+  reloadBudget.reset();
+}
+
+export function cancelPendingReload(login: string) {
+  const timer = pendingReloads.get(login);
+  if (timer) clearTimeout(timer);
+  pendingReloads.delete(login);
+}
+
+export function scheduleReload(login: string): boolean {
   if (
     !playerRegistry.has(login) ||
     playbackRecovery.isManagedPause(login) ||
@@ -116,6 +130,39 @@ export function usePlaybackRecovery({
       window.removeEventListener('offline', tick);
     };
   }, [channels, focused, muted, hidden, status, bandwidthSaving]);
+
+  useEffect(() => {
+    const onIntent = (event: MessageEvent) => {
+      if (
+        event.origin !== 'https://player.twitch.tv' ||
+        !['mtv:playback-intent', 'mtv:player-interaction'].includes(event.data?.type)
+      )
+        return;
+      const frame = [
+        ...document.querySelectorAll<HTMLIFrameElement>('[data-player-host] iframe'),
+      ].find((f) => f.contentWindow === event.source);
+      const login = frame?.closest<HTMLElement>('[data-testid=player-tile]')?.dataset.channel;
+      if (!login) return;
+      markNativePlayerInput(login);
+      if (
+        event.data.type === 'mtv:player-interaction' ||
+        typeof event.data.paused !== 'boolean' ||
+        (event.data.paused && selectedRecently(login))
+      )
+        return;
+      const entry = playerRegistry.get(login);
+      if (event.data.paused) {
+        playbackRecovery.pauseManually(login);
+        entry?.adapter.pause();
+      } else {
+        playbackRecovery.allowManualPlay(login);
+        entry?.adapter.play();
+        entry?.controller.reapply();
+      }
+    };
+    window.addEventListener('message', onIntent);
+    return () => window.removeEventListener('message', onIntent);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = desktop?.onPlayerError?.(({ channel, code }) => {

@@ -136,3 +136,82 @@ describe('pickQuality', () => {
   });
   it('waits for the qualities to be known', () => expect(pickQuality([], 'source', 1)).toBeNull());
 });
+
+it('retries delayed app-command echoes without adopting stale mute/volume state during transitions', async () => {
+  let now = 0;
+  let accept = false;
+  const player = new MockPlayer(document.createElement('div'), 'settling', true, { readyDelay: 0 });
+  const onExternalMute = vi.fn();
+  const onExternalVolume = vi.fn();
+  const controller = new PlayerController(
+    player,
+    { muted: false, volume: 0.4, quality: null },
+    { onExternalMute, onExternalVolume },
+    { now: () => now, graceMs: 1000, adoptExternalChange: () => accept },
+  );
+  await flush();
+  player.setMuted(true);
+  player.setVolume(0.9); // an old frame message arrives late
+  now = 2000;
+  controller.sync();
+  expect(onExternalMute).not.toHaveBeenCalled();
+  expect(onExternalVolume).not.toHaveBeenCalled();
+  expect(player.getMuted()).toBe(false);
+  expect(player.getVolume()).toBe(0.4);
+  accept = true;
+  player.setMuted(true);
+  player.setVolume(0.7);
+  now = 4000;
+  controller.sync();
+  expect(onExternalMute).toHaveBeenCalledWith(true);
+  expect(onExternalVolume).toHaveBeenCalledWith(0.7);
+  controller.dispose();
+  player.destroy();
+});
+
+it('does not promote a configured DJ level to the embed default of 100%, even after a long delay', async () => {
+  let now = 0;
+  let explicitInput = false;
+  const player = new MockPlayer(document.createElement('div'), 'dj-level', true, { readyDelay: 0 });
+  const onExternalVolume = vi.fn();
+  const controller = new PlayerController(
+    player,
+    { muted: false, volume: 0.25, quality: null },
+    { onExternalVolume },
+    {
+      now: () => now,
+      adoptExternalChange: (_kind, _value, oldCommand) => explicitInput || !oldCommand,
+    },
+  );
+  await flush();
+  now = 60_000;
+  player.setVolume(1);
+  controller.sync();
+  expect(player.getVolume()).toBe(0.25);
+  expect(onExternalVolume).not.toHaveBeenCalled();
+  explicitInput = true;
+  now = 65_000;
+  player.setVolume(1);
+  controller.sync();
+  expect(onExternalVolume).toHaveBeenCalledWith(1);
+  controller.dispose();
+  player.destroy();
+});
+
+it('ignores invalid startup telemetry instead of storing an invalid channel level', async () => {
+  const { player, controller, callbacks, advance } = setup({
+    muted: true,
+    volume: null,
+    quality: null,
+  });
+  await flush();
+  advance(2000);
+  player.volume = NaN;
+  controller.sync();
+  expect(callbacks.onExternalVolume).not.toHaveBeenCalled();
+  player.volume = 0.4;
+  controller.sync();
+  expect(callbacks.onExternalVolume).toHaveBeenCalledWith(0.4);
+  controller.dispose();
+  player.destroy();
+});

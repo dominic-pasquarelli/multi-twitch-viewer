@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -24,7 +25,12 @@ import { Button } from '@/ui/Button';
 import { useLiveStatus } from '../follows/queries';
 import { useStreamHotkeys } from '../shortcuts/useHotkeys';
 import { CHANNEL_MIME, setDragging } from './dnd';
-import { markInteraction, markSelection, playerHasFocus } from './playerInteraction';
+import {
+  markInteraction,
+  markSelection,
+  playerHasFocus,
+  selectedRecently,
+} from './playerInteraction';
 import { playerRegistry } from './playerRegistry';
 import { playbackRecovery } from './playbackRecovery';
 import { usePlaybackRecovery } from './usePlaybackRecovery';
@@ -35,6 +41,10 @@ import { useElementSize } from './useElementSize';
 import { keepOwnVolume, setStreamVolume, useVolumeModel } from './volume';
 import styles from './Viewer.module.css';
 import { getPlaybackView, usePlaybackView, useMusicChannel } from '../music/useMusic';
+import { temporaryScale, usePlaybackEffects } from '@/state/playbackEffectsStore';
+import { muteExplanation } from '@/lib/audio/muteExplanation';
+import { useMusicStore } from '@/state/musicStore';
+import { markPlaybackTransition, playbackTransitionActive } from '@/lib/player/transitions';
 
 /** Closes any reachable stream surface; ordinary removals support Undo. */
 function closeStream(login: string) {
@@ -57,6 +67,9 @@ const isPrimary = (view: ViewState, login: string, channels: string[]) =>
 export function Viewer() {
   const containerRef = useRef<HTMLDivElement>(null);
   const size = useElementSize(containerRef);
+  useLayoutEffect(() => {
+    markPlaybackTransition();
+  }, [size.width, size.height]);
   const view = usePlaybackView();
   const musicChannel = useMusicChannel();
   const actions = useViewStore.getState();
@@ -70,6 +83,10 @@ export function Viewer() {
     bandwidthSaving,
   } = useSettings();
   const volumeModel = useVolumeModel();
+  const effects = usePlaybackEffects();
+  const baseView = useViewStore((s) => s.view);
+  const appMuted = useViewStore((s) => s.mutedFrom !== null);
+  const music = useMusicStore();
   const output = useChannelPrefs((s) => s.output);
   const playerStatus = useUi((s) => s.playerStatus);
   const selected = useUi((s) => s.selected);
@@ -100,6 +117,10 @@ export function Viewer() {
   const shown = useMemo(() => displayedChannels(view, visible), [view, visible]);
   const sections = useMemo(() => streamSections(view, visible), [view, visible]);
   useEffect(() => useUi.getState().setVisibleChannels(shown), [shown]);
+  useEffect(() => {
+    if (effects.listen && !shown.includes(effects.listen))
+      usePlaybackEffects.setState({ listen: null });
+  }, [effects.listen, shown]);
   const hidden = useMemo(
     () => new Set(view.channels.filter((c) => !groupChannels.includes(c))),
     [view.channels, groupChannels],
@@ -269,7 +290,7 @@ export function Viewer() {
         if (!(el instanceof HTMLIFrameElement)) return;
         const login = el.closest<HTMLElement>('[data-testid=player-tile]')?.dataset.channel;
         if (!login) return;
-        markInteraction(login); // a pause right after this is yours: don't undo it
+        if (!playbackTransitionActive() || selectedRecently(login)) markInteraction(login);
         if (useSettings.getState().clickToFocus) promote(login, statuses[login]);
       }, 0);
     };
@@ -378,13 +399,15 @@ export function Viewer() {
         return (
           <PlayerTile
             key={login}
+            live={liveStatus.known ? liveStatus.live.has(login) : undefined}
+            muteExplanation={muteExplanation(login, baseView, music, appMuted)}
             login={login}
             kick={kickSlugFor(liveStatus.live.get(login))}
             rect={rect}
             audible={level.focused}
             main={view.layout.mode !== 'grid' && focuses.has(login)}
             muted={level.muted}
-            volumeScale={level.scale * output}
+            volumeScale={level.scale * output * temporaryScale(login, musicChannel, effects)}
             volume={streamVolume(volumeModel, login)}
             quality={isPrimary(view, login, shown) ? mainQuality : otherQuality}
             belowMinimum={isBelowMinimum(rect, DEFAULT_LAYOUT_OPTIONS.minTile)}

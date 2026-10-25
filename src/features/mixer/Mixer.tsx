@@ -1,3 +1,4 @@
+import { temporaryScale, usePlaybackEffects } from '@/state/playbackEffectsStore';
 import { useRef, useState } from 'react';
 import { Crown, Pin, SlidersHorizontal, Volume2, VolumeX, X } from 'lucide-react';
 import { audioLevel, slotOrder, focusedChannels } from '@/lib/view/operations';
@@ -40,6 +41,7 @@ export function Mixer() {
   const update = useSettings((s) => s.update);
   const mainPriority = useSettings((s) => s.mainPriority);
   const volumeModel = useVolumeModel();
+  const effects = usePlaybackEffects();
   const live = useLiveStatus(view.channels).live;
   const multi = view.layout.mode === 'multi-focus';
   const channels = slotOrder(view, view.channels);
@@ -126,7 +128,12 @@ export function Mixer() {
               level.muted ||
               !shown.includes(login) ||
               ['paused', 'blocked', 'offline'].includes(status[login] ?? '');
-            const effective = outputPercent(volume, level.scale, output, silent);
+            const effective = outputPercent(
+              volume,
+              level.scale * temporaryScale(login, musicChannel, effects),
+              output,
+              silent,
+            );
             return (
               <div
                 key={login}

@@ -57,7 +57,7 @@ function MusicEditor() {
     <div className={styles.editor}>
       <p>
         Keep a DJ playing while you watch other streams. Automatic uses the first live channel
-        below, and switches when a higher-priority DJ goes live or the current one goes offline.
+        below. Use DJ rules to control category filtering, interruptions and transitions.
       </p>
       <div className={styles.modes} role="group" aria-label="Music selection">
         <Button aria-pressed={music.mode === 'off'} onClick={() => music.setMode('off')}>
@@ -116,6 +116,42 @@ function MusicEditor() {
         label="Mix with stream audio"
         help="Off: hear only music while watching. On: keep music alongside your Solo, Duck or Mix audio. Music has its own volume; M mutes everything."
       />
+      <details className={styles.rules}>
+        <summary>DJ rules and transitions</summary>
+        <Checkbox
+          checked={music.musicOnly}
+          onChange={(musicOnly) => music.update({ musicOnly })}
+          label="Only automatically select Music or DJs categories"
+          help="Live channels in other categories are ignored. Pinned DJs override this rule."
+        />
+        <Checkbox
+          checked={music.keepCurrent}
+          onChange={(keepCurrent) => music.update({ keepCurrent })}
+          label="Keep the current DJ until they go offline"
+          help="A higher-priority channel going live will not interrupt your music."
+        />
+        <label className={styles.transitionLabel}>
+          Transition fade{' '}
+          <select
+            className={formStyles.input}
+            aria-label="DJ transition fade"
+            value={music.fadeSeconds}
+            onChange={(e) => music.update({ fadeSeconds: Number(e.target.value) })}
+          >
+            {[0, 0.5, 1, 2, 3, 5].map((n) => (
+              <option key={n} value={n}>
+                {n ? `${n} seconds` : 'Off'}
+              </option>
+            ))}
+          </select>
+        </label>
+        <small>Fades soften transitions; the next live player may still need time to load.</small>
+        {music.skipped.length > 0 && (
+          <Button size="small" onClick={music.resetSkips}>
+            Reset session skips ({music.skipped.length})
+          </Button>
+        )}
+      </details>
       <div className={styles.columns}>
         <MusicChannelPicker />
         <section className={styles.order} aria-label="Your music order">
@@ -185,6 +221,28 @@ function MusicEditor() {
                   label={`Remove ${name(c)} from music`}
                   onClick={() => music.removeChannel(c)}
                 />
+                <div className={styles.djOptions}>
+                  <label>
+                    DJ trim{' '}
+                    <input
+                      type="range"
+                      min={25}
+                      max={200}
+                      step={5}
+                      value={Math.round((music.trims[c] ?? 1) * 100)}
+                      aria-label={`${name(c)} DJ trim`}
+                      onChange={(e) => music.setTrim(c, Number(e.target.value) / 100)}
+                    />
+                    <output>{Math.round((music.trims[c] ?? 1) * 100)}%</output>
+                  </label>
+                  <Button
+                    size="small"
+                    disabled={music.skipped.includes(c)}
+                    onClick={() => music.skip(c)}
+                  >
+                    {music.skipped.includes(c) ? 'Skipped this session' : 'Skip this session'}
+                  </Button>
+                </div>
               </li>
             ))}
           </ol>

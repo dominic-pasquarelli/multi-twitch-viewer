@@ -1,0 +1,46 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.stack p {
+  margin: 0;
+  line-height: 1.5;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.preview {
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+}
+.preview p {
+  margin: 10px 0;
+}
+.tableWrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.health {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.health th,
+.health td {
+  padding: 9px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.health th {
+  font-weight: 600;
+}
+.health td {
+  color: var(--text-muted);
+}
+.health .actions {
+  min-width: 120px;
+}

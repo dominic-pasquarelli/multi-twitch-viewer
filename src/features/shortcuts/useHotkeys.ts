@@ -8,6 +8,7 @@ import { openHome } from '../favorites/useFavoritesHome';
 import { toggleFullscreen } from '../topbar/fullscreen';
 import { nudgeHeard, VOLUME_STEP } from '../viewer/volume';
 import { getPlaybackView } from '../music/useMusic';
+import { usePlaybackEffects } from '@/state/playbackEffectsStore';
 
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
@@ -54,6 +55,14 @@ export function useHotkeys(): void {
       }
       if (e.ctrlKey || e.metaKey) return;
       if (ui.dialog || document.querySelector('dialog[open]')) return; // let dialogs handle their own keys
+      if (e.key.toLowerCase() === 'q' && !e.repeat) {
+        const login = ui.selected ?? ui.mainStream ?? getPlaybackView().audio.active[0];
+        if (login && (ui.visibleChannels ?? getPlaybackView().channels).includes(login)) {
+          usePlaybackEffects.setState({ listen: login });
+          e.preventDefault();
+        }
+        return;
+      }
 
       const scale = view.view.layout.mainScale;
       const step = (delta: number) => {
@@ -100,6 +109,26 @@ export function useHotkeys(): void {
       }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const release = () => usePlaybackEffects.setState({ listen: null });
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'q') release();
+    };
+    const onVisibility = () => {
+      if (document.hidden) release();
+    };
+    const unsubscribe = useUi.subscribe((s) => {
+      if (s.dialog || s.backgrounded) release();
+    });
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', release);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', release);
+      document.removeEventListener('visibilitychange', onVisibility);
+      unsubscribe();
+      release();
+    };
   }, []);
 }

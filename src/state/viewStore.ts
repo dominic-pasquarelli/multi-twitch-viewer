@@ -1,3 +1,5 @@
+import { markPlaybackTransition } from '@/lib/player/transitions';
+import { usePlaybackEffects } from './playbackEffectsStore';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { zustandStorage } from '@/lib/persistence/zustandStorage';
@@ -14,6 +16,7 @@ const HISTORY_LIMIT = 20;
 
 /** An earlier view, for undo, and whether it was the Favorites home view. */
 export interface HistoryEntry {
+  restore?: () => void;
   view: ViewState;
   home: boolean;
 }
@@ -48,7 +51,7 @@ interface ViewStore {
   replaceChannel(target: string, replacement: string): void;
   swapChannels(a: string, b: string): void;
   clear(): void;
-  loadView(view: ViewState): void;
+  loadView(view: ViewState, restore?: () => void): void;
   undo(): boolean;
 
   setLayoutMode(mode: LayoutMode): void;
@@ -87,6 +90,7 @@ export const useViewStore = create<ViewStore>()(
         const before = get().view;
         let after = groups.normalizeGroups(fn(before));
         if (after === before) return;
+        markPlaybackTransition();
         const settings = useSettings.getState();
         // Chat follows the stream you're listening to.
         const heard = after.audio.active[after.audio.active.length - 1];
@@ -177,8 +181,17 @@ export const useViewStore = create<ViewStore>()(
           apply((v) => ({ ...ops.watchOnly(v, []), groups: [], activeGroup: null }), true);
           set({ home: false });
         },
-        loadView: (view) => {
-          apply(() => ops.normalize(structuredClone(view)), true);
+        loadView: (view, restore) => {
+          markPlaybackTransition();
+          if (restore)
+            set({
+              view: ops.normalize(structuredClone(view)),
+              history: [...get().history, { view: get().view, home: get().home, restore }].slice(
+                -HISTORY_LIMIT,
+              ),
+              mutedFrom: null,
+            });
+          else apply(() => ops.normalize(structuredClone(view)), true);
           // A preset keeps its streams.
           set({ pinned: get().view.channels.length > 0, home: false });
         },
@@ -186,6 +199,7 @@ export const useViewStore = create<ViewStore>()(
           const history = get().history;
           const previous = history[history.length - 1];
           if (!previous) return false;
+          previous.restore?.();
           set({ view: previous.view, home: previous.home, history: history.slice(0, -1) });
           return true;
         },
@@ -236,22 +250,14 @@ export const useViewStore = create<ViewStore>()(
             music.setMuted(!music.muted);
             return;
           }
-          if (music.mode !== 'off' && music.channels.includes(login)) {
-            music.pin(login);
-            music.setMuted(false);
-            return;
-          }
           if (music.mode !== 'off' && !music.mixWithStreams) {
             music.setMixWithStreams(true);
-            apply((v) => ops.focusAudio(v, login));
+            apply((v) => ops.externalMuteChange(v, login, false));
           } else apply((v) => ops.toggleAudio(v, login));
         },
         focusAudio: (login) => {
           const music = useMusicStore.getState();
-          if (
-            music.mode !== 'off' &&
-            (activeMusicChannel(music) === login || music.channels.includes(login))
-          ) {
+          if (music.mode !== 'off' && activeMusicChannel(music) === login) {
             if (activeMusicChannel(music) !== login) music.pin(login);
             music.setMuted(false);
             music.setMixWithStreams(false);
@@ -261,8 +267,16 @@ export const useViewStore = create<ViewStore>()(
           apply((v) => ops.focusAudio(v, login));
         },
         toggleMuteAll: () => {
+          const wasPreviewing = usePlaybackEffects.getState().listen !== null;
+          usePlaybackEffects.setState({ listen: null });
           const { view, mutedFrom } = get();
           const music = useMusicStore.getState();
+          if (
+            wasPreviewing &&
+            !withMusic(view, music).audio.active.length &&
+            (music.mode === 'off' || music.muted)
+          )
+            return;
           if (
             withMusic(view, music).audio.active.length ||
             (music.mode !== 'off' && !music.muted)
@@ -286,7 +300,11 @@ export const useViewStore = create<ViewStore>()(
             mutedFrom: null,
           });
         },
-        setAudioMode: (mode) => apply((v) => ops.setAudioMode(v, mode)),
+        setAudioMode: (mode) => {
+          if (mode === 'mix' && useMusicStore.getState().mode !== 'off')
+            useMusicStore.getState().setMixWithStreams(true);
+          apply((v) => ops.setAudioMode(v, mode));
+        },
         externalMuteChange: (login, muted) => {
           const music = useMusicStore.getState();
           if (activeMusicChannel(music) === login) {
@@ -294,11 +312,6 @@ export const useViewStore = create<ViewStore>()(
             return;
           }
           if (!muted && music.mode !== 'off') {
-            if (music.channels.includes(login)) {
-              music.pin(login);
-              music.setMuted(false);
-              return;
-            }
             music.setMixWithStreams(true);
           }
           apply((v) => ops.externalMuteChange(v, login, muted));
