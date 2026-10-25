@@ -187,6 +187,8 @@ test('sleep timer fades using wall-clock time, pauses streams and preserves save
   await page.goto('/#/pixelpaladin/novastrike');
   await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-volume', '0.50');
   await page.clock.install();
+  // Freeze setup time so action/worker delays cannot skip the exact half-fade level.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
   await page.getByTestId('playback-tools-button').click();
   await tools(page).getByRole('tab', { name: 'Sleep timer', exact: true }).click();
   await tools(page).getByRole('spinbutton', { name: 'Sleep timer minutes' }).fill('1');
