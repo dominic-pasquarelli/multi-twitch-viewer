@@ -1,3 +1,4 @@
+import { channelName, kickSlugFromId } from '@/lib/channels/parseChannels';
 import {
   useEffect,
   useMemo,
@@ -115,7 +116,7 @@ function useWatchedMetadata(
     followed,
     profiles,
     live: new Map(streams.data?.map((stream) => [stream.login, stream])),
-    known: streams.isSuccess && !streams.isPlaceholderData,
+    knownFor: streams.knownFor,
   };
 }
 
@@ -193,12 +194,12 @@ function watchAll(logins: string[]) {
 /** Streams in the view that aren't in your follows, so they can be removed here too. */
 function useNotFollowedRows(inView: string[], follows: FollowedChannelInfo[] | undefined): Row[] {
   const showHistory = useSettings((s) => s.showHistory);
-  const { followed, entries, profiles, live, known } = useWatchedMetadata(
+  const { followed, entries, profiles, live, knownFor } = useWatchedMetadata(
     inView,
     follows,
     showHistory,
   );
-  const logins = follows ? inView.filter((l) => !followed.has(l)) : [];
+  const logins = inView.filter((l) => (follows || kickSlugFromId(l)) && !followed.has(l));
   return logins.map((login) => {
     const stream = live.get(login);
     const profile = profiles.get(login);
@@ -208,10 +209,10 @@ function useNotFollowedRows(inView: string[], follows: FollowedChannelInfo[] | u
         stream?.displayName ??
         profile?.displayName ??
         entries.find((entry) => entry.login === login)?.displayName ??
-        login,
+        channelName(login),
       avatar: profile?.profileImageUrl ?? '',
       stream,
-      liveKnown: known,
+      liveKnown: knownFor(login),
     };
   });
 }
@@ -297,6 +298,10 @@ function ExpandedSidebar({ onCollapse }: { onCollapse(): void }) {
             </span>
           )}
           <LoginButton label={status === 'expired' ? 'Log in again' : undefined} />
+          {others.map((row) => (
+            <ChannelRow key={row.login} row={row} inView onHover={(el) => showPreview(row, el)} />
+          ))}
+          <HistorySection inView={inView} filter={match} onHover={showPreview} />
         </div>
       ) : mode === 'discover' ? (
         <Discovery
@@ -458,7 +463,9 @@ function ChannelRow({
       >
         <Avatar src={row.avatar} name={row.displayName} size={30} live={!!s} />
         <span className={styles.text}>
-          <div className={styles.name}>{row.displayName}</div>
+          <div className={styles.name}>
+            {row.displayName} {!s && kickSlugFromId(row.login) && <KickBadge />}
+          </div>
           {s && <div className={styles.game}>{s.gameName || 'No category'}</div>}
         </span>
         {s && (
@@ -641,7 +648,11 @@ function useHistoryRows(
   follows: FollowedChannelInfo[] | undefined,
   enabled: boolean,
 ) {
-  const { entries, followed, profiles, live, known } = useWatchedMetadata(inView, follows, enabled);
+  const { entries, followed, profiles, live, knownFor } = useWatchedMetadata(
+    inView,
+    follows,
+    enabled,
+  );
   const shown = useMemo(
     () => entries.filter((e) => !inView.includes(e.login) && !followed.has(e.login)),
     [entries, inView, followed],
@@ -652,7 +663,7 @@ function useHistoryRows(
       live.get(e.login)?.displayName ?? profiles.get(e.login)?.displayName ?? e.displayName,
     avatar: profiles.get(e.login)?.profileImageUrl ?? '',
     stream: live.get(e.login),
-    liveKnown: known,
+    liveKnown: knownFor(e.login),
   }));
   return { rows, count: shown.length };
 }

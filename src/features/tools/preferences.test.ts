@@ -10,6 +10,7 @@ import { useMixStore } from '@/state/mixStore';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { DEFAULT_SETTINGS, useSettings } from '@/state/settingsStore';
 import { useViewStore } from '@/state/viewStore';
+import { useWatchHistory } from '@/state/historyStore';
 import { usePresets } from '@/state/presetsStore';
 import { sleepGain } from '@/state/sleepTimerStore';
 import { withTemporaryListen, temporaryScale } from '@/state/playbackEffectsStore';
@@ -26,6 +27,7 @@ beforeEach(() => {
     mutedFrom: null,
   });
   usePresets.setState({ presets: [] });
+  useWatchHistory.setState({ entries: [] });
   useChannelPrefs.setState({
     volumes: {},
     balance: {},
@@ -113,6 +115,27 @@ describe('complete scenes and backups', () => {
       sanitizeSettings({ clientId: 'injected', update: 'replace action', tileGap: 99 }),
     ).not.toHaveProperty('clientId');
     expect(typeof useSettings.getState().update).toBe('function');
+  });
+  it('round-trips direct Kick favorites, DJ trims, role assignments, audio and history in a backup', () => {
+    useViewStore.getState().addChannels(['kick:dj-one']);
+    useMusicStore.getState().pin('kick:dj-one');
+    useMusicStore.getState().setTrim('kick:dj-one', 0.6);
+    useMixStore.getState().update({ priorities: ['kick:dj-one'], prioritySource: 'manual' });
+    useChannelPrefs.getState().addFavorites(['kick:dj-one']);
+    useChannelPrefs.getState().setVolume('kick:dj-one', 0.23);
+    useWatchHistory.getState().record('kick:dj-one', 'DJ One');
+    const text = JSON.stringify(captureBackup());
+    useMusicStore.getState().setMode('off');
+    useChannelPrefs.setState({ favorites: [], volumes: {} });
+    useWatchHistory.getState().clear();
+    restoreBackup(parseBackup(text));
+    expect(useChannelPrefs.getState().favorites).toContain('kick:dj-one');
+    expect(useChannelPrefs.getState().volumes['kick:dj-one']).toBe(0.23);
+    expect(useMusicStore.getState().pinned).toBe('kick:dj-one');
+    expect(useMusicStore.getState().trims['kick:dj-one']).toBe(0.6);
+    expect(useMixStore.getState().priorities).toContain('kick:dj-one');
+    expect(useViewStore.getState().view.channels).toContain('kick:dj-one');
+    expect(useWatchHistory.getState().entries[0]?.login).toBe('kick:dj-one');
   });
   it('rejects malformed backups before changing any state', () => {
     const before = captureScene();

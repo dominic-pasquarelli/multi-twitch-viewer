@@ -6,6 +6,10 @@ import type { LiveStream, TwitchUser } from '@/lib/twitch/types';
 import { useAuth } from '@/state/authStore';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useSettings } from '@/state/settingsStore';
+import { isValidLogin, kickChannelId, kickSlugFromId } from '@/lib/channels/parseChannels';
+import { useViewStore } from '@/state/viewStore';
+import { useMusicStore } from '@/state/musicStore';
+import { useWatchHistory } from '@/state/historyStore';
 
 export interface FollowedChannelInfo {
   id: string;
@@ -73,9 +77,9 @@ export function useFollowedChannels() {
  * follow), including linked ones live only on Kick.
  */
 export function useStreamsFor(logins: string[], pollInBackground = false) {
-  const { api } = useServices();
+  const { api, kickApi } = useServices();
   const refreshSeconds = useSettings((s) => s.refreshSeconds);
-  const key = [...logins].sort();
+  const key = [...new Set(logins.filter(isValidLogin))].sort();
   const query = useQuery({
     queryKey: ['streams', key],
     queryFn: () => api!.getStreamsByLogins(key),
@@ -84,21 +88,80 @@ export function useStreamsFor(logins: string[], pollInBackground = false) {
     refetchIntervalInBackground: pollInBackground,
     placeholderData: keepPreviousData,
   });
-  const kick = useKickLive();
-  const keyId = key.join(',');
+  const kickQuery = useKickChannels(logins);
+  const links = useChannelPrefs((s) => s.kickLinks);
+  const keyId = [...new Set(logins)].sort().join(',');
   const data = useMemo(
-    () => (query.data && kick.size ? withKickLive(query.data, kick, keyId.split(',')) : query.data),
-    [query.data, kick, keyId],
+    () =>
+      withKickLive(
+        query.data ?? [],
+        kickLiveByLogin(links, kickQuery.data ?? [], keyId.split(',')),
+        keyId.split(','),
+      ),
+    [query.data, kickQuery.data, links, keyId],
   );
-  return useMemo(() => ({ ...query, data }) as typeof query, [query, data]);
+  const knownFor = useMemo(() => {
+    const requested = new Set(keyId.split(','));
+    const twitchKnown = !!api && query.isSuccess && !query.isPlaceholderData;
+    const kickKnown = !!kickApi && kickQuery.isSuccess && !kickQuery.isPlaceholderData;
+    return (login: string) =>
+      requested.has(login) &&
+      (kickSlugFromId(login) ? kickKnown : twitchKnown && (!links[login] || !kickApi || kickKnown));
+  }, [
+    keyId,
+    api,
+    kickApi,
+    query.isSuccess,
+    query.isPlaceholderData,
+    kickQuery.isSuccess,
+    kickQuery.isPlaceholderData,
+    links,
+  ]);
+  const isSuccess = logins.every(knownFor);
+  const needsKick = logins.some((c) => kickSlugFromId(c) || links[c]);
+  const isError = (key.length > 0 && query.isError) || (needsKick && kickQuery.isError);
+  return {
+    ...query,
+    data,
+    knownFor,
+    isSuccess,
+    isError,
+    isPending: !isSuccess && !isError,
+    isPlaceholderData:
+      (key.length > 0 && query.isPlaceholderData) || (needsKick && kickQuery.isPlaceholderData),
+    error: query.error ?? (needsKick ? kickQuery.error : null),
+  };
 }
 
-/** Live status of the Kick channels you linked (needs your Kick app; see lib/kick). */
-export function useKickChannels() {
+/** Poll linked and direct Kick channels together, including saved favorites/DJs/history. */
+export function useKickChannels(extra: readonly string[] = []) {
   const { kickApi } = useServices();
   const refreshSeconds = useSettings((s) => s.refreshSeconds);
   const links = useChannelPrefs((s) => s.kickLinks);
-  const slugs = useMemo(() => [...new Set(Object.values(links))].sort(), [links]);
+  const favorites = useChannelPrefs((s) => s.favorites);
+  const watched = useViewStore((s) => s.view.channels);
+  const music = useMusicStore();
+  const history = useWatchHistory((s) => s.entries);
+  const extraKey = extra.join(',');
+  const slugs = useMemo(
+    () =>
+      [
+        ...new Set([
+          ...Object.values(links),
+          ...[
+            ...favorites,
+            ...watched,
+            ...music.channels,
+            ...(music.pinned ? [music.pinned] : []),
+            ...history.map((e) => e.login),
+            ...extraKey.split(','),
+          ]
+            .map(kickSlugFromId)
+            .filter((s): s is string => !!s),
+        ]),
+      ].sort(),
+    [links, favorites, watched, music.channels, music.pinned, history, extraKey],
+  );
   return useQuery({
     queryKey: ['kick-live', slugs],
     queryFn: () => kickApi!.getChannels(slugs),
@@ -114,7 +177,27 @@ export function useKickChannels() {
 export function useKickLive(): ReadonlyMap<string, LiveStream> {
   const links = useChannelPrefs((s) => s.kickLinks);
   const { data } = useKickChannels();
-  return useMemo(() => kickLiveByLogin(links, data ?? []), [links, data]);
+  return useMemo(
+    () =>
+      kickLiveByLogin(
+        links,
+        data ?? [],
+        (data ?? []).map((c) => kickChannelId(c.slug)),
+      ),
+    [links, data],
+  );
+}
+
+/** Exact username lookup; Kick's public API does not offer fuzzy channel search. */
+export function useKickChannelLookup(slug: string | null) {
+  const { kickApi } = useServices();
+  return useQuery({
+    queryKey: ['kick-lookup', slug],
+    queryFn: async () => (await kickApi!.getChannels([slug!])).find((c) => c.slug === slug) ?? null,
+    enabled: !!kickApi && !!slug,
+    staleTime: 30_000,
+    retry: 1,
+  });
 }
 
 export function useChannelSearch(query: string) {
@@ -155,7 +238,7 @@ export function useCategoryStreams(categoryId: string) {
 /** Profile images for history and category results, which aren't always followed. */
 export function useUsersFor(logins: string[]) {
   const { api } = useServices();
-  const key = [...new Set(logins)].sort();
+  const key = [...new Set(logins.filter(isValidLogin))].sort();
   return useQuery({
     queryKey: ['channel-users', key],
     queryFn: () => api!.getUsersByLogins(key),
@@ -169,27 +252,46 @@ export interface LiveStatus {
   live: Map<string, LiveStream>;
   /** false until we have real data (then unknown channels are not assumed offline). */
   known: boolean;
+  /** Unknown Kick status must not hide/drop unrelated Twitch streams, or vice versa. */
+  knownFor(login: string): boolean;
 }
 
 /** Live status for the given channels, combining follows and direct lookups. */
 export function useLiveStatus(logins: string[]): LiveStatus {
-  const followed = useFollowedLive();
+  const {
+    data: followedData,
+    isSuccess: followedSuccess,
+    isPlaceholderData: followedPlaceholder,
+  } = useFollowedLive();
   const followedLogins = useMemo(
-    () => new Set((followed.data ?? []).map((s) => s.login)),
-    [followed.data],
+    () => new Set((followedData ?? []).map((s) => s.login)),
+    [followedData],
   );
   // Only look up channels we can't already see in the followed-live list.
   const extra = useMemo(
-    () => (followed.isSuccess ? logins.filter((l) => !followedLogins.has(l)) : logins),
-    [logins, followed.isSuccess, followedLogins],
+    () => (followedSuccess ? logins.filter((l) => !followedLogins.has(l)) : logins),
+    [logins, followedSuccess, followedLogins],
   );
-  const direct = useStreamsFor(extra);
+  const { data: directData, knownFor: directKnownFor } = useStreamsFor(extra);
 
   return useMemo(() => {
     const live = new Map<string, LiveStream>();
-    for (const s of followed.data ?? []) live.set(s.login, s);
-    for (const s of direct.data ?? []) live.set(s.login, s);
-    const known = extra.length === 0 ? followed.isSuccess : direct.isSuccess;
-    return { live, known };
-  }, [followed.data, followed.isSuccess, direct.data, direct.isSuccess, extra.length]);
+    for (const s of followedData ?? []) live.set(s.login, s);
+    for (const s of directData ?? []) live.set(s.login, s);
+    const extraSet = new Set(extra);
+    const knownFor = (login: string) =>
+      extraSet.has(login)
+        ? directKnownFor(login)
+        : followedSuccess && !followedPlaceholder && followedLogins.has(login);
+    return { live, known: logins.every(knownFor), knownFor };
+  }, [
+    followedData,
+    followedSuccess,
+    followedPlaceholder,
+    followedLogins,
+    directData,
+    directKnownFor,
+    logins,
+    extra,
+  ]);
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { House, Plus, X } from 'lucide-react';
-import { parseChannelInput } from '@/lib/channels/parseChannels';
+import { channelName, kickSlugFromId, parseChannelInput } from '@/lib/channels/parseChannels';
+import { KickBadge } from '../kick/KickBadge';
 import { useChannelPrefs } from '@/state/channelPrefsStore';
 import { useUi } from '@/state/uiStore';
 import { Avatar } from '@/ui/Avatar';
@@ -23,7 +24,7 @@ export function FavoritesDialog() {
 }
 
 function FavoritesEditor({ onDone }: { onDone(): void }) {
-  const { favorites, live, streams, known } = useLiveFavorites();
+  const { favorites, live, streams, knownFor } = useLiveFavorites();
   const users = new Map((useUsersFor(favorites).data ?? []).map((u) => [u.login, u]));
   const { addFavorites, toggleFavorite } = useChannelPrefs.getState();
   const [text, setText] = useState('');
@@ -47,7 +48,7 @@ function FavoritesEditor({ onDone }: { onDone(): void }) {
         <input
           className={formStyles.input}
           aria-label="Add favorites"
-          placeholder="Channel names or twitch.tv links"
+          placeholder="Twitch names, kick:name, or channel links"
           value={text}
           onChange={(e) => setText(e.target.value)}
           data-testid="favorites-add"
@@ -65,7 +66,7 @@ function FavoritesEditor({ onDone }: { onDone(): void }) {
         <ul className={styles.list} data-testid="favorites-list">
           {favorites.map((login) => {
             const stream = streams.get(login);
-            const name = stream?.displayName ?? users.get(login)?.displayName ?? login;
+            const name = stream?.displayName ?? users.get(login)?.displayName ?? channelName(login);
             return (
               <li key={login} data-testid="favorite-row" data-channel={login} data-live={!!stream}>
                 <Avatar
@@ -75,12 +76,13 @@ function FavoritesEditor({ onDone }: { onDone(): void }) {
                   live={!!stream}
                 />
                 <span className={styles.name}>{name}</span>
+                {kickSlugFromId(login) && <KickBadge />}
                 <span className={`${styles.status} ${stream ? styles.live : ''}`}>
                   {stream
                     ? `Live${stream.gameName ? ` · ${stream.gameName}` : ''}`
-                    : known
+                    : knownFor(login)
                       ? 'Offline'
-                      : ''}
+                      : 'Status unavailable'}
                 </span>
                 <IconButton
                   size="sm"

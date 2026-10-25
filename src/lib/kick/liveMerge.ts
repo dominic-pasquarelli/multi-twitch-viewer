@@ -1,5 +1,6 @@
 import type { LiveStream } from '../twitch/types';
 import type { KickChannel, KickLinks } from './types';
+import { channelName, kickSlugFromId } from '../channels/parseChannels';
 
 /**
  * Linked channels that are live on Kick, as live streams of their Twitch
@@ -8,16 +9,22 @@ import type { KickChannel, KickLinks } from './types';
 export function kickLiveByLogin(
   links: KickLinks,
   channels: readonly KickChannel[],
+  direct: Iterable<string> = [],
 ): Map<string, LiveStream> {
   const bySlug = new Map(channels.map((c) => [c.slug, c]));
   const out = new Map<string, LiveStream>();
-  for (const [login, slug] of Object.entries(links)) {
+  const accounts = { ...links };
+  for (const id of direct) {
+    const slug = kickSlugFromId(id);
+    if (slug) accounts[id] = slug;
+  }
+  for (const [login, slug] of Object.entries(accounts)) {
     const channel = bySlug.get(slug);
     if (!channel?.isLive) continue;
     out.set(login, {
       userId: '',
       login,
-      displayName: login,
+      displayName: channelName(login),
       gameName: channel.categoryName,
       title: channel.title,
       viewerCount: channel.viewerCount,

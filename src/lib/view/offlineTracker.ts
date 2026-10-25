@@ -11,10 +11,21 @@ export class OfflineTracker {
   constructor(public graceMs = 90_000) {}
 
   /** Feeds the current channels; returns the ones to drop now. */
-  update(channels: string[], isLive: (login: string) => boolean, now = Date.now()): string[] {
+  update(
+    channels: string[],
+    isLive: (login: string) => boolean | undefined,
+    now = Date.now(),
+  ): string[] {
     const drop: string[] = [];
     for (const login of channels) {
-      if (isLive(login)) {
+      const state = isLive(login);
+      if (state === undefined) {
+        // An unavailable source isn't an offline event. Retain live history,
+        // but require a fresh continuous offline grace period after recovery.
+        this.offlineSince.delete(login);
+        continue;
+      }
+      if (state) {
         this.seenLive.add(login);
         this.offlineSince.delete(login);
         continue;

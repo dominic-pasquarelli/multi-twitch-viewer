@@ -1,3 +1,4 @@
+import { normalizeChannel } from '../channels/parseChannels';
 /**
  * A log of channels you watched without following them, newest first, so
  * you can find them again later.
@@ -42,7 +43,7 @@ export function sanitizeHistory(value: unknown): HistoryEntry[] {
         !!e &&
         typeof e === 'object' &&
         typeof (e as HistoryEntry).login === 'string' &&
-        /^[a-z0-9_]{1,25}$/.test((e as HistoryEntry).login) &&
+        normalizeChannel((e as HistoryEntry).login) === (e as HistoryEntry).login &&
         typeof (e as HistoryEntry).lastWatched === 'number',
     )
     .map((e) => ({

@@ -429,13 +429,18 @@ function AppUpdates() {
   );
 }
 
-/** Kick fallback for linked channels: your Kick app's credentials and the links. */
+/** Optional Kick lookup/live-status credentials and Twitch-first fallback links. */
 function KickSettings() {
   const s = useSettings();
   const { mock } = useServices();
   return (
     <>
-      <div className={formStyles.section}>Kick (linked channels)</div>
+      <div className={formStyles.section}>Kick lookup & live status</div>
+      <p className={formStyles.help}>
+        Select Kick in Add channels or paste a kick.com link to open a stream directly. Credentials
+        enable exact username lookup, live status, automatic DJs and favorite alerts. Twitch remains
+        the default; links below enable Twitch-first fallback.
+      </p>
       {!mock && (
         <>
           <Field

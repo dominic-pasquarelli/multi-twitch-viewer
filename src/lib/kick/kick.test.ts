@@ -144,4 +144,18 @@ describe('kick live merge', () => {
       ['bravo', 'kick', 'Bravo'],
     ]);
   });
+
+  it('opens a direct Kick channel independently while linked identities still prefer live Twitch', () => {
+    const live = kickLiveByLogin({ alpha: 'a' }, [kick('a', true)], ['kick:a']);
+    expect(
+      withKickLive([twitch('alpha')], live, ['alpha', 'kick:a']).map((s) => [
+        s.login,
+        s.platform ?? 'twitch',
+      ]),
+    ).toEqual([
+      ['alpha', 'twitch'],
+      ['kick:a', 'kick'],
+    ]);
+    expect(live.get('kick:a')?.displayName).toBe('a');
+  });
 });

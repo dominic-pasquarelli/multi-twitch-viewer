@@ -155,7 +155,7 @@ class KickEmbedAdapter implements PlayerAdapter {
 /** Kick players; pass the desktop app's frame control for full control. */
 export function createKickPlayerFactory(control?: KickPlayerControl): PlayerFactory {
   return {
-    capabilities: { volume: !!control },
+    capabilities: { volume: !!control, playbackState: !!control },
     create: (host, { channel, muted }) => new KickEmbedAdapter(host, channel, muted, control),
   };
 }

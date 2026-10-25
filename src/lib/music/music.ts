@@ -1,4 +1,4 @@
-import { normalizeLogin } from '../channels/parseChannels';
+import { normalizeChannel } from '../channels/parseChannels';
 import type { ViewState } from '../view/types';
 
 export interface MusicPreferences {
@@ -35,11 +35,11 @@ export interface MusicPlayback extends MusicPreferences {
 export function sanitizeMusic(input: unknown): MusicPreferences {
   const p = input && typeof input === 'object' ? (input as Partial<MusicPreferences>) : {};
   const channels = Array.isArray(p.channels)
-    ? [...new Set(p.channels.map((c) => (typeof c === 'string' ? normalizeLogin(c) : null)))]
+    ? [...new Set(p.channels.map((c) => (typeof c === 'string' ? normalizeChannel(c) : null)))]
         .filter((c): c is string => !!c)
         .slice(0, 50)
     : [];
-  const pinned = typeof p.pinned === 'string' ? normalizeLogin(p.pinned) : null;
+  const pinned = typeof p.pinned === 'string' ? normalizeChannel(p.pinned) : null;
   return {
     channels,
     pinned,
@@ -60,7 +60,7 @@ export function sanitizeMusic(input: unknown): MusicPreferences {
       Object.entries(p.trims && typeof p.trims === 'object' ? p.trims : {})
         .filter(
           ([login, trim]) =>
-            normalizeLogin(login) === login &&
+            normalizeChannel(login) === login &&
             typeof trim === 'number' &&
             Number.isFinite(trim) &&
             trim >= 0.25 &&

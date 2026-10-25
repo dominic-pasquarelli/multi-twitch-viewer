@@ -1,4 +1,4 @@
-import { normalizeLogin } from '../channels/parseChannels';
+import { normalizeChannel } from '../channels/parseChannels';
 import type { ViewState } from './types';
 import { focusedChannels } from './operations';
 import type { LayoutMode } from '../layout';
@@ -35,15 +35,15 @@ export function hashToView(hash: string): HashView | null {
     ...new Set(
       path
         .split('/')
-        .map((s) => normalizeLogin(decodeURIComponent(s)))
+        .map((s) => normalizeChannel(decodeURIComponent(s)))
         .filter((s): s is string => !!s),
     ),
   ];
   if (!channels.length) return null;
   const params = new URLSearchParams(query);
-  const main = normalizeLogin(params.get('main') ?? '');
+  const main = normalizeChannel(params.get('main') ?? '');
   const multi = params.get('layout') === 'multi-focus';
-  const focused = [...new Set((params.get('focus') ?? '').split(',').map(normalizeLogin))]
+  const focused = [...new Set((params.get('focus') ?? '').split(',').map(normalizeChannel))]
     .filter((c): c is string => !!c && channels.includes(c))
     .slice(0, 3);
   return {

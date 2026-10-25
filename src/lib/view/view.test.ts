@@ -22,6 +22,24 @@ import {
 
 const withChannels = (...c: string[]) => addChannels(emptyView(), c);
 
+it('preserves mixed-platform identities and assignments in saved views and shared focus links', () => {
+  const view = sanitizeView({
+    channels: ['xqc', 'kick:xqc', 'KICK:DJ-one'],
+    layout: { mode: 'multi-focus', main: 'kick:xqc', focused: ['xqc', 'kick:xqc'] },
+    audio: { mode: 'mix', active: ['xqc', 'kick:xqc'] },
+    chat: { open: true, channel: 'kick:dj-one' },
+    groups: [{ id: 'music', name: 'Music', channels: ['kick:dj-one'] }],
+  })!;
+  expect(view.channels).toEqual(['xqc', 'kick:xqc', 'kick:dj-one']);
+  expect(view.audio.active).toEqual(['xqc', 'kick:xqc']);
+  expect(view.chat.channel).toBe('kick:dj-one');
+  expect(view.groups![0]!.channels).toEqual(['kick:dj-one']);
+  expect(hashToView(viewToHash(view))).toMatchObject({
+    channels: view.channels,
+    focused: ['xqc', 'kick:xqc'],
+  });
+});
+
 describe('view operations', () => {
   it('adding the first streams makes the first one audible and its chat active', () => {
     const v = withChannels('a', 'b');

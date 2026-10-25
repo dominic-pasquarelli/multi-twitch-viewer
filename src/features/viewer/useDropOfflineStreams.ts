@@ -7,6 +7,8 @@ import { toast } from '@/state/toastStore';
 import { useUi } from '@/state/uiStore';
 import { useViewStore } from '@/state/viewStore';
 import { useLiveStatus } from '../follows/queries';
+import { useServices } from '@/app/servicesContext';
+import { kickSlugFromId } from '@/lib/channels/parseChannels';
 
 /** How long a stream must stay offline before a temporary view drops it. */
 export const offlineDrop = { graceMs: 90_000 };
@@ -18,6 +20,7 @@ export const offlineDrop = { graceMs: 90_000 };
  * The Favorites home view always lets its favorites go once they're offline.
  */
 export function useDropOfflineStreams(): void {
+  const kickPlaybackKnown = useServices().kickPlayerFactory.capabilities?.playbackState !== false;
   const channels = useViewStore((s) => s.view.channels);
   const pinned = useViewStore((s) => s.pinned);
   const home = useViewStore((s) => s.home);
@@ -53,13 +56,17 @@ export function useDropOfflineStreams(): void {
       lastChecked.current = now;
       if (now < resumeGraceUntil.current) return;
       const { channels, liveStatus, rules } = latest.current;
-      if (!liveStatus.known) return;
       tracker.current.graceMs = offlineDrop.graceMs;
       const playing = useUi.getState().playerStatus;
       // Streams that may not be dropped are left out, so the tracker forgets them.
       const drop = tracker.current.update(
         channels.filter((login) => droppableWhenOffline(login, rules)),
-        (login) => liveStatus.live.has(login) || playing[login] === 'playing',
+        (login) => {
+          const verifiedPlayback =
+            playing[login] === 'playing' && (!kickSlugFromId(login) || kickPlaybackKnown);
+          if (liveStatus.live.has(login) || verifiedPlayback) return true;
+          return liveStatus.knownFor(login) ? false : undefined;
+        },
       );
       if (!drop.length) return;
       useViewStore.getState().removeChannels(drop);
@@ -70,5 +77,5 @@ export function useDropOfflineStreams(): void {
     check();
     const timer = setInterval(check, 5_000);
     return () => clearInterval(timer);
-  }, [channels, liveStatus, enabled, pinned, home, favorites]);
+  }, [channels, liveStatus, enabled, pinned, home, favorites, kickPlaybackKnown]);
 }

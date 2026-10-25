@@ -1,7 +1,7 @@
 import { markPlaybackTransition } from '@/lib/player/transitions';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { normalizeLogin } from '@/lib/channels/parseChannels';
+import { normalizeChannel } from '@/lib/channels/parseChannels';
 import {
   DEFAULT_MUSIC,
   sanitizeMusic,
@@ -72,7 +72,7 @@ export const useMusicStore = create<MusicStore>()(
       },
       pin: (raw) => {
         markPlaybackTransition();
-        const pinned = normalizeLogin(raw);
+        const pinned = normalizeChannel(raw);
         if (!pinned) return;
         set((s) => ({
           mode: 'pinned',

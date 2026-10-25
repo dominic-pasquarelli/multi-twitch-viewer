@@ -24,7 +24,10 @@ const mockPlayers = createMockPlayerFactory({
   isLive: (login) => MOCK_CHANNELS.find((c) => c.login === login)?.live ?? true,
   hueFor: mockHue,
 });
-const mockKickPlayers = createMockPlayerFactory({ hueFor: () => 140, platform: 'kick' });
+const mockKickPlayers = {
+  ...createMockPlayerFactory({ hueFor: () => 140, platform: 'kick' }),
+  capabilities: { volume: true, playbackState: false },
+};
 // The desktop app can reach into Kick's player frames; a browser can't.
 const kickControl = desktop?.kickPlayer;
 const kickPlayers = createKickPlayerFactory(

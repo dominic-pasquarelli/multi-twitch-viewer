@@ -53,5 +53,7 @@ export interface PlayerFactory {
   capabilities?: {
     /** false: no volume control, so such a player is muted unless it's the one you hear. */
     volume: boolean;
+    /** false: "playing" only confirms the iframe loaded, not actual video playback. */
+    playbackState?: boolean;
   };
 }

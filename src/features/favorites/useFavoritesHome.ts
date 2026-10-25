@@ -20,6 +20,7 @@ export interface LiveFavorites {
   streams: ReadonlyMap<string, LiveStream>;
   /** false until live status has loaded. */
   known: boolean;
+  knownFor(login: string): boolean;
 }
 
 /** Your favorites (sidebar stars) and which of them are live right now. */
@@ -31,7 +32,8 @@ export function useLiveFavorites(): LiveFavorites {
       favorites,
       live: liveFavorites(favorites, (login) => status.live.has(login)),
       streams: status.live,
-      known: status.known,
+      known: status.known || favorites.some(status.knownFor),
+      knownFor: status.knownFor,
     }),
     [favorites, status],
   );
