@@ -1,6 +1,8 @@
 import { sanitizeView, type ViewState } from '../view';
+import { sanitizeScene, type ScenePreferences } from '../preferences/configuration';
 
 export interface Preset {
+  scene?: ScenePreferences;
   id: string;
   name: string;
   createdAt: string;
@@ -87,6 +89,7 @@ export function sanitizePreset(input: unknown): Preset | null {
     typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : new Date().toISOString();
   return {
     id: typeof p.id === 'string' && p.id ? p.id : newPresetId(),
+    ...(p.scene && typeof p.scene === 'object' ? { scene: sanitizeScene(p.scene) } : {}),
     name: p.name.trim().slice(0, 80),
     createdAt: date(p.createdAt),
     updatedAt: date(p.updatedAt),

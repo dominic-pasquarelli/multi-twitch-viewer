@@ -3,11 +3,12 @@ import { persist } from 'zustand/middleware';
 import { zustandStorage } from '@/lib/persistence/zustandStorage';
 import { createPreset, mergePresets, sanitizePreset, type Preset } from '@/lib/presets/presets';
 import type { ViewState } from '@/lib/view/types';
+import type { ScenePreferences } from '@/lib/preferences/configuration';
 
 interface PresetsStore {
   presets: Preset[];
-  save(name: string, view: ViewState): Preset;
-  overwrite(id: string, view: ViewState): void;
+  save(name: string, view: ViewState, scene?: ScenePreferences): Preset;
+  overwrite(id: string, view: ViewState, scene?: ScenePreferences): void;
   rename(id: string, name: string): void;
   remove(id: string): void;
   importPresets(incoming: Preset[]): void;
@@ -17,21 +18,27 @@ export const usePresets = create<PresetsStore>()(
   persist(
     (set, get) => ({
       presets: [],
-      save: (name, view) => {
+      save: (name, view, scene) => {
         const existing = get().presets.find((p) => p.name === name.trim());
         if (existing) {
-          get().overwrite(existing.id, view);
+          get().overwrite(existing.id, view, scene);
           return get().presets.find((p) => p.id === existing.id)!;
         }
         const preset = createPreset(name, structuredClone(view));
+        if (scene) preset.scene = structuredClone(scene);
         set((s) => ({ presets: [...s.presets, preset] }));
         return preset;
       },
-      overwrite: (id, view) =>
+      overwrite: (id, view, scene) =>
         set((s) => ({
           presets: s.presets.map((p) =>
             p.id === id
-              ? { ...p, view: structuredClone(view), updatedAt: new Date().toISOString() }
+              ? {
+                  ...p,
+                  scene: scene ? structuredClone(scene) : undefined,
+                  view: structuredClone(view),
+                  updatedAt: new Date().toISOString(),
+                }
               : p,
           ),
         })),

@@ -1,3 +1,7 @@
+import { useSleepTimerPlayback } from '@/features/tools/useSleepTimer';
+import { useWakeRecovery } from '@/features/viewer/useWakeRecovery';
+import { PlaybackToolsDialog } from '@/features/tools/PlaybackTools';
+import { AudioReasonDialog } from '@/features/tools/AudioReasonDialog';
 import { useEffect } from 'react';
 import { desktop } from '@/lib/desktop/bridge';
 import { useClientId } from '@/app/servicesContext';
@@ -42,6 +46,8 @@ export function App() {
   useGoLiveAlerts();
   useFavoritesHome();
   useMusicStream();
+  useSleepTimerPlayback();
+  useWakeRecovery();
   useRememberMusicCategories();
   useEffect(() => installAudioUnlock(), []);
   useEffect(
@@ -104,6 +110,8 @@ export function App() {
       <SavePresetDialog />
       <FavoritesDialog />
       <MusicDialog />
+      <PlaybackToolsDialog />
+      <AudioReasonDialog />
       <KickLinksDialog />
       <ShortcutsDialog />
       <UpdateBanner />

@@ -23,7 +23,7 @@
 }
 .silentBadge {
   position: absolute;
-  top: 8px;
+  bottom: 44px;
   right: 8px;
   z-index: 2;
   display: inline-flex;
@@ -36,7 +36,8 @@
   color: #ffe1ad;
   font-size: 11px;
   font-weight: 600;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
 }
 .tile.dropTarget {
   outline: 2px dashed var(--text);
@@ -119,4 +120,9 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+/* Keep the reason badge above the persistent mix card and native controls. */
+.tile:has([data-mix-controls]) .silentBadge {
+  bottom: 108px;
 }

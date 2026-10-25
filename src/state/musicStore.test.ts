@@ -82,7 +82,7 @@ describe('music preferences and view controls', () => {
     expect(playback().audio.active).toEqual(['dj']);
     view().toggleAudio('b');
     expect(music().mixWithStreams).toBe(true);
-    expect(playback().audio.active).toEqual(['b', 'dj']);
+    expect(playback().audio.active).toEqual(['a', 'b', 'c', 'dj']);
     view().loadView({ ...emptyView(), channels: ['other'] });
     expect(playback().channels).toEqual(['other', 'dj']);
     expect(view().view.channels).toEqual(['other']);
@@ -139,4 +139,59 @@ describe('music volume', () => {
     expect(useChannelPrefs.getState().master).toBe(0.8);
     expect(view().view.chat.channel).toBe(chatBeforeMusic);
   });
+});
+
+it('Mix keeps watched DJ candidates independently audible without changing the selected music channel', () => {
+  view().addChannels(['a', 'b', 'c']);
+  view().setLayoutMode('multi-focus');
+  music().addChannels(['a', 'b', 'dj']);
+  music().pin('dj');
+  view().setAudioMode('mix');
+  expect(music().mixWithStreams).toBe(true);
+  for (const channel of ['a', 'b', 'dj'])
+    expect(audioLevel(playback(), channel, 0.2).muted).toBe(false);
+  view().toggleAudio('b');
+  expect(audioLevel(playback(), 'b', 0.2).muted).toBe(true);
+  view().toggleAudio('b');
+  expect(music().pinned).toBe('dj');
+  for (const channel of ['a', 'b', 'dj'])
+    expect(audioLevel(playback(), channel, 0.2).muted).toBe(false);
+  view().externalMuteChange('a', true);
+  view().externalMuteChange('a', false);
+  expect(music().pinned).toBe('dj');
+  expect(playback().audio.active).toEqual(expect.arrayContaining(['a', 'b', 'dj']));
+});
+
+it('keeps DJ trim/level independent from focus, fixed priorities, master volume and DJ switches', async () => {
+  const { useMixStore } = await import('./mixStore');
+  view().addChannels(['a', 'b', 'dj']);
+  view().setLayoutMode('multi-focus');
+  music().addChannels(['dj', 'a']);
+  music().pin('dj');
+  music().setVolume(0.25);
+  music().setTrim('dj', 0.8);
+  music().setMixWithStreams(true);
+  useMixStore.getState().update({
+    enabled: true,
+    prioritySource: 'manual',
+    priorities: ['a', 'b', 'dj'],
+    priorityLevel: 0.7,
+    backgroundEnabled: true,
+    backgroundLevel: 0.15,
+  });
+  useChannelPrefs.setState({ master: 1, mainLevel: 1, output: 0.5 });
+  for (const consistentVolume of [true, false, true]) {
+    useSettings.setState({ consistentVolume, mainPriority: true });
+    view().setMain('dj');
+    expect(currentVolume('dj')).toBe(0.2);
+    view().setLayoutMode('multi-focus');
+    balanceFocusedAudio();
+    expect(currentVolume('dj')).toBe(0.2);
+    expect(music().volume).toBe(0.25);
+    music().pin('a');
+    expect(currentVolume('a')).toBe(0.25);
+    music().pin('dj');
+    expect(currentVolume('dj')).toBe(0.2);
+  }
+  useMixStore.getState().update({ enabled: false });
 });

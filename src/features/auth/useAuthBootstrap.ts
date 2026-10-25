@@ -66,9 +66,11 @@ export function useAuthBootstrap(clientId: string): void {
     };
     void check();
     const id = setInterval(check, HOUR);
+    window.addEventListener('mtv:resume', check);
     return () => {
       cancelled = true;
       clearInterval(id);
+      window.removeEventListener('mtv:resume', check);
     };
   }, [token]);
 }

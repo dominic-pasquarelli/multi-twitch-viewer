@@ -1,3 +1,4 @@
+import { markPlaybackTransition } from '@/lib/player/transitions';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DEFAULT_MIX, sanitizeMix, type MixPreferences } from '@/lib/audio/mixPreferences';
@@ -11,7 +12,10 @@ export const useMixStore = create<MixStore>()(
   persist(
     (set) => ({
       ...DEFAULT_MIX,
-      update: (patch) => set((s) => sanitizeMix({ ...s, ...patch })),
+      update: (patch) => {
+        markPlaybackTransition();
+        set((s) => sanitizeMix({ ...s, ...patch }));
+      },
     }),
     {
       name: 'mix',

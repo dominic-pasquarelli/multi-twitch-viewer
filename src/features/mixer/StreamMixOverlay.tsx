@@ -1,3 +1,4 @@
+import { temporaryScale, usePlaybackEffects } from '@/state/playbackEffectsStore';
 import { Crown, Music2, Volume2, VolumeX } from 'lucide-react';
 import { useServices } from '@/app/servicesContext';
 import { mixPriorities, outputPercent } from '@/lib/audio/mixPreferences';
@@ -33,6 +34,7 @@ export function StreamMixOverlay({
   const base = useViewStore((s) => s.view);
   const view = usePlaybackView();
   const m = useVolumeModel();
+  const effects = usePlaybackEffects();
   const main = useUi((s) => s.mainStream);
   const visibleChannels = useUi((s) => s.visibleChannels);
   const status = useUi((s) => s.playerStatus[login]);
@@ -47,9 +49,19 @@ export function StreamMixOverlay({
   const selected = prefs.enabled && priorities.includes(login);
   const supported =
     (kick ? services.kickPlayerFactory : services.playerFactory).capabilities?.volume !== false;
-  const silence = silenceReason(level.muted, volume, level.scale * output, supported);
+  const silence = silenceReason(
+    level.muted,
+    volume,
+    level.scale * output * temporaryScale(login, m.musicChannel ?? null, effects),
+    supported,
+  );
   const paused = status === 'paused' || status === 'blocked' || status === 'offline';
-  const effective = outputPercent(volume, level.scale, output, level.muted || paused);
+  const effective = outputPercent(
+    volume,
+    level.scale * temporaryScale(login, m.musicChannel ?? null, effects),
+    output,
+    level.muted || paused,
+  );
   const legacyMain = !role && m.priorityMain === login;
   const name =
     role === 'music'
@@ -75,6 +87,7 @@ export function StreamMixOverlay({
       role="group"
       aria-label={`${login} mix controls`}
       data-testid="stream-mix-overlay"
+      data-mix-controls
       data-channel={login}
       data-role={role ?? 'individual'}
       data-muted={!!silence}

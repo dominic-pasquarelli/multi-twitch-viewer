@@ -2,10 +2,20 @@ import { create } from 'zustand';
 import type { PlayerStatus } from '@/lib/player/types';
 
 export type DialogName =
-  'settings' | 'shortcuts' | 'savePreset' | 'setup' | 'favorites' | 'kick' | 'music' | null;
+  | 'settings'
+  | 'shortcuts'
+  | 'savePreset'
+  | 'setup'
+  | 'favorites'
+  | 'kick'
+  | 'music'
+  | 'tools'
+  | 'streamAudio'
+  | null;
 
 /** Transient UI state (never persisted). */
 interface UiStore {
+  recoveryNotice: string | null;
   dialog: DialogName;
   presetsMenuOpen: boolean;
   fullscreen: boolean;
@@ -47,6 +57,7 @@ interface UiStore {
 }
 
 export const useUi = create<UiStore>()((set) => ({
+  recoveryNotice: null,
   dialog: null,
   presetsMenuOpen: false,
   fullscreen: false,

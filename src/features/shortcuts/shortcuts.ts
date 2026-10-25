@@ -3,6 +3,10 @@ export const SHORTCUTS: { keys: string; description: string }[] = [
   { keys: '1 – 9', description: 'Hear stream 1–9 (others mute)' },
   { keys: 'Shift + 1 – 9', description: 'Add/remove stream from the audio mix' },
   { keys: 'M', description: 'Mute everything / bring the audio back' },
+  {
+    keys: 'Hold Q',
+    description: 'Temporarily listen to the selected stream; release to restore the mix',
+  },
   { keys: '↑  ↓', description: 'Volume of the stream you are hearing (or scroll over its bar)' },
   { keys: 'L', description: 'Switch between grid and focus layout' },
   { keys: '[  ]', description: 'Focus layout: main stream smaller / bigger' },

@@ -7,6 +7,7 @@ import {
   dialog,
   ipcMain,
   Notification,
+  powerMonitor,
   screen,
   session,
   shell,
@@ -94,6 +95,15 @@ async function start() {
   );
 
   createWindow();
+  const resume = () => {
+    if (win && !win.isDestroyed()) win.webContents.send('mtv:system-resume');
+  };
+  powerMonitor.on('resume', resume);
+  powerMonitor.on('unlock-screen', resume);
+  app.once('will-quit', () => {
+    powerMonitor.removeListener('resume', resume);
+    powerMonitor.removeListener('unlock-screen', resume);
+  });
   tray = createTray({
     iconPath: ICON,
     onShow: showWindow,

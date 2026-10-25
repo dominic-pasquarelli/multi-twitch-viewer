@@ -37,6 +37,7 @@ import styles from './TopBar.module.css';
 import { MusicButton } from '../music/MusicDialog';
 import { usePlaybackView } from '../music/useMusic';
 import { useMusicStore } from '@/state/musicStore';
+import { PlaybackToolsButton } from '../tools/PlaybackTools';
 
 const AUDIO_MODES: { mode: AudioMode; label: string; help: string }[] = [
   { mode: 'solo', label: 'Solo', help: 'Solo: hear one stream; the others are muted.' },
@@ -103,6 +104,7 @@ export function TopBar() {
           onClick={() => {
             if (mode === 'multi-focus') return;
             store.setLayoutMode('multi-focus');
+            store.setAudioMode('mix');
             balanceFocusedAudio();
           }}
           title="Multi focus: choose two or three large streams; balance their audio in the Mixer"
@@ -155,6 +157,7 @@ export function TopBar() {
         <ImmersiveMixButton />
         <Mixer />
         <MusicButton />
+        <PlaybackToolsButton />
       </div>
 
       <div className={styles.actions}>

@@ -20,6 +20,7 @@ export interface VolumeModel {
   /** Music has a separate level, unaffected by video focus or the consistent-volume master. */
   musicChannel?: string | null;
   musicVolume?: number;
+  musicTrim?: number;
   consistent: boolean;
   /** Consistent mode: the volume you hear (0–1). */
   master: number;
@@ -45,7 +46,7 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
  * null = no preference yet: leave the player's own volume.
  */
 export function streamVolume(m: VolumeModel, login: string): number | null {
-  if (m.musicChannel === login) return m.musicVolume ?? 0.35;
+  if (m.musicChannel === login) return Math.min(1, (m.musicVolume ?? 0.35) * (m.musicTrim ?? 1));
   const fixed = fixedMixRole(m, login);
   if (fixed === 'priority') return m.mix!.priorityLevel;
   if (fixed === 'background') return m.mix!.backgroundLevel!;
