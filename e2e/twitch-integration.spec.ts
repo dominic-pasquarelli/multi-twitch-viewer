@@ -162,6 +162,72 @@ async function stubTwitch(page: Page, calls: string[], crossOriginPlayers = fals
   await page.route('https://static-cdn.jtvnw.net/**', (route) => route.fulfill({ status: 404 }));
 }
 
+test('native DJ video clicks select music first, focus second and recover the click-induced pause', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (window as unknown as { __fakeClickPauseMs: number }).__fakeClickPauseMs = 250;
+  });
+  await stubTwitch(page, []);
+  await page.route('https://api.twitch.tv/helix/streams?**', (route) => {
+    if (route.request().method() === 'OPTIONS')
+      return route.fulfill({ status: 204, headers: cors });
+    const logins = new URL(route.request().url()).searchParams.getAll('user_login');
+    const charlie = {
+      ...stream('10', 10),
+      user_id: '12',
+      user_login: 'charlie',
+      user_name: 'Charlie',
+    };
+    return route.fulfill({
+      headers: cors,
+      json: {
+        data: [stream('10', 5000), stream('11', 1200), charlie].filter((s) =>
+          logins.includes(s.user_login),
+        ),
+      },
+    });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Account: Viewer', exact: true })).toBeVisible();
+  await page.evaluate(() => (location.hash = '#/charlie/alpha/bravo'));
+  await page.getByRole('button', { name: /^Focus:/ }).click();
+  await page.getByTestId('music-button').click();
+  const music = page.getByRole('dialog', { name: 'DJ & music', exact: true });
+  await music.getByRole('textbox', { name: 'Add music channels' }).fill('alpha bravo');
+  await music.getByRole('button', { name: 'Add', exact: true }).click();
+  await music.getByRole('button', { name: 'Automatic', exact: true }).click();
+  await music.getByRole('button', { name: 'DJ + stream audio', exact: true }).click();
+  await music.getByRole('button', { name: 'Done', exact: true }).click();
+  const bravo = page.locator('iframe[data-fake-twitch=bravo]');
+  const charlie = page.locator('iframe[data-fake-twitch=charlie]');
+  const main = page.locator('[data-testid=player-tile][data-main=true]');
+  await expect(bravo).toHaveAttribute('data-paused', 'false');
+  await bravo.evaluate((el) => el.setAttribute('data-mount-check', 'original'));
+  await page.locator('[data-testid=player-tile][data-channel=bravo]').hover();
+  await bravo.click();
+  await expect(main).toHaveAttribute('data-channel', 'charlie');
+  await expect(page.getByTestId('live-djs').locator('button[data-channel=bravo]')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect.poll(() => bravo.getAttribute('data-pauses')).not.toBe('0');
+  await expect(bravo).toHaveAttribute('data-paused', 'false');
+  await expect.poll(() => bravo.evaluate((el) => document.activeElement === el)).toBe(false);
+  await page.locator('[data-testid=player-tile][data-channel=bravo]').hover();
+  await bravo.click();
+  await expect(main).toHaveAttribute('data-channel', 'bravo');
+  await expect.poll(async () => Number(await bravo.getAttribute('data-pauses'))).toBeGreaterThan(1);
+  await expect(bravo).toHaveAttribute('data-paused', 'false');
+  await expect(bravo).toHaveAttribute('data-mount-check', 'original');
+  await expect(charlie).toHaveAttribute('data-muted', 'false');
+  await expect(bravo).toHaveAttribute('data-volume', '0.35');
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('mtv:music')!).state.channels),
+  ).toEqual(['alpha', 'bravo']);
+});
+
 test('music uses live Helix priority, survives failed checks and syncs native player volume', async ({
   page,
 }) => {

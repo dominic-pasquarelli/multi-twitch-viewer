@@ -35,6 +35,7 @@ import { AddChannelBox } from './AddChannelBox';
 import { toggleFullscreen } from './fullscreen';
 import styles from './TopBar.module.css';
 import { MusicButton } from '../music/MusicDialog';
+import { LiveDJs } from '../music/LiveDJs';
 import { usePlaybackView } from '../music/useMusic';
 import { useMusicStore } from '@/state/musicStore';
 import { PlaybackToolsButton } from '../tools/PlaybackTools';
@@ -248,6 +249,7 @@ export function TopBar() {
           <LoginButton label={status === 'expired' ? 'Log in again' : 'Log in'} />
         </div>
       )}
+      <LiveDJs />
     </header>
   );
 }

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const tile = (page: Page, channel: string) =>
-  page.locator(`[data-testid=player-tile][data-channel=${channel}]`);
+  page.locator(`[data-testid=player-tile][data-channel="${channel}"]`);
 const player = (page: Page, channel: string) => tile(page, channel).locator('.mock-player');
 const dialog = (page: Page) => page.getByRole('dialog', { name: 'DJ & music', exact: true });
 const row = (page: Page, channel: string) =>
@@ -144,6 +144,95 @@ test('quick DJ volume follows the selected DJ and preserves output, mute and pau
   await dialog(page).getByRole('button', { name: 'Off', exact: true }).click();
   await dialog(page).getByRole('button', { name: 'Done', exact: true }).click();
   await expect(quick).toHaveCount(0);
+});
+
+test('live DJ buttons switch first, focus second and preserve the order, mix and player mounts', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/lunarlatte/cozycartographer');
+  await page.getByRole('button', { name: /^Focus:/ }).click();
+  await addMusic(page, 'bytebard lunarlatte cozycartographer kick:bytebard');
+  await dialog(page).getByRole('button', { name: 'Automatic', exact: true }).click();
+  await dialog(page).getByRole('button', { name: 'DJ + stream audio', exact: true }).click();
+  await dialog(page).getByRole('button', { name: 'Done', exact: true }).click();
+  const quick = page.getByTestId('live-djs');
+  const choice = (channel: string) => quick.locator(`button[data-channel="${channel}"]`);
+  await expect(choice('bytebard')).toHaveCount(0); // Offline choices stay out of the strip.
+  await expect(choice('lunarlatte')).toHaveAttribute('aria-pressed', 'true');
+  await expect(choice('kick:bytebard')).toContainText('Kick');
+  await page.getByTestId('dj-volume').fill('23');
+  for (const c of ['pixelpaladin', 'lunarlatte', 'cozycartographer'])
+    await player(page, c).evaluate((el) => el.setAttribute('data-mount-check', 'original'));
+  await choice('cozycartographer').click();
+  await expect(tile(page, 'pixelpaladin')).toHaveAttribute('data-main', 'true');
+  await expect(player(page, 'cozycartographer')).toHaveAttribute('data-volume', '0.23');
+  await expect(player(page, 'cozycartographer')).toHaveAttribute('data-muted', 'false');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-muted', 'true');
+  await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-muted', 'false');
+  await choice('cozycartographer').click();
+  await expect(tile(page, 'cozycartographer')).toHaveAttribute('data-main', 'true');
+  await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-muted', 'false');
+  for (const c of ['pixelpaladin', 'lunarlatte', 'cozycartographer'])
+    await expect(player(page, c)).toHaveAttribute('data-mount-check', 'original');
+  await quick.getByRole('button', { name: 'Resume Automatic', exact: true }).click();
+  await expect(choice('lunarlatte')).toHaveAttribute('aria-pressed', 'true');
+  await expect(tile(page, 'cozycartographer')).toHaveAttribute('data-main', 'true');
+  await choice('kick:bytebard').click();
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-platform', 'kick');
+  await expect(player(page, 'kick:bytebard')).toHaveAttribute('data-volume', '0.23');
+  await expect(tile(page, 'cozycartographer')).toHaveAttribute('data-main', 'true');
+  const savedOrder = () =>
+    page.evaluate(() => JSON.parse(localStorage.getItem('mtv:music')!).state.channels);
+  expect(await savedOrder()).toEqual([
+    'bytebard',
+    'lunarlatte',
+    'cozycartographer',
+    'kick:bytebard',
+  ]);
+  await page.reload();
+  await expect(choice('kick:bytebard')).toHaveAttribute('aria-pressed', 'true');
+  await page.setViewportSize({ width: 800, height: 900 });
+  await expect(quick).toBeInViewport();
+  await choice('lunarlatte').click();
+  await expect(choice('lunarlatte')).toHaveAttribute('aria-pressed', 'true');
+  expect(await savedOrder()).toEqual([
+    'bytebard',
+    'lunarlatte',
+    'cozycartographer',
+    'kick:bytebard',
+  ]);
+});
+
+test('quick DJ switching and Resume Automatic preserve mute all and Pause all', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/lunarlatte/cozycartographer');
+  await page.getByRole('button', { name: /^Focus:/ }).click();
+  await addMusic(page, 'lunarlatte cozycartographer');
+  await dialog(page).getByRole('button', { name: 'Automatic', exact: true }).click();
+  await dialog(page).getByRole('button', { name: 'Done', exact: true }).click();
+  await page.locator('body').press('m');
+  await page.getByTestId('pause-all').click();
+  const quick = page.getByTestId('live-djs');
+  const cozy = quick.locator('button[data-channel=cozycartographer]');
+  await cozy.click();
+  await cozy.click();
+  await expect(tile(page, 'cozycartographer')).toHaveAttribute('data-main', 'true');
+  for (const c of ['pixelpaladin', 'lunarlatte', 'cozycartographer']) {
+    await expect(player(page, c)).toHaveAttribute('data-muted', 'true');
+    await expect(player(page, c)).toHaveAttribute('data-paused', 'true');
+  }
+  await quick.getByRole('button', { name: 'Resume Automatic', exact: true }).click();
+  await expect(cozy).toHaveAttribute('aria-pressed', 'true');
+  await expect(player(page, 'cozycartographer')).toHaveAttribute('data-paused', 'true');
+  await page.getByTestId('play-all').click();
+  await expect(quick.locator('button[data-channel=lunarlatte]')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-muted', 'true');
+  await page.locator('body').press('m');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-muted', 'false');
 });
 
 test('pinning reuses a watched stream, overrides priorities and stops from tile controls', async ({
