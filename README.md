@@ -46,6 +46,11 @@ channels are live, and watch several streams at once with layouts that actually 
   While a DJ is selected, a **DJ volume** slider and percentage appear beside App volume in the
   top bar. Drag, use the arrow keys, or scroll over it to adjust the shared DJ level without opening
   a menu. It stays available at 0% and while muted/paused; adjusting it preserves mute/pause intent.
+  With two or more saved DJs, the **Live DJs** strip lets you switch between live choices: click
+  another DJ to select their music while keeping your main streamer, then click the selected DJ
+  again to make them the main video. Your saved order and stream audio stay unchanged;
+  **Resume Automatic** returns to that order. Saved DJs' videos use the same two-click selection
+  when click-to-focus is enabled. Quick switching preserves DJ volume, mute and Pause all state.
   **Pause all** holds playback and automatic selection until **Play all**. **Clear all** or
   closing the selected DJ stops music. The list, mode, volume and mix preference survive restart,
   separately from watched-stream presets and share links. Explicitly arranging/focusing a DJ or

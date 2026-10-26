@@ -46,6 +46,7 @@ import { getPlaybackView, usePlaybackView, useMusicChannel } from '../music/useM
 import { temporaryScale, usePlaybackEffects } from '@/state/playbackEffectsStore';
 import { muteExplanation } from '@/lib/audio/muteExplanation';
 import { useMusicStore } from '@/state/musicStore';
+import { selectOrFocusDJ } from '../music/djSelection';
 import { markPlaybackTransition, playbackTransitionActive } from '@/lib/player/transitions';
 
 /** Closes any reachable stream surface; ordinary removals support Undo. */
@@ -260,7 +261,10 @@ export function Viewer() {
     if ((statusAtClick ?? useUi.getState().playerStatus[login]) !== 'playing') return;
     const store = useViewStore.getState();
     const { view } = store;
-    if (view.layout.mode === 'multi-focus') {
+    const music = useMusicStore.getState();
+    if (music.mode !== 'off' && music.channels.includes(login)) {
+      if (selectOrFocusDJ(login) === 'unchanged') return;
+    } else if (view.layout.mode === 'multi-focus') {
       const focused = focusedChannels(view);
       if (focused.includes(login) || focused.length >= 3) return;
       store.toggleFocusedChannel(login);

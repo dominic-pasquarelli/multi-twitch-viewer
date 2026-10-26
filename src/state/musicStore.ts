@@ -21,8 +21,8 @@ interface MusicStore extends MusicPlayback {
   addChannels(channels: string[]): void;
   removeChannel(channel: string): void;
   moveChannel(channel: string, offset: number): void;
-  setMode(mode: 'off' | 'auto'): void;
-  pin(channel: string): void;
+  setMode(mode: 'off' | 'auto', options?: { preservePaused?: boolean }): void;
+  pin(channel: string, options?: { preservePaused?: boolean }): void;
   setCurrent(channel: string | null): void;
   setVolume(volume: number): void;
   setMuted(muted: boolean): void;
@@ -64,13 +64,19 @@ export const useMusicStore = create<MusicStore>()(
           [channels[i], channels[j]] = [channels[j]!, channels[i]!];
           return { channels };
         }),
-      setMode: (mode) => {
+      setMode: (mode, options) => {
         markPlaybackTransition();
         return set((s) =>
-          s.mode === mode ? s : { mode, current: mode === 'auto' ? s.pinned : null, paused: false },
+          s.mode === mode
+            ? s
+            : {
+                mode,
+                current: mode === 'auto' ? s.pinned : null,
+                paused: options?.preservePaused ? s.paused : false,
+              },
         );
       },
-      pin: (raw) => {
+      pin: (raw, options) => {
         markPlaybackTransition();
         const pinned = normalizeChannel(raw);
         if (!pinned) return;
@@ -78,7 +84,7 @@ export const useMusicStore = create<MusicStore>()(
           mode: 'pinned',
           pinned,
           current: null,
-          paused: false,
+          paused: options?.preservePaused ? s.paused : false,
           channels: sanitizeMusic({ channels: [...s.channels, pinned] }).channels,
         }));
       },

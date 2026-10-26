@@ -12,6 +12,7 @@ import { useMusicStore } from './musicStore';
 import { useViewStore } from './viewStore';
 import { useChannelPrefs } from './channelPrefsStore';
 import { DEFAULT_SETTINGS, useSettings } from './settingsStore';
+import { selectOrFocusDJ } from '@/features/music/djSelection';
 
 const music = () => useMusicStore.getState();
 const view = () => useViewStore.getState();
@@ -138,6 +139,61 @@ describe('music volume', () => {
     expect(currentVolume('dj')).toBe(0.28);
     expect(useChannelPrefs.getState().master).toBe(0.8);
     expect(view().view.chat.channel).toBe(chatBeforeMusic);
+  });
+});
+
+describe('quick DJ selection', () => {
+  it('switches before focusing without changing the priority order, main stream or stream audio', () => {
+    view().addChannels(['a', 'dj1', 'dj2']);
+    view().setMain('a');
+    music().addChannels(['dj1', 'dj2']);
+    music().setMode('auto');
+    music().setCurrent('dj1');
+    music().setMixWithStreams(true);
+    music().setVolume(0.23);
+    const before = structuredClone(view().view);
+    expect(selectOrFocusDJ('dj2')).toBe('switched');
+    expect(view().view).toEqual(before);
+    expect(music().channels).toEqual(['dj1', 'dj2']);
+    expect(music().mode).toBe('pinned');
+    expect(activeMusicChannel(music())).toBe('dj2');
+    expect(selectOrFocusDJ('dj2')).toBe('focused');
+    expect(view().view.layout.main).toBe('dj2');
+    expect(view().view.audio).toEqual(before.audio);
+    expect(music().volume).toBe(0.23);
+    expect(music().mixWithStreams).toBe(true);
+    expect(selectOrFocusDJ('dj2')).toBe('unchanged');
+  });
+
+  it('keeps mute all and Pause all intent through switching, focus and returning to Automatic', () => {
+    view().addChannels(['a']);
+    view().setMain('a');
+    music().addChannels(['dj1', 'kick:dj2']);
+    music().pin('dj1');
+    music().setPaused(true);
+    view().toggleMuteAll();
+    selectOrFocusDJ('kick:dj2');
+    selectOrFocusDJ('kick:dj2');
+    expect(music().paused).toBe(true);
+    expect(music().muted).toBe(true);
+    expect(view().mutedFrom).toEqual(['a']);
+    expect(playback().audio.active).toEqual([]);
+    expect(view().view.channels).toEqual(['a', 'kick:dj2']);
+    music().setMode('auto', { preservePaused: true });
+    expect(music().paused).toBe(true);
+    expect(activeMusicChannel(music())).toBe('kick:dj2');
+    expect(music().channels).toEqual(['dj1', 'kick:dj2']);
+  });
+
+  it('leaves ordinary streams and disabled DJ mode alone', () => {
+    view().addChannels(['a', 'b']);
+    music().addChannels(['b']);
+    expect(selectOrFocusDJ('b')).toBe('unchanged');
+    expect(music().mode).toBe('off');
+    music().pin('b');
+    expect(selectOrFocusDJ('a')).toBe('unchanged');
+    expect(activeMusicChannel(music())).toBe('b');
+    expect(view().view.layout.mode).toBe('grid');
   });
 });
 

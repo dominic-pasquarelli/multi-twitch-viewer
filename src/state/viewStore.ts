@@ -55,7 +55,7 @@ interface ViewStore {
   undo(): boolean;
 
   setLayoutMode(mode: LayoutMode): void;
-  setMain(login: string): void;
+  setMain(login: string, options?: { preserveAudio?: boolean }): void;
   setFocusedChannels(logins: string[]): void;
   toggleFocusedChannel(login: string): void;
   setMainScale(scale: MainScale): void;
@@ -226,9 +226,10 @@ export const useViewStore = create<ViewStore>()(
         setFocusedChannels: (logins) => apply((v) => ops.setFocusedChannels(v, logins)),
         toggleFocusedChannel: (login) =>
           apply((v) => ops.toggleFocusedChannel(watchMusic(v, [login]), login)),
-        setMain: (login) =>
+        setMain: (login, options) =>
           apply((v) => {
             const next = ops.setMain(watchMusic(v, [login]), login);
+            if (options?.preserveAudio) return { ...next, audio: v.audio };
             return ops.hasSingleFocus(next.audio.mode) && useSettings.getState().audioFollowsMain
               ? ops.focusAudio(next, login)
               : next;
