@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createKickPlayerFactory, type KickPlayerCommand } from './kickEmbed';
+import { createKickPlayerFactory, type KickPlayerCommand, type KickPlayerState } from './kickEmbed';
 import { PlayerController } from './PlayerController';
 
 afterEach(() => vi.useRealTimers());
@@ -8,6 +8,17 @@ const frameSrc = (host: HTMLElement) => host.querySelector('iframe')?.src ?? nul
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('Kick player (browser: no remote control)', () => {
+  it('honors a pause requested before ready, without loading a new autoplay iframe', async () => {
+    const host = document.createElement('div');
+    const player = createKickPlayerFactory().create(host, { channel: 'xqc', muted: true });
+    player.pause();
+    await flush();
+    expect(host.querySelector('iframe')).toBeNull();
+    player.play();
+    expect(host.querySelectorAll('iframe')).toHaveLength(1);
+    player.destroy();
+  });
+
   it('loads with the first mute state, reloads to change it and unloads to pause', async () => {
     const host = document.createElement('div');
     const factory = createKickPlayerFactory();
@@ -41,6 +52,58 @@ describe('Kick player (browser: no remote control)', () => {
 });
 
 describe('Kick player (desktop: frame control)', () => {
+  it('serializes slow commands and coalesces to the latest audio and playback intent', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval'] });
+    const pending: { command: KickPlayerCommand; resolve(state: KickPlayerState | null): void }[] =
+      [];
+    const control = vi.fn(
+      (_id: string, command: KickPlayerCommand) =>
+        new Promise<KickPlayerState | null>((resolve) => pending.push({ command, resolve })),
+    );
+    const player = createKickPlayerFactory(control).create(document.createElement('div'), {
+      channel: 'xqc',
+      muted: true,
+    });
+    const playing = vi.fn();
+    player.on('playing', playing);
+    await flush();
+    player.setVolume(0.2);
+    player.setMuted(false);
+    player.pause();
+    player.play();
+    player.pause(); // only the latest requested playback state should be sent
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(control).toHaveBeenCalledTimes(1);
+    pending[0]!.resolve({ muted: true, volume: 0.5, paused: false });
+    await flush();
+    expect(playing).not.toHaveBeenCalled(); // this was an obsolete reply
+    expect(pending[1]!.command).toEqual({ muted: false, volume: 0.2, pause: true });
+    pending[1]!.resolve({ muted: false, volume: 0.2, paused: true });
+    await flush();
+    expect(player.isPaused?.()).toBe(true);
+    expect(player.getVolume()).toBe(0.2);
+    player.destroy();
+  });
+
+  it('retains a play/pause request while the frame has no video yet', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval'] });
+    let hasVideo = false;
+    const control = vi.fn(async (_id: string, command: KickPlayerCommand) =>
+      hasVideo ? { muted: true, volume: 0.5, paused: command.pause === true } : null,
+    );
+    const player = createKickPlayerFactory(control).create(document.createElement('div'), {
+      channel: 'xqc',
+      muted: true,
+    });
+    player.pause();
+    await flush();
+    hasVideo = true;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(control.mock.calls.at(-1)?.[1]).toMatchObject({ pause: true });
+    expect(player.isPaused?.()).toBe(true);
+    player.destroy();
+  });
+
   it("keeps the video at the app's mute and volume, and plays and pauses it", async () => {
     vi.useFakeTimers({ toFake: ['setInterval'] });
     const commands: KickPlayerCommand[] = [];

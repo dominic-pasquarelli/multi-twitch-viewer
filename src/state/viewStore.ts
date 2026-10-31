@@ -19,6 +19,9 @@ export interface HistoryEntry {
   restore?: () => void;
   view: ViewState;
   home: boolean;
+  pinned: boolean;
+  mutedFrom: string[] | null;
+  musicMutedFrom: boolean | null;
 }
 
 interface ViewStore {
@@ -27,6 +30,8 @@ interface ViewStore {
   history: HistoryEntry[];
   /** What was audible before "mute all", so M can bring it back. */
   mutedFrom: string[] | null;
+  /** The DJ's independent mute setting before a global mute. */
+  musicMutedFrom: boolean | null;
   /**
    * Kept view (loaded from a preset): offline streams stay. Otherwise the view
    * is temporary and streams that go offline are removed.
@@ -85,6 +90,10 @@ export const useViewStore = create<ViewStore>()(
         const next = ops.addChannels(view, [channel]);
         return view.activeGroup ? groups.assignGroup(next, channel, view.activeGroup) : next;
       };
+      const snapshot = (restore?: () => void): HistoryEntry => {
+        const { view, home, pinned, mutedFrom, musicMutedFrom } = get();
+        return { view, home, pinned, mutedFrom, musicMutedFrom, restore };
+      };
       /** Applies a change; `undoable` changes are recorded for undo. */
       const apply = (fn: (v: ViewState) => ViewState, undoable = false) => {
         const before = get().view;
@@ -99,9 +108,7 @@ export const useViewStore = create<ViewStore>()(
         }
         set({
           view: after,
-          history: undoable
-            ? [...get().history, { view: before, home: get().home }].slice(-HISTORY_LIMIT)
-            : get().history,
+          history: undoable ? [...get().history, snapshot()].slice(-HISTORY_LIMIT) : get().history,
           mutedFrom: after.audio.active.length
             ? null
             : get().mutedFrom &&
@@ -109,6 +116,7 @@ export const useViewStore = create<ViewStore>()(
                 after.layout.focused?.join(',') !== before.layout.focused?.join(',')
               ? ops.focusedChannels(after)
               : get().mutedFrom,
+          musicMutedFrom: after.audio.active.length ? null : get().musicMutedFrom,
           // An empty view starts over as a temporary one.
           pinned: after.channels.length ? get().pinned : false,
         });
@@ -118,6 +126,7 @@ export const useViewStore = create<ViewStore>()(
         view: ops.emptyView(),
         history: [],
         mutedFrom: null,
+        musicMutedFrom: null,
         pinned: false,
         home: false,
 
@@ -128,10 +137,16 @@ export const useViewStore = create<ViewStore>()(
               for (const login of logins) {
                 next = groups.assignGroup(next, login, v.activeGroup);
               }
-            return next;
+            // The last live stream may have left while the app was muted.
+            // Adding the first returning stream must not cancel that mute.
+            return get().mutedFrom !== null ? ops.muteAll(next) : next;
           }, true),
         addHomeChannels: (logins) => {
-          if (get().home) apply((v) => ops.addChannels(v, logins));
+          if (get().home)
+            apply((v) => {
+              const next = ops.addChannels(v, logins);
+              return get().mutedFrom !== null ? ops.muteAll(next) : next;
+            });
         },
         enterHome: (logins) => {
           apply((v) => ({ ...ops.watchOnly(v, logins), groups: [], activeGroup: null }), true);
@@ -147,14 +162,14 @@ export const useViewStore = create<ViewStore>()(
         setPinned: (pinned) => set({ pinned }),
         toggleChannel: (login) =>
           apply((v) => {
-            const next = ops.toggleChannel(v, login);
-            return !v.channels.includes(login) && v.activeGroup
-              ? groups.assignGroup(next, login, v.activeGroup)
-              : next;
+            let next = ops.toggleChannel(v, login);
+            if (!v.channels.includes(login) && v.activeGroup)
+              next = groups.assignGroup(next, login, v.activeGroup);
+            return get().mutedFrom !== null ? ops.muteAll(next) : next;
           }, true),
         watchOnly: (logins) => {
           apply((v) => ({ ...ops.watchOnly(v, logins), groups: [], activeGroup: null }), true);
-          set({ home: false });
+          set({ home: false, pinned: false });
         },
         replaceChannel: (t, r) => {
           if (
@@ -179,28 +194,35 @@ export const useViewStore = create<ViewStore>()(
         clear: () => {
           useMusicStore.getState().setMode('off');
           apply((v) => ({ ...ops.watchOnly(v, []), groups: [], activeGroup: null }), true);
-          set({ home: false });
+          set({ home: false, mutedFrom: null, musicMutedFrom: null });
         },
         loadView: (view, restore) => {
           markPlaybackTransition();
-          if (restore)
-            set({
-              view: ops.normalize(structuredClone(view)),
-              history: [...get().history, { view: get().view, home: get().home, restore }].slice(
-                -HISTORY_LIMIT,
-              ),
-              mutedFrom: null,
-            });
-          else apply(() => ops.normalize(structuredClone(view)), true);
+          const next = groups.normalizeGroups(ops.normalize(structuredClone(view)));
           // A preset keeps its streams.
-          set({ pinned: get().view.channels.length > 0, home: false });
+          set({
+            view: next,
+            history: [...get().history, snapshot(restore)].slice(-HISTORY_LIMIT),
+            pinned: next.channels.length > 0,
+            home: false,
+            mutedFrom: null,
+            musicMutedFrom: null,
+          });
         },
         undo: () => {
           const history = get().history;
           const previous = history[history.length - 1];
           if (!previous) return false;
           previous.restore?.();
-          set({ view: previous.view, home: previous.home, history: history.slice(0, -1) });
+          markPlaybackTransition();
+          set({
+            view: previous.view,
+            home: previous.home,
+            pinned: previous.pinned,
+            mutedFrom: previous.mutedFrom,
+            musicMutedFrom: previous.musicMutedFrom,
+            history: history.slice(0, -1),
+          });
           return true;
         },
 
@@ -217,6 +239,7 @@ export const useViewStore = create<ViewStore>()(
             }
             const main = ops.mainChannel(next, groups.displayedChannels(next));
             return mode === 'focus' &&
+              v.audio.active.length > 0 &&
               main &&
               ops.hasSingleFocus(next.audio.mode) &&
               useSettings.getState().audioFollowsMain
@@ -229,7 +252,8 @@ export const useViewStore = create<ViewStore>()(
         setMain: (login, options) =>
           apply((v) => {
             const next = ops.setMain(watchMusic(v, [login]), login);
-            if (options?.preserveAudio) return { ...next, audio: v.audio };
+            if (options?.preserveAudio || !v.audio.active.length)
+              return { ...next, audio: v.audio };
             return ops.hasSingleFocus(next.audio.mode) && useSettings.getState().audioFollowsMain
               ? ops.focusAudio(next, login)
               : next;
@@ -268,6 +292,7 @@ export const useViewStore = create<ViewStore>()(
           apply((v) => ops.focusAudio(v, login));
         },
         toggleMuteAll: () => {
+          markPlaybackTransition();
           const wasPreviewing = usePlaybackEffects.getState().listen !== null;
           usePlaybackEffects.setState({ listen: null });
           const { view, mutedFrom } = get();
@@ -283,22 +308,30 @@ export const useViewStore = create<ViewStore>()(
             (music.mode !== 'off' && !music.muted)
           ) {
             music.setMuted(true);
-            set({ view: ops.muteAll(view), mutedFrom: view.audio.active });
+            set({
+              view: ops.muteAll(view),
+              mutedFrom: view.audio.active,
+              musicMutedFrom: music.muted,
+            });
             return;
           }
-          music.setMuted(false);
+          music.setMuted(mutedFrom !== null ? (get().musicMutedFrom ?? false) : false);
           const restore = (mutedFrom ?? []).filter((c) => view.channels.includes(c));
           const fallback = ops.mainChannel(view, groups.displayedChannels(view));
-          const active = restore.length
-            ? restore
-            : view.layout.mode === 'multi-focus'
-              ? ops.focusedChannels(view, groups.displayedChannels(view))
-              : fallback
-                ? [fallback]
-                : [];
+          const active =
+            mutedFrom?.length === 0
+              ? []
+              : restore.length
+                ? restore
+                : view.layout.mode === 'multi-focus'
+                  ? ops.focusedChannels(view, groups.displayedChannels(view))
+                  : fallback
+                    ? [fallback]
+                    : [];
           set({
             view: ops.normalize({ ...view, audio: { ...view.audio, active } }),
             mutedFrom: null,
+            musicMutedFrom: null,
           });
         },
         setAudioMode: (mode) => {

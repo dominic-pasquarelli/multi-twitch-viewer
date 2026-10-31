@@ -74,8 +74,16 @@ export class PlayerController {
         // On first apply, "no preference" means: leave the player's quality alone.
         this.apply({ ...this.desired, quality: this.desired.quality ?? undefined });
       }),
-      adapter.on('playing', () => setStatus('playing')),
-      adapter.on('online', () => setStatus('loading')),
+      adapter.on('playing', () => {
+        // A reconnect (or resumed video) can replace the embed's audio state
+        // without another READY event. Restore intent before polling it.
+        if (this.ready) this.applyAudio();
+        setStatus('playing');
+      }),
+      adapter.on('online', () => {
+        if (this.ready) this.applyAudio();
+        setStatus('loading');
+      }),
       adapter.on('pause', () => setStatus('paused')),
       adapter.on('offline', () => setStatus('offline')),
       adapter.on('ended', () => setStatus('ended')),
@@ -100,12 +108,19 @@ export class PlayerController {
 
   private apply(state: Partial<DesiredPlayerState>) {
     this.lastCommandAt = this.now();
-    if (state.volume !== undefined && state.volume !== null) {
-      this.rememberVolume(state.volume);
-      this.adapter.setVolume(state.volume);
-    }
+    // Mute/unmute may restore a player-side volume, so always send the current
+    // level AFTER mute, even when only the mute flag changed.
     if (state.muted !== undefined) this.adapter.setMuted(state.muted);
+    const volume = state.volume ?? (state.muted !== undefined ? this.desired.volume : null);
+    if (volume !== null) {
+      this.rememberVolume(volume);
+      this.adapter.setVolume(volume);
+    }
     if (state.quality !== undefined || this.recoveryQualityCap !== null) this.applyQuality();
+  }
+
+  private applyAudio() {
+    this.apply({ muted: this.desired.muted, volume: this.desired.volume });
   }
 
   private rememberVolume(value: number) {
@@ -141,16 +156,30 @@ export class PlayerController {
 
   /** Compares the player with the desired state and reports external changes. */
   sync() {
-    if (!this.ready || this.now() - this.lastCommandAt < this.graceMs) return;
+    if (
+      !this.ready ||
+      ['loading', 'offline', 'ended', 'blocked'].includes(this.status) ||
+      this.now() - this.lastCommandAt < this.graceMs
+    )
+      return;
     const muted = this.adapter.getMuted();
     if (muted !== this.desired.muted) {
       if (this.adoptExternalChange('mute', muted, false)) {
         this.desired.muted = muted;
         this.callbacks.onExternalMute?.(muted);
-      } else this.apply({ muted: this.desired.muted });
+      } else {
+        // Both fields may belong to the same delayed reset. Do not adopt its
+        // volume as a new mix preference after rejecting its mute flag.
+        this.applyAudio();
+        return;
+      }
     }
     const volume = this.adapter.getVolume();
     if (!Number.isFinite(volume) || volume < 0 || volume > 1) return;
+    // Zero while a player's level is still unknown is often muted/startup
+    // telemetry. Latching it without notifying the app leaves the controller
+    // restoring silence forever when the channel is later unmuted.
+    if (this.desired.volume === null && volume === 0) return;
     if (this.desired.volume === null || Math.abs(volume - this.desired.volume) > 0.01) {
       if (
         this.desired.volume !== null &&

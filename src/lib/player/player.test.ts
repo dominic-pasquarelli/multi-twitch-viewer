@@ -18,6 +18,107 @@ function setup(initial = { muted: true, volume: 0.4 as number | null, quality: n
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('PlayerController', () => {
+  it('does not lock an unset channel level to a muted player reporting zero', async () => {
+    const { player, controller, callbacks, advance } = setup({
+      muted: true,
+      volume: null,
+      quality: null,
+    });
+    await flush();
+    player.setVolume(0);
+    advance(60_000);
+    controller.sync();
+    const setMuted = player.setMuted.bind(player);
+    vi.spyOn(player, 'setMuted').mockImplementation((muted) => {
+      const wasMuted = player.getMuted();
+      setMuted(muted);
+      if (wasMuted && !muted) player.setVolume(0.5);
+    });
+    controller.update({ muted: false });
+    controller.reapply(); // e.g. audio unlock or Play all after returning
+    expect(player.getVolume()).toBe(0.5);
+    advance(2000);
+    controller.sync();
+    expect(callbacks.onExternalVolume).toHaveBeenCalledExactlyOnceWith(0.5);
+    controller.dispose();
+    player.destroy();
+  });
+
+  it('restores the configured volume after unmuting a player that resets its own level', async () => {
+    const { player, controller } = setup();
+    await flush();
+    const setMuted = player.setMuted.bind(player);
+    vi.spyOn(player, 'setMuted').mockImplementation((muted) => {
+      setMuted(muted);
+      if (!muted) player.setVolume(0); // the embed restores its own stale level
+    });
+    controller.update({ muted: false });
+    expect(player.getMuted()).toBe(false);
+    expect(player.getVolume()).toBe(0.4);
+    controller.dispose();
+    player.destroy();
+  });
+
+  it.each(['offline', 'ended', 'blocked', 'online'] as const)(
+    'does not save %s player defaults as mute or volume preferences',
+    async (event) => {
+      const { player, controller, callbacks, advance } = setup();
+      await flush();
+      player.emit(event);
+      player.setMuted(false);
+      player.setVolume(0.13);
+      advance(60_000);
+      controller.sync();
+      expect(callbacks.onExternalMute).not.toHaveBeenCalled();
+      expect(callbacks.onExternalVolume).not.toHaveBeenCalled();
+      controller.dispose();
+      player.destroy();
+    },
+  );
+
+  it('restores the latest audio settings when an offline player starts playing again', async () => {
+    const { player, controller, callbacks, advance } = setup();
+    await flush();
+    player.emit('offline');
+    controller.update({ muted: false, volume: 0.23 });
+    player.setMuted(true);
+    player.setVolume(0.87);
+    player.emit('online');
+    player.setMuted(true);
+    player.setVolume(0.87); // reset again as the video is replaced
+    player.emit('playing');
+    expect(player.getMuted()).toBe(false);
+    expect(player.getVolume()).toBe(0.23);
+    advance(2000);
+    controller.sync();
+    expect(callbacks.onExternalMute).not.toHaveBeenCalled();
+    expect(callbacks.onExternalVolume).not.toHaveBeenCalled();
+    controller.dispose();
+    player.destroy();
+  });
+
+  it('repairs both audio fields together after rejecting stale mute feedback', async () => {
+    let now = 0;
+    const player = new MockPlayer(document.createElement('div'), 'echo', true, { readyDelay: 0 });
+    const onExternalVolume = vi.fn();
+    const controller = new PlayerController(
+      player,
+      { muted: true, volume: 0.4, quality: null },
+      { onExternalVolume },
+      { now: () => now, adoptExternalChange: (kind) => kind === 'volume' },
+    );
+    await flush();
+    player.setMuted(false);
+    player.setVolume(0.17);
+    now = 60_000;
+    controller.sync();
+    expect(player.getMuted()).toBe(true);
+    expect(player.getVolume()).toBe(0.4);
+    expect(onExternalVolume).not.toHaveBeenCalled();
+    controller.dispose();
+    player.destroy();
+  });
+
   it('applies the desired state once the player is ready', async () => {
     const { player, controller, callbacks } = setup({ muted: false, volume: 0.4, quality: null });
     expect(controller.isReady).toBe(false);

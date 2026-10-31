@@ -15,6 +15,65 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate(() => (window as unknown as Mock).mtvMock.setOfflineGrace(0));
 });
 
+test('undoing a preset restores the temporary view and its pre-mute listening selection', async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'mtv:presets',
+      JSON.stringify({
+        version: 1,
+        state: {
+          presets: [
+            {
+              id: 'undo-check',
+              name: 'Undo check',
+              createdAt: '2026-01-01',
+              updatedAt: '2026-01-01',
+              view: {
+                channels: ['lunarlatte'],
+                layout: { mode: 'grid', main: null, mainScale: 'auto' },
+                audio: { mode: 'solo', active: ['lunarlatte'] },
+                chat: { open: false, channel: null },
+              },
+            },
+          ],
+        },
+      }),
+    );
+  });
+  await page.goto('/#/pixelpaladin/novastrike/cozycartographer');
+  // Hash navigation retains the existing stores; reload to hydrate the saved preset.
+  await page.reload();
+  await page.getByRole('button', { name: 'Mix', exact: true }).click();
+  await tile(page, 'novastrike').hover();
+  await tile(page, 'novastrike')
+    .getByRole('button', { name: 'Listen to this stream', exact: true })
+    .click();
+  await page.locator('body').press('m');
+  await page.getByTestId('presets-button').click();
+  await page.getByTestId('preset-load').click();
+  await expect(tile(page, 'lunarlatte')).toBeVisible();
+  await page.locator('body').press('Control+z');
+  await expect(tile(page, 'pixelpaladin')).toBeVisible();
+  await page.getByTestId('presets-button').click();
+  await expect(page.getByTestId('keep-view').locator('input')).not.toBeChecked();
+  await page.keyboard.press('Escape');
+  await page.locator('body').press('m');
+  await expect(tile(page, 'pixelpaladin').locator('.mock-player')).toHaveAttribute(
+    'data-muted',
+    'false',
+  );
+  await expect(tile(page, 'novastrike').locator('.mock-player')).toHaveAttribute(
+    'data-muted',
+    'false',
+  );
+  await expect(tile(page, 'cozycartographer').locator('.mock-player')).toHaveAttribute(
+    'data-muted',
+    'true',
+  );
+});
+
 test('a temporary view drops streams that go offline (with Undo)', async ({ page }) => {
   await page.evaluate(() => (location.hash = '#/pixelpaladin/novastrike'));
   await expect(tile(page, 'novastrike')).toHaveAttribute('data-status', 'playing');

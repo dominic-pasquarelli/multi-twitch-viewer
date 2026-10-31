@@ -367,6 +367,9 @@ test('logs in with Twitch, lists live follows and plays them through the embed A
   await expect(alpha).toHaveAttribute('data-muted', 'true');
 
   // Unmuting inside a player (with its own button) mutes the other one.
+  await page
+    .locator('[data-testid=player-tile][data-channel=alpha] [data-player-host]')
+    .dispatchEvent('pointerdown');
   await page.evaluate(() => {
     type Fake = { opts: { channel: string }; setMuted(m: boolean): void };
     const players = (window as unknown as { __fakePlayers: Fake[] }).__fakePlayers;
@@ -386,6 +389,125 @@ test('logs in with Twitch, lists live follows and plays them through the embed A
   await page.locator('[data-testid=player-tile][data-channel=bravo]').hover();
   await page.locator('iframe[data-fake-twitch=bravo]').click();
   await expect.poll(async () => (await width('bravo')) > (await width('alpha'))).toBe(true);
+});
+
+test('desktop mute and unmute survive long delays, stale focus and stream reconnects without restarting', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    (window as unknown as { mtvDesktop: unknown }).mtvDesktop = {
+      isDesktop: true,
+      version: 'test',
+      playAll: () => {},
+      onBackgroundChange: () => () => {},
+      getUpdateStatus: async () => ({ state: 'dev', current: null }),
+      onUpdateStatus: () => () => {},
+    };
+    localStorage.setItem(
+      'mtv:settings',
+      JSON.stringify({
+        version: 1,
+        state: { clickToFocus: false, dropOfflineStreams: false, hideOffline: false },
+      }),
+    );
+  });
+  await stubTwitch(page, [], true);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await page.getByTestId('channel-row').nth(0).click();
+  await page.getByTestId('channel-row').nth(1).click();
+  await page.getByRole('button', { name: 'Multi focus', exact: true }).click();
+  await page.getByTestId('output-volume').fill('60');
+  const alpha = page.locator('iframe[data-fake-twitch=alpha]');
+  const bravo = page.locator('iframe[data-fake-twitch=bravo]');
+  await expect(alpha).toHaveAttribute('data-volume', '0.3');
+  await expect(bravo).toHaveAttribute('data-muted', 'false');
+  await alpha.evaluate((el) => el.setAttribute('data-original-player', 'true'));
+  await bravo.evaluate((el) => el.setAttribute('data-original-player', 'true'));
+  await page.clock.install();
+  const reset = async (login: string, muted: boolean, volume: number, event?: string) => {
+    await page.evaluate(
+      ({ login, muted, volume, event }) => {
+        type Fake = {
+          opts: { channel: string };
+          setMuted(m: boolean): void;
+          setVolume(v: number): void;
+          emit(event: string): void;
+        };
+        const p = (window as unknown as { __fakePlayers: Fake[] }).__fakePlayers.find(
+          (p) => p.opts.channel === login,
+        )!;
+        p.setMuted(muted);
+        p.setVolume(volume);
+        if (event) p.emit(event);
+      },
+      { login, muted, volume, event },
+    );
+  };
+  await page.locator('body').press('m');
+  await expect(alpha).toHaveAttribute('data-muted', 'true');
+  await page.clock.runFor(60_000);
+  // A delayed unmute echo must not cancel the master mute or select a stream.
+  await reset('alpha', false, 0.17);
+  await page.clock.runFor(2000);
+  await expect(alpha).toHaveAttribute('data-muted', 'true');
+  await expect(bravo).toHaveAttribute('data-muted', 'true');
+  await expect(alpha).toHaveAttribute('data-volume', '0.3');
+  await reset('alpha', true, 0.18); // the mute flag can be correct while volume resets
+  await page.clock.runFor(2000);
+  await expect(alpha).toHaveAttribute('data-volume', '0.3');
+  await page.locator('body').press('m');
+  await expect(alpha).toHaveAttribute('data-muted', 'false');
+  await expect(bravo).toHaveAttribute('data-muted', 'false');
+
+  // Old iframe focus is not a new mute request after returning to the app.
+  await page
+    .frameLocator('iframe[data-fake-twitch=alpha]')
+    .getByRole('button', { name: 'Native player control' })
+    .focus();
+  await page.clock.runFor(6000);
+  await reset('alpha', true, 0.19);
+  await page.clock.runFor(2000);
+  await expect(alpha).toHaveAttribute('data-muted', 'false');
+  await expect(alpha).toHaveAttribute('data-volume', '0.3');
+
+  const tile = page.locator('[data-testid=player-tile][data-channel=bravo]');
+  await tile.hover();
+  await tile.getByRole('button', { name: 'Stop listening (M mutes all)', exact: true }).click();
+  await page.clock.runFor(60_000);
+  await reset('bravo', false, 0.21, 'offline');
+  await page.clock.runFor(2000);
+  await reset('bravo', false, 0.21, 'online');
+  await reset('bravo', false, 0.21, 'playing');
+  await expect(bravo).toHaveAttribute('data-muted', 'true');
+  await tile.hover();
+  await tile.getByRole('button', { name: 'Listen to this stream', exact: true }).click();
+  await expect(bravo).toHaveAttribute('data-muted', 'false');
+  await expect(bravo).toHaveAttribute('data-volume', '0.3');
+
+  // At zero app output, stale player levels cannot be divided back into a mix.
+  await page.getByTestId('output-volume').fill('0');
+  await page.clock.runFor(6000);
+  await reset('alpha', false, 0.27);
+  await page.clock.runFor(2000);
+  await expect(alpha).toHaveAttribute('data-volume', '0');
+  await page.getByTestId('output-volume').fill('60');
+  await expect(alpha).toHaveAttribute('data-volume', '0.3');
+  await expect(bravo).toHaveAttribute('data-volume', '0.3');
+  await expect(alpha).toHaveAttribute('data-original-player', 'true');
+  await expect(bravo).toHaveAttribute('data-original-player', 'true');
+
+  // Native controls still express intent when the desktop frame reports input.
+  await page
+    .frameLocator('iframe[data-fake-twitch=alpha]')
+    .locator('body')
+    .evaluate(() => parent.postMessage({ type: 'mtv:player-interaction' }, '*'));
+  await reset('alpha', true, 0.3);
+  await page.clock.runFor(2000);
+  await expect(page.locator('[data-testid=player-tile][data-channel=alpha]')).toHaveAttribute(
+    'data-audible',
+    'false',
+  );
 });
 
 test('ignores a login redirect whose state does not match', async ({ page }) => {

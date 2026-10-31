@@ -130,6 +130,12 @@ Behaviour notes:
   stays closed), and `useDropOfflineStreams` always lets favorites leave once offline, with other
   streams following the temporary-view rule. Undo entries record the flag, so undoing a preset
   load returns to it.
+- **Undo restores session behavior as well as the visible channels.** Entries retain the
+  kept/temporary flag and pre-mute listening selection, including the DJ's independent mute.
+  Loading a preset keeps its offline streams; opening a new watch-only view or link starts a
+  temporary view. Undo restores the previous choice. Global mute preserves an explicitly empty
+  stream selection and an independently muted DJ; changing the Solo main video or layout does
+  not enable audio.
 - **Twitch is primary; direct Kick channels have explicit identities.** Unprefixed channel IDs
   remain Twitch logins for backward compatibility; `kick:slug` identifies a direct Kick stream.
   `lib/channels/parseChannels.ts` normalizes these identities, and persistence/import/share-link
@@ -144,7 +150,9 @@ Behaviour notes:
   the Kick player instead (a platform switch reloads it). Kick players report
   `capabilities.volume`: in the desktop app the main process controls the frame's video and the
   app's mute/volume are re-applied every second (Kick's player restores its own volume after an
-  unmute); in a browser it's muted unless heard, and mute changes reload it.
+  unmute). Desktop requests run one at a time, coalescing newer settings and ignoring obsolete
+  replies; play/pause intent is retained until the frame has a video. In a browser it's muted
+  unless heard, mute changes reload it, and a pause requested before startup prevents autoplay.
 - **The main stream level is part of the volume model.** In Mix + Focus (setting on), the
   `VolumeModel` carries `priorityMain` (the stream the Viewer shows big, kept in `uiStore`) and
   `mainLevel`: that stream plays at the main level, and setting its volume anywhere (hover
@@ -202,9 +210,17 @@ Behaviour notes:
   Exact decoding errors are observed only in verified HTTPS Twitch player frames in Electron;
   browser recovery uses sustained playback starvation.
 - **`PlayerController` reconciles desired vs actual player state.** The app says what it wants
-  (muted, volume, quality). The controller applies it once the player is ready, and polls
-  cheaply once a second to notice changes made with Twitch's own controls, which feed back into
-  the store. That's how "unmute in the player → the others mute" works.
+  (muted, volume, quality). The controller restores audio on READY, ONLINE and PLAYING and sends
+  volume after mute/unmute, since an embed can restore its own level when unmuted. Polling ignores
+  loading, offline, ended and blocked telemetry; an unknown channel level is never latched from
+  a zero-volume sample. Desktop mute changes require recent native input;
+  stale iframe focus and delayed unmute echoes cannot change the listening selection. Browser
+  embeds retain a focus fallback because they cannot report native input. Unsolicited volume
+  changes while muted or at zero app output cannot overwrite the saved mix. Global mute also
+  survives all streams leaving and new streams joining the empty view.
+- **Player-script failures can be retried.** Twitch's shared script loader resets after network
+  errors, missing API initialization or a fifteen-second timeout. A failed first load cannot
+  leave later player reloads sharing a permanently rejected or pending promise.
 - **Implicit-grant OAuth, no server.** The token comes back in the URL fragment, is checked
   against a random `state`, and is stripped from the address bar immediately. It's validated at
   startup and hourly, as Twitch requires. Only `user:read:follows` is requested.

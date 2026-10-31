@@ -51,15 +51,27 @@ export function loadTwitchPlayer(): Promise<TwitchPlayerConstructor> {
     const script = document.createElement('script');
     script.src = SCRIPT_URL;
     script.async = true;
-    script.onload = () =>
-      window.Twitch?.Player
-        ? resolve(window.Twitch.Player)
-        : reject(new Error('Twitch player script loaded without Twitch.Player'));
-    script.onerror = () => {
+    const cleanup = () => {
+      clearTimeout(timeout);
+      script.onload = null;
+      script.onerror = null;
+    };
+    const fail = (message: string) => {
+      cleanup();
       scriptPromise = null;
       script.remove();
-      reject(new Error('Could not load the Twitch player (offline or blocked?)'));
+      reject(new Error(message));
     };
+    const timeout = setTimeout(() => fail('Loading the Twitch player timed out'), 15_000);
+    script.onload = () => {
+      if (!window.Twitch?.Player) {
+        fail('Twitch player script loaded without Twitch.Player');
+        return;
+      }
+      cleanup();
+      resolve(window.Twitch.Player);
+    };
+    script.onerror = () => fail('Could not load the Twitch player (offline or blocked?)');
     document.head.appendChild(script);
   });
   return scriptPromise;
@@ -115,7 +127,7 @@ class TwitchEmbedAdapter implements PlayerAdapter {
               this.ready = true;
               const queued = this.pending;
               this.pending = [];
-              queued.forEach((fn) => fn(player));
+              queued.forEach((fn) => safe(() => fn(player)));
             }
             this.listeners.get(event)?.forEach((h) => h());
           };
@@ -124,6 +136,7 @@ class TwitchEmbedAdapter implements PlayerAdapter {
         }
       })
       .catch((err) => {
+        if (this.destroyed) return;
         console.error(err);
         host.dataset.error = String(err.message ?? err);
       });

@@ -277,14 +277,21 @@ export const PlayerTile = memo(function PlayerTile(props: PlayerTileProps) {
           latest.current.onVolume(login, Math.min(1, v / (latest.current.volumeScale || 1))),
       },
       {
-        adoptExternalChange: (kind, value, recentCommand) => {
+        adoptExternalChange: (kind, _value, recentCommand) => {
+          // There is no inverse output scale at zero. An embed's restored
+          // volume must not overwrite the saved mix while app output is silent.
+          if (kind === 'volume' && latest.current.volumeScale === 0) return false;
           if (
             nativePlayerInputRecent(login) ||
             (!playbackTransitionActive() && interactedRecently(login, 3000))
           )
             return true;
-          if (kind === 'volume') return !recentCommand;
-          return value === false || (!playbackTransitionActive() && playerHasFocus(login));
+          if (kind === 'volume') return !latest.current.muted && !recentCommand;
+          // Unsolicited unmute echoes and old iframe focus are not user intent.
+          // Either can otherwise change the whole app's listening selection.
+          // Browser embeds cannot report native input; retain their focus
+          // fallback. Desktop players report trusted input from the frame.
+          return !desktop && !playbackTransitionActive() && playerHasFocus(login);
         },
       },
     );
