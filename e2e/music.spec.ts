@@ -23,6 +23,24 @@ async function setLive(page: Page, login: string, live: boolean) {
   await page.getByRole('button', { name: 'Refresh now' }).click();
 }
 
+test('global mute restores an independently muted DJ without starting its audio', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/novastrike');
+  await addMusic(page, 'lunarlatte');
+  await dialog(page).getByRole('button', { name: 'Automatic', exact: true }).click();
+  await dialog(page).getByRole('button', { name: 'DJ + stream audio', exact: true }).click();
+  await dialog(page).getByRole('button', { name: 'Mute music', exact: true }).click();
+  await dialog(page).getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-muted', 'false');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-muted', 'true');
+  await page.locator('body').press('m');
+  await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-muted', 'true');
+  await page.locator('body').press('m');
+  await expect(player(page, 'pixelpaladin')).toHaveAttribute('data-muted', 'false');
+  await expect(player(page, 'lunarlatte')).toHaveAttribute('data-muted', 'true');
+});
+
 test('automatic DJs follow priority and live transitions, and mute all survives a switch', async ({
   page,
 }) => {

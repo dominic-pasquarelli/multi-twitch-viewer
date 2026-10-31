@@ -4,6 +4,24 @@ const tile = (page: Page, channel: string) =>
   page.locator(`[data-testid=player-tile][data-channel=${channel}]`);
 const mockPlayer = (page: Page, channel: string) => tile(page, channel).locator('.mock-player');
 
+test('mute all stays silent through solo focus changes and restores the original stream', async ({
+  page,
+}) => {
+  await page.goto('/#/pixelpaladin/novastrike');
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-muted', 'false');
+  await page.locator('body').press('m');
+  await page.locator('body').press('l');
+  await tile(page, 'novastrike').hover();
+  await tile(page, 'novastrike').getByRole('button', { name: 'Make this the main stream' }).click();
+  await page.locator('body').press('l');
+  await page.locator('body').press('l');
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-muted', 'true');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-muted', 'true');
+  await page.locator('body').press('m');
+  await expect(mockPlayer(page, 'pixelpaladin')).toHaveAttribute('data-muted', 'false');
+  await expect(mockPlayer(page, 'novastrike')).toHaveAttribute('data-muted', 'true');
+});
+
 test('hovering a stream shows its category and title, in grid and focus', async ({ page }) => {
   await page.goto('/#/pixelpaladin/novastrike');
   for (const layout of ['grid', 'focus']) {

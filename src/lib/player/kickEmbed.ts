@@ -44,6 +44,11 @@ class KickEmbedAdapter implements PlayerAdapter {
   private poll: ReturnType<typeof setInterval> | undefined;
   private reported: 'playing' | 'pause' | null = null;
   private destroyed = false;
+  private initialized = false;
+  private sending = false;
+  private commandPending = false;
+  private commandVersion = 0;
+  private playbackIntent: 'play' | 'pause' | null = null;
   private readonly listeners = new Map<PlayerEvent, Set<() => void>>();
   private readonly host: HTMLElement;
   private readonly slug: string;
@@ -58,8 +63,9 @@ class KickEmbedAdapter implements PlayerAdapter {
     // (e.g. unmuted) decide how the player loads.
     queueMicrotask(() => {
       if (this.destroyed) return;
+      this.initialized = true;
       this.emit('ready');
-      this.load();
+      if (!this.destroyed && (this.control || !this.paused) && !this.frame) this.load();
     });
   }
 
@@ -82,10 +88,14 @@ class KickEmbedAdapter implements PlayerAdapter {
     frame.title = `${this.slug} on Kick`;
     frame.dataset.kickPlayer = this.slug;
     frame.style.cssText = 'display:block;width:100%;height:100%;border:0';
-    if (!this.control) frame.addEventListener('load', () => this.report('playing'));
+    if (!this.control)
+      frame.addEventListener('load', () => {
+        if (!this.destroyed && this.frame === frame) this.report('playing');
+      });
     this.host.appendChild(frame);
     this.frame = frame;
-    if (this.control && !this.poll) this.poll = setInterval(() => void this.send(), 1000);
+    if (this.control && !this.poll) this.poll = setInterval(() => this.send(), 1000);
+    this.send();
   }
 
   private unload() {
@@ -95,22 +105,43 @@ class KickEmbedAdapter implements PlayerAdapter {
   }
 
   /** Desktop: applies the app's mute and volume (plus a command) and reads play state. */
-  private async send(command: KickPlayerCommand = {}) {
-    if (!this.control || !this.frame) return;
-    const state = await this.control(this.id, {
-      muted: this.muted,
-      volume: this.volume,
-      ...command,
-    }).catch(() => null);
-    if (!state || this.destroyed) return;
-    this.paused = state.paused;
-    this.report(state.paused ? 'pause' : 'playing');
+  private send() {
+    if (this.destroyed || !this.control) return;
+    this.commandPending = true;
+    if (this.frame && !this.sending) void this.flushCommands();
+  }
+
+  /** One request at a time: slow replies cannot undo newer audio/pause intent. */
+  private async flushCommands() {
+    this.sending = true;
+    try {
+      while (!this.destroyed && this.frame && this.commandPending) {
+        this.commandPending = false;
+        const version = this.commandVersion;
+        const intent = this.playbackIntent;
+        const state = await this.control!(this.id, {
+          muted: this.muted,
+          volume: this.volume,
+          ...(intent ? { [intent]: true } : {}),
+        }).catch(() => null);
+        if (this.destroyed) return;
+        // Retain play/pause until a video exists. Retry on the next tick,
+        // without spinning while a channel is offline or still loading.
+        if (!state || version !== this.commandVersion) continue;
+        this.playbackIntent = null;
+        this.paused = state.paused;
+        this.report(state.paused ? 'pause' : 'playing');
+      }
+    } finally {
+      this.sending = false;
+    }
   }
 
   setMuted(m: boolean) {
     if (this.control) {
+      if (this.muted !== m) this.commandVersion++;
       this.muted = m;
-      void this.send();
+      this.send();
       return;
     }
     if (m === this.muted) return;
@@ -119,20 +150,35 @@ class KickEmbedAdapter implements PlayerAdapter {
   }
   getMuted = () => this.muted;
   setVolume(v: number) {
+    if (this.volume !== v) this.commandVersion++;
     this.volume = v;
-    void this.send();
+    this.send();
   }
   getVolume = () => this.volume;
   getQualities = (): PlayerQuality[] => [];
   getQuality = () => 'auto';
   setQuality() {}
   play() {
-    if (this.control) void this.send({ play: true });
-    else if (!this.frame) this.load();
+    if (this.destroyed) return;
+    if (this.control) {
+      this.playbackIntent = 'play';
+      this.commandVersion++;
+      this.send();
+    } else {
+      this.paused = false;
+      if (this.initialized && !this.frame) this.load();
+    }
   }
   pause() {
-    if (this.control) void this.send({ pause: true });
-    else this.unload();
+    if (this.destroyed) return;
+    if (this.control) {
+      this.playbackIntent = 'pause';
+      this.commandVersion++;
+      this.send();
+    } else {
+      this.paused = true;
+      this.unload();
+    }
   }
   isPaused = () => (this.control ? this.paused : !this.frame);
 

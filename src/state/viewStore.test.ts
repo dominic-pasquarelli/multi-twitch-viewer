@@ -4,11 +4,14 @@ import { useViewStore } from './viewStore';
 import { usePresets } from './presetsStore';
 import { useChannelPrefs } from './channelPrefsStore';
 import { emptyView } from '@/lib/view/operations';
+import { DEFAULT_MUSIC, withMusic } from '@/lib/music/music';
+import { useMusicStore } from './musicStore';
 
 const store = () => useViewStore.getState();
 
 beforeEach(() => {
   useSettings.setState({ ...DEFAULT_SETTINGS });
+  useMusicStore.setState({ ...DEFAULT_MUSIC, current: null, paused: false, skipped: [] });
   useViewStore.setState({
     view: emptyView(),
     history: [],
@@ -21,6 +24,100 @@ beforeEach(() => {
 });
 
 describe('viewStore', () => {
+  it('keeps solo-mode silence through changing main stream and entering focus layout', () => {
+    store().addChannels(['a', 'b']);
+    store().toggleMuteAll();
+    store().setMain('b');
+    store().setLayoutMode('grid');
+    store().setLayoutMode('focus');
+    expect(store().view.audio.active).toEqual([]);
+    expect(store().mutedFrom).toEqual(['a']);
+    store().toggleMuteAll();
+    expect(store().view.audio.active).toEqual(['a']);
+  });
+
+  it('keeps mute all when the sidebar adds the first channel after everyone went offline', () => {
+    store().addChannels(['a']);
+    store().toggleMuteAll();
+    store().removeChannels(['a']);
+    store().toggleChannel('b');
+    expect(store().view.audio.active).toEqual([]);
+    expect(store().mutedFrom).toEqual(['a']);
+  });
+
+  it('restores an independently muted DJ after a global mute cycle', () => {
+    store().addChannels(['a']);
+    useMusicStore.getState().pin('dj');
+    useMusicStore.getState().setMixWithStreams(true);
+    useMusicStore.getState().setMuted(true);
+    store().toggleMuteAll();
+    store().toggleMuteAll();
+    expect(useMusicStore.getState().muted).toBe(true);
+    expect(withMusic(store().view, useMusicStore.getState()).audio.active).toEqual(['a']);
+  });
+
+  it('does not add a previously silent video when restoring a DJ-only listening selection', () => {
+    store().addChannels(['a']);
+    store().toggleAudio('a');
+    useMusicStore.getState().pin('dj');
+    useMusicStore.getState().setMixWithStreams(true);
+    store().toggleMuteAll();
+    store().toggleMuteAll();
+    expect(store().view.audio.active).toEqual([]);
+    expect(withMusic(store().view, useMusicStore.getState()).audio.active).toEqual(['dj']);
+  });
+
+  it.each([false, true])(
+    'undo restores the kept/temporary behavior of a view (pinned=%s)',
+    (pinned) => {
+      store().addChannels(['a']);
+      store().setPinned(pinned);
+      if (pinned) store().clear();
+      else store().loadView({ ...emptyView(), channels: ['preset'] });
+      store().undo();
+      expect(store().view.channels).toEqual(['a']);
+      expect(store().pinned).toBe(pinned);
+    },
+  );
+
+  it('opening a new watch-only link leaves kept-preset behavior and Undo restores it', () => {
+    store().loadView({ ...emptyView(), channels: ['preset'] });
+    store().watchOnly(['link']);
+    expect(store().pinned).toBe(false);
+    store().undo();
+    expect(store().view.channels).toEqual(['preset']);
+    expect(store().pinned).toBe(true);
+  });
+
+  it('undoing a preset restores the saved mute selection, not a fallback stream', () => {
+    store().addChannels(['a', 'b', 'c']);
+    store().setAudioMode('mix');
+    store().toggleAudio('b');
+    store().toggleMuteAll();
+    store().loadView({
+      ...emptyView(),
+      channels: ['preset'],
+      audio: { mode: 'solo', active: ['preset'] },
+    });
+    store().undo();
+    expect(store().mutedFrom).toEqual(['a', 'b']);
+    store().toggleMuteAll();
+    expect(store().view.audio.active).toEqual(['a', 'b']);
+  });
+
+  it.each([false, true])('keeps mute all when streams rejoin an empty view (home=%s)', (home) => {
+    if (home) store().enterHome(['a']);
+    else store().addChannels(['a']);
+    store().toggleMuteAll();
+    store().removeChannels(['a']);
+    if (home) store().addHomeChannels(['b']);
+    else store().addChannels(['b']);
+    expect(store().view.audio.active).toEqual([]);
+    expect(store().mutedFrom).not.toBeNull();
+    store().toggleMuteAll();
+    expect(store().view.audio.active).toEqual(['b']);
+  });
+
   it('multi focus preserves mute all across selection changes and restores the new focus mix', () => {
     store().addChannels(['a', 'b', 'c', 'd']);
     store().setLayoutMode('multi-focus');
